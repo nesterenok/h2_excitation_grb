@@ -31,14 +31,26 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 
 #define REL_ERROR_SOLVER 1.e-6
 #define ABS_CONCENTRATION_ERROR_SOLVER 1.e-14  // specimen concentration (cm-3)
-#define ABS_POPULATION_H2_ERROR_SOLVER 1.e-14  // specimen level population density (cm-3)
+#define ABS_POPULATION_ERROR_SOLVER 1.e-14     // specimen level population density (cm-3)
 #define ABS_ELSPECTRA_ERROR_SOLVER 1.e-14
 #define ABS_PARAMETER_ERROR_SOLVER 1.e-11  // e.g., grain radius (cm), temperature (K)
 #define MAX_CONV_FAILS_SOLVER 100  // default value is 10;
 #define MAX_ERR_TEST_FAILS_SOLVER 14  // default value is 7;
 
-#define NB_OF_BINS_PER_ORDER_EL 100
 
+#define MAX_NB_STEPS 15
+#define NB_OF_BINS_PER_ORDER_EL 100
+#define NB_OF_BINS_PER_ORDER_TIME 10
+#define MINIMAL_ABUNDANCE 1.e-99  // for saving in file
+
+#define ELECTRON_ENERGY_FIXED 1.   // eV, the energy grid intervals are equal at E < E_fixed,
+#define MAX_ELECTRON_ENERGY 1.e+6  // eV
+#define MIN_MODEL_TIME 1.e+2   // in s, minimal model time at which data are saved,
+#define MAX_MODEL_TIME 1.e+7   // maximal model time in s
+
+// the number of vibrational states of the ground electronic state taken into account in the simulations,
+// must be less or equal than maximal, H2_VSTATES_X1SU
+#define NB_OF_H2_VSTATES_X1SU 3
 
 // ----------------------------------------------------
 // Electron spectra evolution

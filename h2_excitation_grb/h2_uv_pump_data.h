@@ -3,6 +3,21 @@
 #include <vector>
 #include "spectroscopy.h"
 
+// Must be deleted,
+// Rotational level nb of the initial vibrational state of the ground electronic state for which the excitation vi -> vf is taken into account 
+// must be <= nb of levels of the initial vibrational state, maximal for vi = 0 is 29, 
+#define MAX_J_H2_VIBR_INIT 15
+
+
+// Nb of vibrational states of electronic state taken into account,
+// this nb is reconciled with CLOUDY data (reference in CLOUDY files, Abgrall et al., A&AS, 141, 297-300, 2000);
+#define MAX_H2_VSTATES_X1SU 15   // 0,1,..,14 (including) in CLOUDY, the same as in Dabrowski, Can. J. Phys. 62, p. 1639, 1984
+#define MAX_H2_VSTATES_B1SU 38   // 0,1,..,37 in CLOUDY
+#define MAX_H2_VSTATES_C1PU 14   // 0,1,..,13 in CLOUDY
+#define MAX_H2_VSTATES_BP1SU 10  // 0,1,..,9 in CLOUDY
+#define MAX_H2_VSTATES_D1PU 19   // 0,1,..,18 in CLOUDY - for D-; for D+ v=0,1,2; (for C-+, D-+ levels with j=0 were commented in original file);
+
+
 // The data on Lyman and Werner band transitions is initialized by this function - vector<transition>,
 // H2 energy levels of the excited electronic state and of the ground state must be given,
 void h2_band_transitions(const std::string& path, std::vector<transition> & einstein_coeff_vector, 
@@ -56,13 +71,17 @@ void print_statistics(std::string output_path, std::string name, const energy_di
 	const std::vector<h2_energy_level_param>& level_param_vector);
 
 
+//
+// Honl-London factors,
+// Whiting & Nicholls, ApJ Suppl. Ser. 235, 27 (1974); 
+// additional: Gay et al. ApJ 746, 78 (2012);
 class honl_london {
 public:
 	// the rotational quantum nb j of the lower level,
 	virtual double operator()(int j, int dj) { return 0.; }
 };
 
-// for S1g(X) -> S1u(B), adsorption, j -> j + dj
+// for S1g+(X) -> S1u+(B), adsorption, j -> j + dj
 class honl_london_singlet_dl0 : public honl_london {
 public:
 	double operator()(int j, int dj);
@@ -74,4 +93,3 @@ public:
 	double operator()(int j, int dj);
 	honl_london_singlet_dl1() { ; }
 };
-

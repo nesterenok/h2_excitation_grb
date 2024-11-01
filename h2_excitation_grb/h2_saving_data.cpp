@@ -9,71 +9,79 @@
 #include <ctime>
 #include <limits>
 
+#include "constants.h"
 #include "h2_saving_data.h"
 #include "h2_parameters.h"
-
 using namespace std;
 
-#define NB_OF_TIME_STEPS 4
-
-void save_electron_spectrum_evolution(const string& output_path, const elspectra_evolution_data* user_data,
-	const vector<double>& time_moments, const vector<dynamic_array>& spectrum_data)
+void save_electron_spectrum_evolution(const string& output_path, const vector<double>& electron_energies_grid, const vector<double>& electron_energy_bin_size,
+	const vector<double>& time_moments, const vector<dynamic_array>& spectrum_data, double grb_distance, double conc_h_tot)
 {
-	int i, l, n;
+	int i, l, nb_of_times, nb_of_el_energies;
 	double en, d_en, tot_en, tot_n;
 
 	string fname;
 	ofstream output;
 
-	n = (int)spectrum_data.size();
+	nb_of_el_energies = (int)electron_energy_bin_size.size();
+	nb_of_times = (int)spectrum_data.size();
 
-	fname = output_path + "h2exc_electron_spectrum.txt";
+	fname = output_path + "h2grb_electron_spectrum.txt";
 	output.open(fname.c_str());
 
-	output << "! Electron spectrum evolution," << endl
-		<< "! first row: nb of rows (= nb of el. energies) and nb of times," << endl
-		<< "! second row: time (s)," << endl
-		<< "! data: col.1 - centre of the energy bin (eV), col.2 - bin semi-length (eV), col.3 - N(E), nb of electrons per eV per cm3," << endl;
+	output << "!Electron spectrum evolution," << endl
+		<< "!first row: distance from the GRB source [pc], H nuclei concentration [cm-3], nb of rows (= nb of el. energies) and nb of times," << endl
+		<< "!second row: time (s)," << endl
+		<< "!data: col.1 - centre of the energy bin [eV], col.2 - bin semi-length [eV], col.3 - spectrum N(E) [cm-3 eV-1]," << endl;
 
 	output << scientific;
-	output.precision(4);
-	output << left << "! " << setw(7) << user_data->get_nb_of_el_en() << setw(7) << n << endl;
+	output << left << "! " << setprecision(5) << setw(14) << grb_distance / PARSEC << setprecision(3) << setw(12) << conc_h_tot
+		<< setw(7) << nb_of_el_energies << setw(7) << nb_of_times << endl;
 
-	output << left << setw(26) << "!";
-	for (l = 0; l < n; l++) {
+	output.precision(4);
+	output << left << setw(28) << "!";
+	for (l = 0; l < nb_of_times; l++) {
 		output << left << setw(13) << time_moments[l];
 	}
 	output << endl;
 
-	for (i = 0; i < user_data->get_nb_of_el_en(); i++) {
-		en = user_data->get_electron_energy(i);
-		d_en = user_data->get_electron_energy_bin(i);
-		output << left << setw(13) << en << setw(13) << 0.5 * d_en;
+	for (i = 0; i < nb_of_el_energies; i++) {
+		en = electron_energies_grid[i];
+		d_en = electron_energy_bin_size[i];
 
-		for (l = 0; l < n; l++) {
-			output << left << setw(13) << spectrum_data[l].arr[i] / d_en;
+		output.precision(6);
+		output << left << setw(14) << en + 0.5 * d_en << setw(14) << 0.5 * d_en;
+
+		output.precision(4);
+		for (l = 0; l < nb_of_times; l++) { 
+			// spectrum in the data array - nb of electrons in the energy interval per cm3 [cm-3]
+			output << left << setw(13) << spectrum_data[l].arr[i] / d_en; 
 		}
 		output << endl;
 	}
 	output.close();
 
-	fname = output_path + "h2exc_electron_energy.txt";
+	fname = output_path + "h2grb_electron_energy.txt";
 	output.open(fname.c_str());
 
-	output << "! Kinetic energy of electrons," << endl
-		<< "! first row: nb of rows (= nb of times)," << endl
-		<< "! data: time (s) - conc of electrons (cm-3) - total energy (eV cm-3) - median energy (eV)" << endl;
+	output << "!Kinetic energy of electrons," << endl
+		<< "!first row: distance from the GRB source [pc], H nuclei concentration [cm-3], nb of rows (= nb of times)," << endl
+		<< "!data: time (s), conc of electrons [cm-3], total energy [eV cm-3], median energy [eV]," << endl;
 
 	output << scientific;
-	output.precision(4);
-	output << left << "! " << setw(7) << n << endl;
+	output << left << "! " << setprecision(5) << setw(14) << grb_distance / PARSEC << setprecision(3) << setw(12) << conc_h_tot 
+		<< setw(7) << nb_of_times << endl;
 
-	for (l = 0; l < n; l++) {
+	output.precision(4);
+	for (l = 0; l < nb_of_times; l++) {
 		tot_n = tot_en = 0.;
 
-		for (i = 0; i < user_data->get_nb_of_el_en(); i++) {
-			en = user_data->get_electron_energy(i);
-			tot_n += spectrum_data[l].arr[i];
+		for (i = 0; i < nb_of_el_energies; i++) {
+			en = electron_energies_grid[i];
+			d_en = electron_energy_bin_size[i];
+			en += 0.5 * d_en;
+
+			tot_n += spectrum_data[l].arr[i];  // [cm-3]
 			tot_en += spectrum_data[l].arr[i] * en;
 		}
 		output << left << setw(13) << time_moments[l] << setw(13) << tot_n << setw(13) << tot_en
@@ -82,24 +90,25 @@ void save_electron_spectrum_evolution(const string& output_path, const elspectra
 	output.close();
 }
 
+
 void save_specimen_conc_evolution(const string& output_path, const vector<double>& time_moments,
-	const vector<dynamic_array>& conc_data)
+	const vector<dynamic_array>& conc_data, double grb_distance, double conc_h_tot)
 {
 	int i, l;
+	double w;
 	string fname;
 	ofstream output;
 
-	fname = output_path + "h2exc_specimen_conc.txt";
+	fname = output_path + "h2grb_specimen_conc.txt";
 	output.open(fname.c_str());
 
+	output << left << "!Evolution of concentrations of chemical species," << endl
+		<< "!first row - distance from the GRB source [pc], H nuclei concentration [cm-3], nb of times, number of species," << endl
+		<< "!second row - specimen list," << endl;
+
 	output << scientific;
-	output.precision(3);
-
-	output << left << "! Evolution of abundances of chemical species," << endl
-		<< "! first row - nb of times, number of species," << endl
-		<< "! second row - specimen list," << endl;
-
-	output << left << "! " << setw(7) << (int)conc_data.size() << setw(7) << NB_OF_CHEM_SPECIES << endl;
+	output << left << "! " << setprecision(5) << setw(14) << grb_distance / PARSEC << setprecision(3) << setw(12) << conc_h_tot
+		<< setw(7) << (int)conc_data.size() << setw(7) << NB_OF_CHEM_SPECIES << endl;
 	output << left << setw(13) << "!";
 
 	for (i = 0; i < NB_OF_CHEM_SPECIES; i++) {
@@ -112,144 +121,90 @@ void save_specimen_conc_evolution(const string& output_path, const vector<double
 		output << left << setw(13) << time_moments[l];
 
 		output.precision(3);
-		for (i = 0; i < NB_OF_CHEM_SPECIES; i++) {
-			output << left << setw(12) << conc_data[l].arr[i];
+		for (i = 0; i < NB_OF_CHEM_SPECIES; i++) 
+		{
+			w = conc_data[l].arr[i];
+			if (w < MINIMAL_ABUNDANCE)
+				w = MINIMAL_ABUNDANCE;
+			output << left << setw(12) << w;
 		}
 		output << endl;
 	}
 	output.close();
 }
+
 
 void save_h2_populations_evolution(const string& output_path, const vector<double>& time_moments,
-	const vector<dynamic_array>& h2_pop_data, const energy_diagram* h2_di)
+	const vector<dynamic_array>& h2_popdens_data, const vector<dynamic_array>& h2_popdens_v_data, double grb_distance, double conc_h_tot, int nb_lev_h2)
 {
-	const int max_v = 15;  // the number of vibrational states (v = 0,1,2,.., max_v-1 )
-	const int max_j = 32;
-
-	int i, l, v, n;
-	int index_arr[max_v][max_j];
-	double h2_pop_v[max_v];
-
+	int i, l, v;
+	double w;
 	string fname;
 	ofstream output;
 
-	for (v = 0; v < max_v; v++) {
-		for (i = 0; i < max_j; i++) {
-			index_arr[v][i] = -1;
-		}
-	}
-	for (i = 0; i < h2_di->nb_lev; i++) {
-		index_arr[h2_di->lev_array[i].v][rounding(h2_di->lev_array[i].j)] = i;
-	}
-
-	// Saving level population densities,
-	fname = output_path + "h2exc_h2_populations.txt";
+	fname = output_path + "h2grb_popdens.txt";
 	output.open(fname.c_str());
 
 	output << scientific;
 	output.precision(3);
 
-	output << left << "! Evolution of population densities of H2 energy levels," << endl
-		<< "! first row - nb of times, number of levels," << endl
-		<< "! second row - level nb," << endl;
+	output << left << "!Evolution of population densities [cm-3] of H2 energy levels," << endl
+		<< "!first row - - distance from the GRB source [pc], H nuclei concentration [cm-3], nb of times, number of levels," << endl
+		<< "!second row - level nb," << endl;
 
-	output << left << "! " << setw(7) << (int)h2_pop_data.size() << setw(7) << h2_di->nb_lev << endl;
+	output << left << "! " << setprecision(5) << setw(14) << grb_distance / PARSEC << setprecision(3) << setw(12) << conc_h_tot 
+		<< setw(7) << (int)h2_popdens_data.size() << setw(7) << nb_lev_h2 << endl;
 	output << left << setw(13) << "!";
 
-	for (v = 0; v < max_v; v++) {
-		for (i = 0; i < max_j; i++) {
-			n = index_arr[v][i];
-			// it is assumed that data size > 0
-			if (n != -1 && n < h2_pop_data[0].dim)
-				output << left << setw(4) << v << setw(8) << i;
-		}
-		output << setw(3) << "";
-	}
-	output << endl;
-
-	for (l = 0; l < (int)h2_pop_data.size(); l++) {
-		output.precision(4);
-		output << left << setw(13) << time_moments[l];
-
-		output.precision(3);
-		for (v = 0; v < max_v; v++) {
-			for (i = 0; i < max_j; i++) {
-				n = index_arr[v][i];
-				if (n != -1 && n < h2_pop_data[l].dim)
-					output << left << setw(12) << h2_pop_data[l].arr[n];
-			}
-			output << setw(3) << "";
-		}
-		output << endl;
-	}
-	output.close();
-
-	// Saving the populations of vibrational states,
-	fname = output_path + "h2exc_h2_populations_vstates.txt";
-	output.open(fname.c_str());
-
-	output << scientific;
-	output << left << "! Evolution of population densities of vibrational states of H2," << endl
-		<< "! first row - nb of times, number of vibrational states max_v (0,1,2,.., max_v-1)," << endl
-		<< "! second row - v state nb," << endl;
-
-	output << left << "! " << setw(7) << (int)h2_pop_data.size() << setw(7) << max_v << endl;
-	output << left << setw(13) << "!";
-	for (v = 0; v < max_v; v++) {
-		output << left << setw(12) << v;
-	}
-	output << endl;
-
-	for (l = 0; l < (int)h2_pop_data.size(); l++) {
-		output.precision(4);
-		output << left << setw(13) << time_moments[l];
-
-		memset(h2_pop_v, 0, max_v * sizeof(double));
-		for (i = 0; i < h2_pop_data[l].dim; i++) {
-			h2_pop_v[h2_di->lev_array[i].v] += h2_pop_data[l].arr[i];
-		}
-
-		output.precision(3);
-		for (v = 0; v < max_v; v++) {
-			output << left << setw(12) << h2_pop_v[v];
-		}
-		output << endl;
-	}
-	output.close();
-}
-
-void save_hei_populations_evolution(const string& output_path, const vector<double>& time_moments,
-	const vector<dynamic_array>& hei_pop_data, const energy_diagram* hei_di)
-{
-	int i, l;
-	string fname;
-	ofstream output;
-
-	fname = output_path + "h2exc_hei_populations.txt";
-	output.open(fname.c_str());
-
-	output << scientific;
-	output.precision(3);
-
-	output << left << "! Evolution of population densities of HeI energy levels," << endl
-		<< "! first row - nb of times, number of levels," << endl
-		<< "! second row - level nb," << endl;
-
-	output << left << "! " << setw(7) << (int)hei_pop_data.size() << setw(7) << hei_di->nb_lev << endl;
-	output << left << setw(13) << "!";
-
-	for (i = 1; i <= hei_di->nb_lev; i++) {
+	for (i = 1; i <= nb_lev_h2; i++) {
 		output << left << setw(12) << i;
 	}
 	output << endl;
 
-	for (l = 0; l < (int)hei_pop_data.size(); l++) {
+	for (l = 0; l < (int)h2_popdens_data.size(); l++) {
 		output.precision(4);
 		output << left << setw(13) << time_moments[l];
 
 		output.precision(3);
-		for (i = 0; i < hei_pop_data[l].dim; i++) {
-			output << left << setw(12) << hei_pop_data[l].arr[i];
+		for (i = 0; i < nb_lev_h2; i++) 
+		{
+			w = h2_popdens_data[l].arr[i];
+			if (w < MINIMAL_ABUNDANCE)
+				w = MINIMAL_ABUNDANCE;
+			output << left << setw(12) << w;
+		}
+		output << endl;
+	}
+	output.close();
+
+	fname = output_path + "h2grb_popdens_v.txt";
+	output.open(fname.c_str());
+
+	output << scientific;
+	output << left << "!Evolution of population densities [cm-3] of vibrational states of H2," << endl
+		<< "!first row - - distance from the GRB source [pc], H nuclei concentration [cm-3], nb of times, number of vibr states," << endl
+		<< "!second row - v state nb," << endl;
+
+	output << left << "! " << setprecision(5) << setw(14) << grb_distance / PARSEC << setprecision(3) << setw(12) << conc_h_tot
+		<< setw(7) << (int)h2_popdens_v_data.size() << setw(7) << MAX_H2_VSTATES_X1SU << endl;
+
+	output << left << setw(13) << "!";
+	for (v = 0; v < MAX_H2_VSTATES_X1SU; v++) {
+		output << left << setw(12) << v;
+	}
+	output << endl;
+
+	for (l = 0; l < (int)h2_popdens_v_data.size(); l++) {
+		output.precision(4);
+		output << left << setw(13) << time_moments[l];
+
+		output.precision(3);
+		for (v = 0; v < MAX_H2_VSTATES_X1SU; v++)
+		{
+			w = h2_popdens_v_data[l].arr[v];
+			if (w < MINIMAL_ABUNDANCE)
+				w = MINIMAL_ABUNDANCE;
+			output << left << setw(12) << w;
 		}
 		output << endl;
 	}
@@ -257,106 +212,214 @@ void save_hei_populations_evolution(const string& output_path, const vector<doub
 }
 
 
-void save_electron_energy_losses(const string& output_path, const vector<double>& time_moments,
-	const vector<double>& deriv_mt_arr, const vector<double>& mt_arr,
-	const vector<double>& deriv_h2_rot_arr, const vector<double>& h2_rot_arr,
-	const vector<double>& deriv_h2_vibr_arr, const vector<double>& h2_vibr_arr,
-	const vector<double>& deriv_h2_electr_arr, const vector<double>& h2_electr_arr,
-	const vector<double>& deriv_h2_electr_tr_arr, const vector<double>& h2_electr_tr_arr,
-	const vector<double>& deriv_ioniz_arr, const vector<double>& ioniz_arr,
-	const vector<double>& deriv_coloumb_ions_arr, const vector<double>& coloumb_ions_arr,
-	const vector<double>& deriv_coloumb_el_arr, const vector<double>& coloumb_el_arr,
-	const vector<double>& deriv_hei_arr, const vector<double>& hei_arr)
+void save_hei_populations_evolution(const string& output_path, const vector<double>& time_moments,
+	const vector<dynamic_array>& hei_popdens_data, double grb_distance, double conc_h_tot, int nb_lev_hei)
 {
-	int i;
-	double tot, tot_int;
+	int i, l;
+	double w;
 	string fname;
 	ofstream output;
 
-	fname = output_path + "h2exc_electron_enloss.txt";
+	fname = output_path + "h2grb_hei_populations.txt";
 	output.open(fname.c_str());
 
 	output << scientific;
-	output << left << "! Evolution of energy losses of electrons, parameter < 0 if electrons lose energy," << endl
-		<< "! rate [eV cm-3 s-1] and integrated [eV cm-3]," << endl
-		<< "! total rate and total integrated losses (without scattering on electrons), " << endl
-		<< "! mt, mt_int - momentum transfer, " << endl
-		<< "! rot, rot_int - H2 rotational excitation," << endl
-		<< "! vibr, vibr_int - H2 vibrational excitation," << endl
-		<< "! elecs, elecs_int - H2 electronic states excitation (singlet)," << endl
-		<< "! elect, elect_int - H2 electronic states excitation (triplet)," << endl
-		<< "! ion, ion_int - molecule/atom ionization," << endl
-		<< "! coli, coli_int - Coulomb loses on ions," << endl
-		<< "! cole, cole_int - Coulomb loses on electrons, |energy loss| + |energy gain|," << endl
-		<< "! hei, hei_int - HeI excitation by electron impact" << endl;
+	output.precision(3);
 
-	output << left << "! nb of times:" << endl
-		<< "! " << setw(7) << (int)deriv_mt_arr.size() << endl;
+	output << left << "!Evolution of population densities [cm-3] of HeI energy levels," << endl
+		<< "!first row - - distance from the GRB source [pc], H nuclei concentration [cm-3], nb of times, number of HeI levels," << endl
+		<< "!second row - level nb," << endl;
 
-	output << left << setw(13) << "!t(s)"
-		<< setw(11) << "tot" << setw(13) << "tot_int"
-		<< setw(11) << "mt" << setw(13) << "mt_int"
-		<< setw(11) << "rot" << setw(13) << "rot_int"
-		<< setw(11) << "vibr" << setw(13) << "vibr_int"
-		<< setw(11) << "elecs" << setw(13) << "elecs_int"
-		<< setw(11) << "elect" << setw(13) << "elect_int"
-		<< setw(11) << "ion" << setw(13) << "ion_int"
-		<< setw(11) << "coli" << setw(13) << "coli_int"
-		<< setw(11) << "cole" << setw(13) << "cole_int"
-		<< setw(11) << "hei" << setw(13) << "hei_int" << endl;
+	output << left << "! " << setprecision(5) << setw(14) << grb_distance / PARSEC << setprecision(3) << setw(12) << conc_h_tot
+		<< setw(7) << (int)hei_popdens_data.size() << setw(7) << nb_lev_hei << endl;
 
-	for (i = 0; i < (int)deriv_mt_arr.size(); i++) {
-		tot = deriv_mt_arr[i] + deriv_h2_rot_arr[i] + deriv_h2_vibr_arr[i] + deriv_h2_electr_arr[i] + deriv_h2_electr_tr_arr[i]
-			+ deriv_ioniz_arr[i] + deriv_coloumb_ions_arr[i] + deriv_hei_arr[i];
-		tot_int = mt_arr[i] + h2_rot_arr[i] + h2_vibr_arr[i] + h2_electr_arr[i] + h2_electr_tr_arr[i] + ioniz_arr[i]
-			+ coloumb_ions_arr[i] + hei_arr[i];
+	output << left << setw(13) << "!";
+	for (i = 1; i <= nb_lev_hei; i++) {
+		output << left << setw(12) << i;
+	}
+	output << endl;
+
+	for (l = 0; l < (int)hei_popdens_data.size(); l++) {
+		output.precision(4);
+		output << left << setw(13) << time_moments[l];
 
 		output.precision(3);
-		output << left << setw(13) << time_moments[i];
-
-		output.precision(2);
-		output << left << setw(11) << tot << setw(13) << tot_int
-			<< setw(11) << deriv_mt_arr[i] << setw(13) << mt_arr[i]
-			<< setw(11) << deriv_h2_rot_arr[i] << setw(13) << h2_rot_arr[i]
-			<< setw(11) << deriv_h2_vibr_arr[i] << setw(13) << h2_vibr_arr[i]
-			<< setw(11) << deriv_h2_electr_arr[i] << setw(13) << h2_electr_arr[i]
-			<< setw(11) << deriv_h2_electr_tr_arr[i] << setw(13) << h2_electr_tr_arr[i]
-			<< setw(11) << deriv_ioniz_arr[i] << setw(13) << ioniz_arr[i]
-			<< setw(11) << deriv_coloumb_ions_arr[i] << setw(13) << coloumb_ions_arr[i]
-			<< setw(11) << deriv_coloumb_el_arr[i] << setw(13) << coloumb_el_arr[i]
-			<< setw(11) << deriv_hei_arr[i] << setw(13) << hei_arr[i] << endl;
+		for (i = 0; i < nb_lev_hei; i++)
+		{
+			w = hei_popdens_data[l].arr[i];
+			if (w < MINIMAL_ABUNDANCE)
+				w = MINIMAL_ABUNDANCE;
+			output << left << setw(12) << w;
+		}
+		output << endl;
 	}
 	output.close();
 }
 
-void save_h2_data(const string& output_path, const vector<double>& time_moments,
-	const vector<double>& h2_solomon_diss_arr, const vector<double>& h2_diss_exc_arr, const vector<double>& h2_diss_exc_triplet_arr,
-	const vector<double>& hei_exc_arr)
+
+void save_electron_energy_loss_rates(const string& output_path, double grb_distance, double conc_h_tot, const vector<double>& time_moments,
+	const vector<double>& enloss_rates_mt,
+	const vector<double>& enloss_rates_h2_rot, 
+	const vector<double>& enloss_rates_h2_vibr, 
+	const vector<double>& enloss_rates_h2_electr_sin, 
+	const vector<double>& enloss_rates_h2_electr_tri, 
+	const vector<double>& enloss_rates_ioniz, 
+	const vector<double>& enloss_rates_coloumb_ions, 
+	const vector<double>& enloss_rates_coloumb_el, 
+	const vector<double>& enloss_rates_hei)
+{
+	int i;
+	double tot;
+	string fname;
+	ofstream output;
+
+	fname = output_path + "h2grb_electron_enloss_rates.txt";
+	output.open(fname.c_str());
+
+	output << scientific;
+	output << left << "!Energy loss rates of electrons, parameter < 0 if electrons lose energy, rate in [eV cm-3 s-1]," << endl
+		<< "!total rate, " << endl
+		<< "!mt - momentum transfer, " << endl
+		<< "!rot - H2 rotational excitation," << endl
+		<< "!vibr - H2 vibrational excitation," << endl
+		<< "!elec_s - H2 electronic states excitation (singlet)," << endl
+		<< "!elec_t - H2 electronic states excitation (triplet)," << endl
+		<< "!ion - molecule/atom ionization," << endl
+		<< "!coli - Coulomb loses on ions," << endl
+		<< "!cole - Coulomb loses on electrons, |energy loss| + |energy gain|," << endl
+		<< "!hei - HeI excitation by electron impact" << endl;
+
+	output << left << "!distance from the GRB source [pc], H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setprecision(5) << setw(14) << grb_distance / PARSEC << setprecision(3) << setw(12) << conc_h_tot
+		<< setw(7) << (int)enloss_rates_mt.size() << endl;
+	
+	output << left << setw(13) << "!t(s)"
+		<< setw(11) << "tot" << setw(11) << "mt" << setw(11) << "rot" << setw(11) << "vibr" << setw(11) << "elec_s" << setw(11) << "elec_t"
+		<< setw(11) << "ion" << setw(11) << "coli" << setw(11) << "cole" << setw(11) << "hei" << endl;
+
+	for (i = 0; i < (int)enloss_rates_mt.size(); i++) {
+		tot = enloss_rates_mt[i] + enloss_rates_h2_rot[i] + enloss_rates_h2_vibr[i] + enloss_rates_h2_electr_sin[i] + enloss_rates_h2_electr_tri[i]
+			+ enloss_rates_ioniz[i] + enloss_rates_coloumb_ions[i] + enloss_rates_coloumb_el[i] + enloss_rates_hei[i];
+	
+		output.precision(3);
+		output << left << setw(13) << time_moments[i];
+
+		output.precision(2);
+		output << left << setw(11) << tot 
+			<< setw(11) << enloss_rates_mt[i]
+			<< setw(11) << enloss_rates_h2_rot[i]
+			<< setw(11) << enloss_rates_h2_vibr[i]
+			<< setw(11) << enloss_rates_h2_electr_sin[i]
+			<< setw(11) << enloss_rates_h2_electr_tri[i]
+			<< setw(11) << enloss_rates_ioniz[i]
+			<< setw(11) << enloss_rates_coloumb_ions[i]
+			<< setw(11) << enloss_rates_coloumb_el[i]
+			<< setw(11) << enloss_rates_hei[i] << endl;
+	}
+	output.close();
+}
+
+
+void save_electron_energy_losses(const string& output_path, double grb_distance, double conc_h_tot, const vector<double>& time_moments,
+	const vector<double>& enloss_mt,
+	const vector<double>& enloss_h2_rot,
+	const vector<double>& enloss_h2_vibr,
+	const vector<double>& enloss_h2_singlet,
+	const vector<double>& enloss_h2_triplet,
+	const vector<double>& enloss_ioniz,
+	const vector<double>& enloss_coloumb_ions,
+	const vector<double>& enloss_coloumb_el,
+	const vector<double>& enloss_hei)
 {
 	int i;
 	double tot_int;
 	string fname;
 	ofstream output;
 
-	fname = output_path + "h2exc_h2_data.txt";
+	fname = output_path + "h2grb_electron_enloss_int.txt";
 	output.open(fname.c_str());
 
 	output << scientific;
-	output << left << "! Reaction contribution," << endl
-		<< "! integrated losses [cm-3]," << endl
-		<< "! sol_int - Solomon process of H2, " << endl
-		<< "! de_int  - dissociative excitation of H2 (via singlet states)," << endl
-		<< "! det_int - dissociative excitation of H2 (via triplet states)," << endl
-		<< "! hei_int - HeI excitation" << endl;
+	output << left << "!Energy losses of electrons, parameter < 0 if electrons lose energy, integrated up to a given time [eV cm-3]," << endl
+		<< "!total integrated losses, " << endl
+		<< "!mt_int - momentum transfer, " << endl
+		<< "!rot_int - H2 rotational excitation," << endl
+		<< "!vibr_int - H2 vibrational excitation," << endl
+		<< "!elec_s_int - H2 electronic states excitation (singlet)," << endl
+		<< "!elec_t_int - H2 electronic states excitation (triplet)," << endl
+		<< "!ion_int - molecule/atom ionization," << endl
+		<< "!coli_int - Coulomb loses on ions," << endl
+		<< "!cole_int - Coulomb loses on electrons, |energy loss| + |energy gain|," << endl
+		<< "!hei_int - HeI excitation by electron impact" << endl;
 
-	output << left << "! nb of times:" << endl
-		<< "! " << setw(7) << (int)h2_solomon_diss_arr.size() << endl;
+	output << left << "!distance from the GRB source [pc], H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setprecision(5) << setw(14) << grb_distance / PARSEC << setprecision(3) << setw(12) << conc_h_tot
+		<< setw(7) << (int)enloss_mt.size() << endl;
+
+	output << left << setw(13) << "!t(s)" 
+		<< setw(11) << "tot_int"
+		<< setw(11) << "mt_int"
+		<< setw(11) << "rot_int"
+		<< setw(11) << "vibr_int"
+		<< setw(11) << "elec_s_int"
+		<< setw(11) << "elec_t_int"
+		<< setw(11) << "ion_int"
+		<< setw(11) << "coli_int"
+		<< setw(11) << "cole_int"
+		<< setw(11) << "hei_int" << endl;
+
+	for (i = 0; i < (int)enloss_mt.size(); i++) {
+		tot_int = enloss_mt[i] + enloss_h2_rot[i] + enloss_h2_vibr[i] + enloss_h2_singlet[i] + enloss_h2_triplet[i] + enloss_ioniz[i]
+			+ enloss_coloumb_ions[i] + enloss_coloumb_el[i] + enloss_hei[i];
+
+		output.precision(3);
+		output << left << setw(13) << time_moments[i];
+
+		output.precision(2);
+		output << left << setw(11) << tot_int
+			<< setw(11) << enloss_mt[i]
+			<< setw(11) << enloss_h2_rot[i]
+			<< setw(11) << enloss_h2_vibr[i]
+			<< setw(11) << enloss_h2_singlet[i]
+			<< setw(11) << enloss_h2_triplet[i]
+			<< setw(11) << enloss_ioniz[i]
+			<< setw(11) << enloss_coloumb_ions[i]
+			<< setw(11) << enloss_coloumb_el[i]
+			<< setw(11) << enloss_hei[i] << endl;
+	}
+	output.close();
+}
+
+
+void save_diss_excit_data(const string& output_path, const vector<double>& time_moments,
+	const vector<double>& h2_solomon_diss_arr, const vector<double>& h2_diss_exc_singlet_arr, const vector<double>& h2_diss_exc_triplet_arr,
+	const vector<double>& hei_exc_arr, double grb_distance, double conc_h_tot)
+{
+	int i;
+	double tot_int;
+	string fname;
+	ofstream output;
+
+	fname = output_path + "h2grb_diss_excit_data.txt";
+	output.open(fname.c_str());
+
+	output << scientific;
+	output << left << "!Reaction contribution," << endl
+		<< "!integrated amount of H2 dissociated [cm-3]," << endl
+		<< "!sol_int -  Solomon process of H2 [cm-3], " << endl
+		<< "!de_s_int - dissociative excitation of H2 (via singlet states)," << endl
+		<< "!de_t_int - dissociative excitation of H2 (via triplet states)," << endl
+		<< "!hei_int  - HeI excitation [cm-3];" << endl;
+
+	output << left << "!distance from the GRB source [pc], H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setprecision(5) << setw(14) << grb_distance / PARSEC << setprecision(3) << setw(12) << conc_h_tot
+		<< setw(7) << (int)h2_solomon_diss_arr.size() << endl;
 
 	output << left << setw(13) << "!t(s)" << setw(12) << "tot_int(H2)"
-		<< setw(12) << "sol_int" << setw(12) << "de_int" << setw(12) << "det_int" << setw(12) << "hei_int" << endl;
+		<< setw(12) << "sol_int" << setw(12) << "de_s_int" << setw(12) << "de_t_int" << setw(12) << "hei_int" << endl;
 
 	for (i = 0; i < (int)h2_solomon_diss_arr.size(); i++) {
-		tot_int = h2_solomon_diss_arr[i] + h2_diss_exc_arr[i] + h2_diss_exc_triplet_arr[i];
+		tot_int = h2_solomon_diss_arr[i] + h2_diss_exc_singlet_arr[i] + h2_diss_exc_triplet_arr[i];
 
 		output.precision(3);
 		output << left << setw(13) << time_moments[i];
@@ -364,33 +427,35 @@ void save_h2_data(const string& output_path, const vector<double>& time_moments,
 		output.precision(2);
 		output << left << setw(12) << tot_int
 			<< setw(12) << h2_solomon_diss_arr[i]
-			<< setw(12) << h2_diss_exc_arr[i]
+			<< setw(12) << h2_diss_exc_singlet_arr[i]
 			<< setw(12) << h2_diss_exc_triplet_arr[i]
 			<< setw(12) << hei_exc_arr[i] << endl;
 	}
 	output.close();
 }
 
+
 void save_phys_parameters(const string& output_path, const vector<double>& time_moments,
 	const vector<double>& neut_temp_arr, const vector<double>& ion_temp_arr, const vector<double>& dust_charge_arr,
-	const vector<dynamic_array>& conc_data)
+	const vector<dynamic_array>& conc_data, double grb_distance, double conc_h_tot)
 {
 	int i;
 	string fname;
 	ofstream output;
 
-	fname = output_path + "h2exc_physparam_data.txt";
+	fname = output_path + "h2grb_physparam_data.txt";
 	output.open(fname.c_str());
 
 	output << scientific;
-	output << left << "! Physical parameters," << endl
-		<< "! temp_n - temperature of neutral component [K]," << endl
-		<< "! temp_i - ion temperature [K]," << endl
-		<< "! dcharge - charge of dust grains [cm-3]," << endl
-		<< "! conc_e - concentration of electrons [cm-3]" << endl;
+	output << left << "!Physical parameters," << endl
+		<< "!temp_n - temperature of neutral component [K]," << endl
+		<< "!temp_i - ion temperature [K]," << endl
+		<< "!dcharge - charge of dust grains [cm-3]," << endl
+		<< "!conc_e - concentration of electrons [cm-3]" << endl;
 
-	output << left << "! nb of times:" << endl
-		<< "! " << setw(7) << (int)neut_temp_arr.size() << endl;
+	output << left << "!distance from the GRB source [pc], H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setprecision(5) << setw(14) << grb_distance / PARSEC << setprecision(3) << setw(12) << conc_h_tot
+		<< setw(7) << (int)neut_temp_arr.size() << endl;
 
 	output << left << setw(13) << "!t(s)" << setw(12) << "temp_n(K)"
 		<< setw(12) << "temp_i(K)" << setw(12) << "dcharge" << setw(12) << "conc_e" << endl;

@@ -345,6 +345,8 @@ void print_statistics(std::string output_path, std::string name, const energy_di
 }
 
 
+//
+// Honl-London factors,
 double honl_london_singlet_dl0::operator()(int j, int dj)
 {
 	double f(0.);
@@ -369,4 +371,3 @@ double honl_london_singlet_dl1::operator()(int j, int dj)
 
 	return f;
 }
-

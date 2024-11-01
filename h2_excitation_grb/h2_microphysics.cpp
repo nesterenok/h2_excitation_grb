@@ -92,6 +92,444 @@ cross_section_table_vs1::cross_section_table_vs1(const std::string& data_path, c
 	en_thr = en_arr[0];
 }
 
+
+//
+// Electron impact ionization classes
+oscillator_strength::oscillator_strength() : af(0.), bf(0.), cf(0.), df(0.), ef(0.), ff(0.)
+{;}
+
+oscillator_strength::~oscillator_strength()
+{;}
+
+void oscillator_strength::assign_coeff(double a, double b, double c, double d, double e, double f)
+{
+	af = a;
+	bf = b;
+	cf = c;
+	df = d;
+	ef = e;
+	ff = f;
+}
+
+diff_oscillator_strength::diff_oscillator_strength()
+	: oscillator_strength()
+{;}
+
+double diff_oscillator_strength::operator()(double w) const {
+	double x, x2;
+	x = 1. / (1. + w);
+	x2 = x * x;
+	return (af + bf * x + cf * x2 + df * x2 * x + ef * x2 * x2 + ff * x2 * x2 * x) * x;
+}
+
+diff_oscillator_strength_aux::diff_oscillator_strength_aux()
+	: oscillator_strength()
+{;}
+
+double diff_oscillator_strength_aux::operator()(double w) const {
+	double x, x2;
+	x = 1. / (1. + w);
+	x2 = x * x;
+	return (af + bf * x + cf * x2 + df * x2 * x + ef * x2 * x2 + ff * x2 * x2 * x) * x2;
+}
+
+
+electron_ionization_data::electron_ionization_data()
+	: ne(0), ni(0.), orbital_kin_en(0.), orbital_bind_en(0.), name("empty"), af(0.), bf(0.), cf(0.), df(0.), ef(0.), ff(0.)
+{;}
+
+h2_electron_ionization_data::h2_electron_ionization_data()
+	: electron_ionization_data()
+{
+	name = "H2 + e- -> H2+ + e- + e-";
+	orbital_bind_en = 15.43;  // in eV,
+	orbital_kin_en = 25.68;   // in eV,
+
+	// Kim & Rudd (1994)
+	ne = 2;
+	ni = 1.173;
+	af = 0.;
+	bf = 0.;
+	cf = 1.1262;
+	df = 6.3982;
+	ef = -7.8055; 
+	ff = 2.144;
+}
+
+he_electron_ionization_data::he_electron_ionization_data()
+	: electron_ionization_data()
+{
+	name = "He + e- -> He+ + e- + e-";
+	orbital_bind_en = 24.59;  // in eV,
+	orbital_kin_en = 39.51;   // in eV,
+
+	// Kim & Rudd (1994)
+	ne = 2;
+	ni = 1.605;
+	af = 0.;
+	bf = 0.;
+	cf = 12.178;
+	df = -29.585;
+	ef = 31.251;
+	ff = -12.175;
+}
+
+h_electron_ionization_data::h_electron_ionization_data()
+	: electron_ionization_data()
+{
+	name = "H + e- -> H+ + e- + e-";
+	orbital_bind_en = 13.606;  // in eV,
+	orbital_kin_en = 13.606;
+
+	// Kim & Rudd (1994),
+	ne = 1;
+	ni = 0.4343;
+	af = 0.;
+	bf = -0.022473;
+	cf = 1.1775;
+	df = -0.46264;
+	ef = 0.089064; 
+	ff = 0.;
+}
+
+hep_electron_ionization_data::hep_electron_ionization_data()
+	: electron_ionization_data()
+
+{
+	name = "He+ + e- -> He++ + e- + e-";
+	orbital_bind_en = 54.416;  // in eV, Draine, "Physics of the interstellar and intergalactic medium" (2011)
+	orbital_kin_en = 0.;       // for one-electron ions is set to zero,
+
+	// Kim & Rudd (1994), oscillation strength coefficients as for H atom
+	ne = 1;
+	ni = -1.;
+	af = 0.;
+	bf = -0.022473;
+	cf = 1.1775;
+	df = -0.46264;
+	ef = 0.089064; 
+	ff = 0.;
+}
+
+h2p_electron_ionization_data::h2p_electron_ionization_data()
+{
+	name = "H2+ + e- -> H+ + H+ + e- + e-";
+	orbital_bind_en = 16.25;  // in eV, Wikipedia
+	orbital_kin_en = 0.;      // for one-electron ions is set to zero,
+
+	// Kim & Rudd (1994), oscillation strength coefficients as for H atom 
+	// BED model is used, possibly more simple BEQ or BEB model should be used
+	ne = 1;
+	ni = -1.;
+	af = 0.;
+	bf = -0.022473;
+	cf = 1.1775;
+	df = -0.46264;
+	ef = 0.089064;
+	ff = 0.;
+}
+
+electron_impact_ionization::electron_impact_ionization(const electron_ionization_data & data, int verbosity)
+{
+	double af, bf, cf, df, ef, ff;
+
+	af = data.af;
+	bf = data.bf;
+	cf = data.cf;
+	df = data.df;
+	ef = data.ef;
+	ff = data.ff;
+
+	ne = data.ne;
+	orbital_bind_en = data.orbital_bind_en;
+	orbital_kin_en = data.orbital_kin_en;
+
+	u = orbital_kin_en / orbital_bind_en;
+	s = 4. * M_PI * BOHR_RADIUS * BOHR_RADIUS * ne
+		* RYDBERG_ENERGY_EV * RYDBERG_ENERGY_EV / (orbital_bind_en * orbital_bind_en); 
+
+	diff_osc_str.assign_coeff(af, bf, cf, df, ef, ff);
+	diff_osc_str_aux.assign_coeff(af, bf, cf, df, ef, ff);
+
+	// the values of N_i are provided by Kim & Rudd (1994) for simple atoms/molecules (H, He, H2, Ne),
+	// this data may be used to check the integration:
+	ni = qromb<diff_oscillator_strength>(diff_osc_str, 0., 100., err, false);  // upper integration limit is arbitrary
+
+	if (verbosity) {
+		cout << scientific;
+		cout.precision(3);
+		cout << left << "reaction: " << name << endl
+			<< "    parameter Ni from integration: " << ni << endl
+			<< "    from table in Kim & Rudd (1994): " << data.ni << endl;
+	}
+
+	c1 = 2. - ni / ne;	
+	err = 1.e-6;
+	proj_en = 0.;
+}
+
+electron_impact_ionization::~electron_impact_ionization()
+{;}
+
+// it is assumed in the formula, that ejected energy is the energy of the slowest electron,
+double electron_impact_ionization::operator()(double projectile_energy, double ejected_energy) const
+{
+	if (ejected_energy < 0. || projectile_energy < 0.)
+		return 0.;
+
+	double cs, w, wp, t;
+
+	t = projectile_energy / orbital_bind_en;
+	if (t < 1.)
+		return 0.;
+
+	w = ejected_energy / orbital_bind_en;
+	wp = t - w - 1.;
+	if (wp < 0.)
+		return 0.;
+
+	// formula (44) in Kim & Rudd (1994),
+	cs = s / (orbital_bind_en * (t + u + 1.))
+		* ( c1 * (1. / ((1. + w) * (1. + w)) - 1. / ((1. + w) * (1. + wp)) + 1. / ((1. + wp) * (1. + wp)))
+			+ log(t) * diff_osc_str(w) / (ne * (1. + w)) );
+	return cs;
+}
+
+double electron_impact_ionization::operator()(double ejected_energy) const
+{
+	double cs;
+	// saved projectile energy is in eV,
+	cs = electron_impact_ionization::operator()(proj_en, ejected_energy);  
+	return cs;
+}
+
+double electron_impact_ionization::get_int_cs(double projectile_energy)
+{
+	double cs, d, lnt, t;
+	t = projectile_energy / orbital_bind_en;
+	if (t < 1.)
+		return 0.;
+
+	lnt = log(t);
+	d = qromb<diff_oscillator_strength_aux>(diff_osc_str_aux, 0., 0.5 * (t - 1.), err, false);
+	d /= ne;
+
+	// equations (55) and (56) in Kim & Rudd (1994),
+	cs = s / (1. + t + u) * (d * lnt + c1 * (1. - 1. / t - lnt / (1. + t)));
+	return cs;
+}
+
+double electron_impact_ionization::get_int_cs(double projectile_energy, double ej_energy_min, double ej_energy_max)
+{
+	double cs, d, lnt, z, w, t, e1, e2;
+	
+	t = projectile_energy / orbital_bind_en;
+	if (t < 1.)
+		return 0.;
+
+	e1 = ej_energy_min / orbital_bind_en;
+	e2 = ej_energy_max / orbital_bind_en;
+
+	lnt = log(t);
+	d = qromb<diff_oscillator_strength_aux>(diff_osc_str_aux, e1, e2, err, false);
+	d /= ne;
+
+	z = log((1. + e2) * (t - e1) / ((1. + e1) * (t - e2)));
+	w = (e2 - e1) * (1. / ((1. + e2) * (1. + e1)) + 1. / ((t - e2) * (t - e1)));
+	
+	cs = s / (1. + t + u) * (d * lnt + c1 * (-z / (1. + t) + w));
+	return cs;
+}
+
+
+// Relativistic formulas for cross sections
+electron_impact_ionization_relativistic::electron_impact_ionization_relativistic(const electron_ionization_data & data, int verbosity)
+	: electron_impact_ionization(data, verbosity), srel(0.), bp(0.), up(0.), beta_b2(0.), beta_u2(0.)
+{
+	// constants that are used in relativistic formula of cross section,
+	srel = 4.*M_PI * BOHR_RADIUS * BOHR_RADIUS 
+		* FINE_STRUCTURE_CONSTANT * FINE_STRUCTURE_CONSTANT * FINE_STRUCTURE_CONSTANT * FINE_STRUCTURE_CONSTANT * 0.5 * ne;
+
+	bp = orbital_bind_en / ELECTRON_MASS_EV;
+	up = orbital_kin_en / ELECTRON_MASS_EV;
+
+	beta_b2 = 1. - 1. / ((1. + bp) * (1. + bp));
+	beta_u2 = 1. - 1. / ((1. + up) * (1. + up));
+}
+
+double electron_impact_ionization_relativistic::operator()(double projectile_energy, double ejected_energy) const
+{
+	if (ejected_energy < 0. || projectile_energy < 0.)
+		return 0.;
+
+	double t, tp, beta_t2;
+	double cs, w, wp;
+
+	t = projectile_energy / orbital_bind_en;
+	if (t < 1.)
+		return 0.;
+
+	w = ejected_energy / orbital_bind_en;
+	wp = t - w - 1.;
+	if (wp < 0.)
+		return 0.;
+
+	tp = projectile_energy / ELECTRON_MASS_EV;
+	beta_t2 = 1. - 1. / ((1. + tp) * (1. + tp));
+	
+	// formula (19) in Kim et al. (2000),
+	// must be deleted by binding energy,
+	cs = srel / ((beta_t2 + beta_u2 + beta_b2) * bp * orbital_bind_en) * (
+		-c1 / ((1. + w) * (1. + wp)) * (1. + 2. * tp) / ((1. + 0.5 * tp) * (1. + 0.5 * tp))
+		+ c1 * (1. / ((1. + w) * (1. + w)) + 1. / ((1. + wp) * (1. + wp)) + bp * bp / ((1. + 0.5 * tp) * (1. + 0.5 * tp)))
+		+ diff_osc_str(w) / (ne * (1. + w)) * (log(beta_t2 / (1. - beta_t2)) - beta_t2 - log(2. * bp)));
+	return cs;
+}
+
+double electron_impact_ionization_relativistic::operator()(double ejected_energy) const
+{
+	double cs;
+	// the projectile energy is in eV, must be initialized before,
+	cs = electron_impact_ionization_relativistic::operator()(proj_en, ejected_energy);
+	return cs;
+}
+
+double electron_impact_ionization_relativistic::get_int_cs(double projectile_energy)
+{
+	double cs, x, d, t, tp, beta_t2;
+
+	t = projectile_energy / orbital_bind_en;
+	if (t < 1.)
+		return 0.;
+
+	tp = projectile_energy / ELECTRON_MASS_EV;
+	beta_t2 = 1. - 1. / ((1. + tp) * (1. + tp));
+
+	d = qromb<diff_oscillator_strength_aux>(diff_osc_str_aux, 0., 0.5 * (t - 1.), err, false);
+	d /= ne;
+	x = (1. + 0.5 * tp) * (1. + 0.5 * tp);
+
+	cs = srel / ((beta_t2 + beta_u2 + beta_b2) * bp) * (
+		d *(log(beta_t2 /(1. - beta_t2)) - beta_t2 - log(2.*bp))
+		+ c1 *(1. - 1./t - log(t) * (1. + 2. * tp) /((1. + t) * x) + 0.5 * bp *bp * (t - 1.) / x) );
+	return cs;
+}
+
+double electron_impact_ionization_relativistic::get_int_cs(double projectile_energy, double ej_energy_min, double ej_energy_max)
+{
+	double cs, d, lnt, x, z, w, t, tp, beta_t2, e1, e2;
+	t = projectile_energy / orbital_bind_en;
+	if (t < 1.)
+		return 0.;
+
+	tp = projectile_energy / ELECTRON_MASS_EV;
+	beta_t2 = 1. - 1. / ((1. + tp) * (1. + tp));
+
+	e1 = ej_energy_min / orbital_bind_en;
+	e2 = ej_energy_max / orbital_bind_en;
+
+	lnt = log(t);
+	d = qromb<diff_oscillator_strength_aux>(diff_osc_str_aux, e1, e2, err, false);
+	d /= ne;
+
+	x = (1. + 0.5 * tp) * (1. + 0.5 * tp);
+	z = log((1. + e2) * (t - e1) / ((1. + e1) * (t - e2)));
+	w = (e2 - e1) * ( 1. / ((1. + e2) * (1. + e1)) + 1. / ((t - e2) * (t - e1)) );
+
+	cs = srel / ((beta_t2 + beta_u2 + beta_b2) * bp) * (
+		d * (log(beta_t2 / (1. - beta_t2)) - beta_t2 - log(2. * bp)) 
+		+ c1 * (-z * (1. + 2. * tp) / ((1. + t) * x)
+		+ w + bp * bp *(e2 - e1) / x) );
+	return cs;
+}
+
+electron_impact_ionization_relativistic::~electron_impact_ionization_relativistic()
+{;}
+
+
+cross_section_integral_2d::cross_section_integral_2d(electron_impact_ionization* ei, double e)
+	:x1(0.), x2(0.), z1(0.), z2(0.), ionization(ei), err(e)
+{;}
+
+double cross_section_integral_2d::operator()(double x)
+{
+	if (x < ionization->get_binding_energy())
+		return 0.;
+
+	double a;
+	ionization->set_projectile_energy(x);
+
+	// maximal energy of the ejected electron (ejected electron has the lowest energy among final electrons):
+	a = 0.5 * (x - ionization->get_binding_energy());
+	if (z2 < a)
+		a = z2;
+
+	if (a < z1)
+		return 0.;
+
+	a = qromb<electron_impact_ionization>(*ionization, z1, a, 0.1 * err, false);
+	return a;
+}
+
+double cross_section_integral_2d::get(double xx1, double xx2, double zz1, double zz2)
+{
+	x1 = xx1;
+	x2 = xx2;
+	z1 = zz1;
+	z2 = zz2;
+
+	return qromb<cross_section_integral_2d>(*this, x1, x2, err, false);
+}
+
+
+cross_section_integral_weight::cross_section_integral_weight(electron_impact_ionization* ei, double e)
+	:x1(0.), x2(0.), y1(0.), y2(0.), z1(0.), z2(0.), ionization(ei), err(e)
+{;}
+
+double cross_section_integral_weight::operator()(double x)
+{
+	double a, b, max;
+	ionization->set_projectile_energy(x);
+
+	// lower limit of the integration:
+	a = x - y2 - ionization->get_binding_energy();
+	if (z1 > a)
+		a = z1;
+
+	// upper limit of the integration:
+	b = x - y1 - ionization->get_binding_energy();
+	if (z2 < b)
+		b = z2;
+
+	// ejected electron has the lowest energy,
+	max = 0.5 * (x - ionization->get_binding_energy());
+	if (max < b)
+		b = max;
+
+	if (a >= b)
+		return 0.;
+
+	// integral over the energy interval of ejected electron, 
+	a = qromb<electron_impact_ionization>(*ionization, a, b, 0.1 * err, false);
+	return a;
+}
+
+double cross_section_integral_weight::get(double xx1, double xx2, double yy1, double yy2, double zz1, double zz2)
+{
+	x1 = xx1;
+	x2 = xx2;
+	y1 = yy1;
+	y2 = yy2;
+	z1 = zz1;
+	z2 = zz2;
+
+	// integral over the energy interval of incident particle:
+	return qromb<cross_section_integral_weight>(*this, x1, x2, err, false);
+}
+
+
+//
+// Vibrationally-resolved electronic excitation of H2 ground state S1g+(X), 
 cross_section_table_mccc::cross_section_table_mccc(const std::string& data_path, const std::string& name)
 	:cross_section_table()
 {
@@ -144,8 +582,8 @@ cross_section_table_mccc::cross_section_table_mccc(const std::string& data_path,
 		cs_arr[i] = csv[i];
 	}
 
-	en_thr = en_arr[0];
-	gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 2]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 2]);
+	en_thr = en_arr[0];  // the cross section at this energy is zero,
+	gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 3]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 3]);
 }
 
 
@@ -166,338 +604,6 @@ double h2_excitation_vibr02_cs::operator()(double energy) const
 }
 
 
-//
-// Electron impact ionization classes
-oscillator_strength::oscillator_strength() : af(0.), bf(0.), cf(0.), df(0.), ef(0.), ff(0.)
-{;}
-
-oscillator_strength::~oscillator_strength()
-{;}
-
-void oscillator_strength::assign_coeff(double a, double b, double c, double d, double e, double f)
-{
-	af = a;
-	bf = b;
-	cf = c;
-	df = d;
-	ef = e;
-	ff = f;
-}
-
-diff_oscillator_strength::diff_oscillator_strength()
-	: oscillator_strength()
-{;}
-
-double diff_oscillator_strength::operator()(double w) const {
-	double x, x2;
-	x = 1. / (1. + w);
-	x2 = x * x;
-	return (af + bf * x + cf * x2 + df * x2 * x + ef * x2 * x2 + ff * x2 * x2 * x) * x;
-}
-
-diff_oscillator_strength_aux::diff_oscillator_strength_aux()
-	: oscillator_strength()
-{;}
-
-double diff_oscillator_strength_aux::operator()(double w) const {
-	double x, x2;
-	x = 1. / (1. + w);
-	x2 = x * x;
-	return (af + bf * x + cf * x2 + df * x2 * x + ef * x2 * x2 + ff * x2 * x2 * x) * x2;
-}
-
-
-electron_impact_ionization::electron_impact_ionization()
-	: ne(0), s(0.), ni(0.), orbital_kin_en(0.), orbital_bind_en(0.), proj_en(0.), name(""), err(1.e-6), c1(0.), c2(0.)
-{;}
-
-electron_impact_ionization::~electron_impact_ionization()
-{;}
-
-// it is assumed in the formula, that ejected energy is the energy of the slowest electron,
-double electron_impact_ionization::operator()(double projectile_energy, double ejected_energy) const
-{
-	if (ejected_energy < 0. || projectile_energy < 0.)
-		return 0.;
-
-	double cs, w, wp, t;
-
-	t = projectile_energy / orbital_bind_en;
-	if (t < 1.)
-		return 0.;
-
-	w = ejected_energy / orbital_bind_en;
-	wp = t - w - 1.;
-	if (wp < 0.)
-		return 0.;
-
-	// formula (44) in Kim & Rudd (1994),
-	cs = c1 / (t + orbital_kin_en + 1.)
-		* (1. / ((1. + w) * (1. + w)) - 1. / ((1. + w) * (1. + wp)) + 1. / ((1. + wp) * (1. + wp))
-			+ log(t) * diff_osc_str(w) / (c2 * (1. + w)));
-	return cs;
-}
-
-double electron_impact_ionization::operator()(double ejected_energy) const
-{
-	double cs;
-	// saved projectile energy is in eV,
-	cs = electron_impact_ionization::operator()(proj_en, ejected_energy);  
-	return cs;
-}
-
-double electron_impact_ionization::get_int_cs(double projectile_energy)
-{
-	double cs, d, lnt, t;
-	t = projectile_energy / orbital_bind_en;
-	if (t < 1.)
-		return 0.;
-
-	lnt = log(t);
-	d = qromb<diff_oscillator_strength_aux>(diff_osc_str_aux, 0., 0.5 * (t - 1.), err, false);
-	
-	// equations (55) and (56) in Kim & Rudd (1994),
-	cs = s / (ne * (1. + t + orbital_kin_en)) * (d * lnt + c2 * (1. - 1. / t - lnt / (1. + t)));
-	return cs;
-}
-
-double electron_impact_ionization::get_int_cs(double projectile_energy, double ej_energy_min, double ej_energy_max)
-{
-	double cs, d, lnt, z, w, t, e1, e2;
-	t = projectile_energy / orbital_bind_en;
-	if (t < 1.)
-		return 0.;
-
-	e1 = ej_energy_min / orbital_bind_en;
-	e2 = ej_energy_max / orbital_bind_en;
-
-	lnt = log(t);
-	d = qromb<diff_oscillator_strength_aux>(diff_osc_str_aux, e1, e2, err, false);
-	
-	z = log((1. + e2) * (t - e1) / ((1. + e1) * (t - e2)));
-	w = (e2 - e1) * (1. / ((1. + e2) * (1. + e1)) + 1. / ((t - e2) * (t - e1)));
-	
-	cs = s / (ne * (1. + t + orbital_kin_en)) * (d * lnt + c2 * (-z / (1. + t) + w));
-	return cs;
-}
-
-
-h2_electron_impact_ionization::h2_electron_impact_ionization(int verbosity)
-	: electron_impact_ionization()
-{
-	name = "H2 + e- -> H2+ + e- + e-";
-	orbital_bind_en = 15.43;  // in eV,
-	orbital_kin_en = 25.68 / orbital_bind_en;   // must be normalized,
-
-	ne = 2;
-	s = 4. * M_PI * BOHR_RADIUS * BOHR_RADIUS * ne
-		* RYDBERG_ENERGY_EV * RYDBERG_ENERGY_EV / (orbital_bind_en * orbital_bind_en);
-
-	// Kim & Rudd (1994)
-	diff_osc_str.assign_coeff(0., 0., 1.1262, 6.3982, -7.8055, 2.144);
-	diff_osc_str_aux.assign_coeff(0., 0., 1.1262, 6.3982, -7.8055, 2.144);
-
-	// the values of N_i are provided by Kim & Rudd (1994) for simple atoms/molecules (H, He, H2, Ne),
-	// this data may be used to check the integration:
-	ni = qromb<diff_oscillator_strength>(diff_osc_str, 0., 100., err, false);  // upper integration limit is arbitrary
-
-	if (verbosity) {
-		cout << scientific;
-		cout.precision(3);
-		cout << left << "H2 electron impact ionization, " << endl
-			<< "    parameter Ni from integration: " << ni << endl
-			<< "    from table in Kim & Rudd (1994): 1.173" << endl;
-	}
-	c1 = s * (2. * ne - ni) / (orbital_bind_en * ne);
-	c2 = 2. * ne - ni;
-}
-
-he_electron_impact_ionization::he_electron_impact_ionization(int verbosity)
-	: electron_impact_ionization()
-{
-	name = "He + e- -> He+ + e- + e-";
-	orbital_bind_en = 24.59;  // in eV,
-	orbital_kin_en = 39.51 / orbital_bind_en;   // must be normalized,
-
-	ne = 2;
-	s = 4. * M_PI * BOHR_RADIUS * BOHR_RADIUS * ne
-		* RYDBERG_ENERGY_EV * RYDBERG_ENERGY_EV / (orbital_bind_en * orbital_bind_en);
-
-	// Kim & Rudd (1994)
-	diff_osc_str.assign_coeff(0., 0., 12.178, -29.585, 31.251, -12.175);
-	diff_osc_str_aux.assign_coeff(0., 0., 12.178, -29.585, 31.251, -12.175);
-
-	ni = qromb<diff_oscillator_strength>(diff_osc_str, 0., 100., err, false);
-
-	if (verbosity) {
-		cout << scientific;
-		cout.precision(3);
-		cout << left << "He electron impact ionization, " << endl
-			<< "    parameter Ni from integration: " << ni << endl
-			<< "    from table in Kim & Rudd (1994): 1.605" << endl;
-	}
-	c1 = s * (2. * ne - ni) / (orbital_bind_en * ne);
-	c2 = 2. * ne - ni;
-}
-
-h_electron_impact_ionization::h_electron_impact_ionization(int verbosity)
-{
-	name = "H + e- -> H+ + e- + e-";
-	orbital_bind_en = 13.606;  // in eV,
-	orbital_kin_en = 13.606;
-
-	ne = 1;
-	s = 4. * M_PI * BOHR_RADIUS * BOHR_RADIUS * ne
-		* RYDBERG_ENERGY_EV * RYDBERG_ENERGY_EV / (orbital_bind_en * orbital_bind_en);
-
-	// Kim & Rudd (1994),
-	diff_osc_str.assign_coeff(0., -0.022473, 1.1775, -0.46264, 0.089064, 0.);
-	diff_osc_str_aux.assign_coeff(0., -0.022473, 1.1775, -0.46264, 0.089064, 0.);
-
-	ni = qromb<diff_oscillator_strength>(diff_osc_str, 0., 100., err, false);
-
-	if (verbosity) {
-		cout << scientific;
-		cout.precision(3);
-		cout << left << "H electron impact ionization, " << endl
-			<< "    parameter Ni from integration: " << ni << endl
-			<< "    from table in Kim & Rudd (1994): 0.4343" << endl;
-	}
-	c1 = s * (2. * ne - ni) / (orbital_bind_en * ne);
-	c2 = 2. * ne - ni;
-}
-
-hep_electron_impact_ionization::hep_electron_impact_ionization(int verbosity)
-{
-	name = "He+ + e- -> He++ + e- + e-";
-	orbital_bind_en = 54.416;  // in eV, Draine, "Physics of the interstellar and intergalactic medium" (2011)
-	orbital_kin_en = 0.;     // for one-electron ions is set to zero,
-
-	ne = 1;
-	s = 4. * M_PI * BOHR_RADIUS * BOHR_RADIUS * ne
-		* RYDBERG_ENERGY_EV * RYDBERG_ENERGY_EV / (orbital_bind_en * orbital_bind_en);
-
-	// Kim & Rudd (1994), as for H atom
-	diff_osc_str.assign_coeff(0., -0.022473, 1.1775, -0.46264, 0.089064, 0.);
-	diff_osc_str_aux.assign_coeff(0., -0.022473, 1.1775, -0.46264, 0.089064, 0.);
-
-	ni = qromb<diff_oscillator_strength>(diff_osc_str, 0., 100., err, false);
-
-	if (verbosity) {
-		cout << scientific;
-		cout.precision(3);
-		cout << left << "He+ electron impact ionization, " << endl
-			<< "    parameter Ni from integration: " << ni << endl;
-	}
-	c1 = s * (2. * ne - ni) / (orbital_bind_en * ne);
-	c2 = 2. * ne - ni;
-}
-
-h2p_electron_impact_ionization::h2p_electron_impact_ionization(int verbosity)
-{
-	name = "H2+ + e- -> H+ + H+ + e- + e-";
-	orbital_bind_en = 16.25;  // in eV, Wikipedia
-	orbital_kin_en = 0.;     // for one-electron ions is set to zero,
-
-	ne = 1;
-	s = 4. * M_PI * BOHR_RADIUS * BOHR_RADIUS * ne
-		* RYDBERG_ENERGY_EV * RYDBERG_ENERGY_EV / (orbital_bind_en * orbital_bind_en);
-
-	// Kim & Rudd (1994), as for H atom
-	diff_osc_str.assign_coeff(0., -0.022473, 1.1775, -0.46264, 0.089064, 0.);
-	diff_osc_str_aux.assign_coeff(0., -0.022473, 1.1775, -0.46264, 0.089064, 0.);
-
-	ni = qromb<diff_oscillator_strength>(diff_osc_str, 0., 100., err, false);
-
-	if (verbosity) {
-		cout << scientific;
-		cout.precision(3);
-		cout << left << "H2+ electron impact ionization, " << endl
-			<< "    parameter Ni from integration: " << ni << endl;
-	}
-	c1 = s * (2. * ne - ni) / (orbital_bind_en * ne);
-	c2 = 2. * ne - ni;
-}
-
-
-cross_section_integral_2d::cross_section_integral_2d(electron_impact_ionization* ei, double e)
-	:x1(0.), x2(0.), z1(0.), z2(0.), el_ion(ei), err(e)
-{
-	;
-}
-
-double cross_section_integral_2d::operator()(double x)
-{
-	if (x < el_ion->get_binding_energy())
-		return 0.;
-
-	double a;
-	el_ion->set_projectile_energy(x);
-
-	// ejected electron has the lowest energy,
-	a = 0.5 * (x - el_ion->get_binding_energy());
-	if (z2 < a)
-		a = z2;
-
-	if (a < z1)
-		return 0.;
-
-	a = qromb<electron_impact_ionization>(*el_ion, z1, a, 0.1 * err, false);
-	return a;
-}
-
-double cross_section_integral_2d::get(double xx1, double xx2, double zz1, double zz2)
-{
-	x1 = xx1;
-	x2 = xx2;
-	z1 = zz1;
-	z2 = zz2;
-
-	return qromb<cross_section_integral_2d>(*this, x1, x2, err, false);
-}
-
-cross_section_integral_weight::cross_section_integral_weight(electron_impact_ionization* ei, double e)
-	:x1(0.), x2(0.), y1(0.), y2(0.), z1(0.), z2(0.), el_ion(ei), err(e)
-{
-	;
-}
-
-double cross_section_integral_weight::operator()(double x)
-{
-	double a, b, c;
-	el_ion->set_projectile_energy(x);
-
-	a = x - y2 - el_ion->get_binding_energy();
-	if (z1 > a)
-		a = z1;
-
-	b = x - y1 - el_ion->get_binding_energy();
-	if (z2 < b)
-		b = z2;
-
-	// ejected electron has the lowest energy,
-	c = 0.5 * (x - el_ion->get_binding_energy());
-	if (c < b)
-		b = c;
-
-	if (a >= b)
-		return 0.;
-
-	a = qromb<electron_impact_ionization>(*el_ion, a, b, 0.1 * err, false);
-	return a;
-}
-
-double cross_section_integral_weight::get(double xx1, double xx2, double yy1, double yy2, double zz1, double zz2)
-{
-	x1 = xx1;
-	x2 = xx2;
-	y1 = yy1;
-	y2 = yy2;
-	z1 = zz1;
-	z2 = zz2;
-
-	return qromb<cross_section_integral_weight>(*this, x1, x2, err, false);
-}
 
 
 // HeI excitation by electron impact,
@@ -572,4 +678,53 @@ double hei_electron_excitation_spin_forbidden::operator()(double en) const
 		answ = 0.;
 
 	return answ;
+}
+
+
+// 
+void save_cross_section_table(const string& output_path, const string& data_path)
+{
+	int verbosity = 1;
+	double en, en_min, en_max, t;
+
+	string fname;
+	ofstream output;
+
+	// Initialization of cross section data for elastic scattering:
+	cross_section_table_vs1 *elastic_h2_el_cs
+		= new cross_section_table_vs1(data_path, "elastic_scattering/e-h2_mt_cs.txt");
+
+	cross_section_table_vs1* elastic_he_el_cs
+		= new cross_section_table_vs1(data_path, "elastic_scattering/e-he_mt_cs.txt");
+
+	// Electron impact ionization
+	h2_electron_ionization_data h2_ioniz_data;
+
+	electron_impact_ionization* h2_ioniz_cs
+		= new electron_impact_ionization(h2_ioniz_data, verbosity);
+
+	electron_impact_ionization_relativistic* h2_ioniz_cs_rel
+		= new electron_impact_ionization_relativistic(h2_ioniz_data, verbosity);
+
+	fname = output_path + "cs_electron_medium.txt";
+	output.open(fname.c_str());
+
+	output << left << "!Cross sections in [cm2] of electron interaction with the medium," << endl
+		<< setw(14) << "!Energy(eV) " << setw(12) << "H2(mt) " << setw(12) << "He(mt) " << setw(12) << "H2(ion) " << setw(12) << "H2(ion_rel) " << endl;
+
+	en_min = 0.1;  // eV
+	en_max = 1.e+6;
+	t = pow(10., 0.05);
+
+	for (en = en_min; en <= en_max; en *= t) {
+		output.precision(6);
+		output << left << setw(14) << en;
+
+		output.precision(3);
+		output << left << setw(12) << (*elastic_h2_el_cs)(en) 
+			<< setw(12) << (*elastic_he_el_cs)(en)
+			<< setw(12) << h2_ioniz_cs->get_int_cs(en) 
+			<< setw(12) << h2_ioniz_cs_rel->get_int_cs(en) << endl;
+	}
+	output.close();
 }

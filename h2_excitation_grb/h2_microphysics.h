@@ -4,6 +4,9 @@
 #include "spectroscopy.h"
 #include "dynamic_array.h"
 
+// Saving cross section table
+void save_cross_section_table(const std::string& output_path, const std::string& data_path);
+
 
 // pure virtual class:
 class cross_section
@@ -56,36 +59,14 @@ public:
 	~cross_section_table_vs1() { ; }
 };
 
-// cross section values in the data file are in a0^2 (Bohr radius squared), a0 = 0.529e-8 cm
-class cross_section_table_mccc : public cross_section_table
-{
-public:
-	// path to the data folder, and file name with the path within the data folder must be given:
-	cross_section_table_mccc(const std::string& data_path, const std::string& name);
-	~cross_section_table_mccc() { ; }
-};
-
-//
-// Excitation of H2 vibration states,
-// Janev et al. "Collision Processes in Low-Temperature Hydrogen Plasmas", FZ-Juelich Report No. 4105 (2003)
-class h2_excitation_vibr02_cs : public cross_section
-{
-protected:
-	double alpha, gamma;
-
-public:
-	double operator() (double energy) const;
-	h2_excitation_vibr02_cs();
-};
-
 
 // Electron impact ionization (only simple atoms and molecules: H, He, H2, He+, H2+,..)
 // Kim & Rudd, Physical Review A 50, p.3954 (1994); 
-// Kim et al. Physical Review A 62, 052710 (2000);
+// Kim et al., Physical Review A 62, 052710 (2000);
 class oscillator_strength
 {
 protected: 
-	// approximation parameters of oscillator strength, dimensionless
+	// parameters of the approximation of oscillator strength, dimensionless
 	double af, bf, cf, df, ef, ff; 
 
 public:
@@ -97,7 +78,7 @@ public:
 };
 
 // df/dw
-// for calculation of singly differential cross section,
+// for the calculation of singly differential cross section,
 class diff_oscillator_strength : public oscillator_strength
 {
 public:	
@@ -114,6 +95,57 @@ public:
 	diff_oscillator_strength_aux();
 };
 
+// Binary-Encounter-Dipole (BED) model for all species
+class electron_ionization_data
+{
+public:
+	int ne;     // number of electrons,
+	double ni;  // oscillator strength integral, dimensionless
+	double orbital_bind_en;  // orbital binding energy, in eV (= B in the paper by Kim et al., 1994)
+	double orbital_kin_en;   // orbital kinetic energy of the target electron, in eV (= U),
+	double af, bf, cf, df, ef, ff;  // parameters of the approximation of oscillator strength, dimensionless
+	std::string name;
+
+	electron_ionization_data();
+};
+
+// H2 + e- -> H2+ + e- + e-
+// dissociative recombination cross section is about 10 per cent - is not taken into account here (Yoon et al., J.Phys. Chem. Ref. Data 37, 913, 2008)
+class h2_electron_ionization_data : public electron_ionization_data {
+public:
+	h2_electron_ionization_data();
+};
+
+// He + e- -> He+ + e- + e-  (total cross section is about 3e-17 cm2 at the peak about 100 eV),
+// only single ionization of helium is considered,
+// double ionization of helium is about 1e-19 cm2 at the peak at energy 250 eV, Ralchenko et al., Atomic Data and Nuclear Data Tables 94, 603 (2008)
+class he_electron_ionization_data : public electron_ionization_data {
+public:
+	he_electron_ionization_data();
+};
+
+// H + e- -> H+ + e- + e-
+class h_electron_ionization_data : public electron_ionization_data {
+public:
+	h_electron_ionization_data();
+};
+
+// He+ + e- -> He++ + e- + e-
+// Binary-Encounter-Dipole (BED) model, 
+// for one-electron ions the differential oscillator strength as for H atom (Kim & Rudd, 1994),
+class hep_electron_ionization_data : public electron_ionization_data {
+public:
+	hep_electron_ionization_data();
+};
+
+// H2+ + e- -> H+ + H+ + e- + e-,
+// is accompanied by ion destruction
+class h2p_electron_ionization_data : public electron_ionization_data {
+public:
+	h2p_electron_ionization_data();
+};
+
+
 //
 // Because the scattered and ejected electrons are indistinguishable, it is customary to call the faster one of the
 // two (after a collision) the primary electron, and the slower one - the secondary electron,
@@ -122,26 +154,27 @@ class electron_impact_ionization
 {
 protected:
 	int		ne;  // number of electrons,
-	double  orbital_bind_en;  // orbital binding energy, in eV 
-	double  orbital_kin_en;   // orbital kinetic energy of the target electron, normalized on binding energy, dimensionless
+	double  orbital_bind_en;  // orbital binding energy, in eV (= B in the paper by Kim et al., 1994)
+	double  orbital_kin_en;   // orbital kinetic energy of the target electron, in eV (= U),
+	double  u;                // orbital kinetic energy normalized by orbital binding energy, dimensionless
 	double  s;   // normalization parameter, [cm2]
 	double  ni;  // oscillator strength integral, dimensionless
 	double  proj_en;  // projectile energy, in eV 
 	double  err;      // relative error in the integration
-	double  c1, c2;   // auxiliary parameters,
+	double  c1;       // auxiliary parameters,
 	std::string name;
 
 	diff_oscillator_strength		diff_osc_str;
 	diff_oscillator_strength_aux	diff_osc_str_aux;
 
 public:
-	// energy in eV, returns differential cross section, per unit of energy of ejected electron [cm2 eV-1]
 	// ejected_energy - energy of the slowest electron after collision,
+	// returns differential cross section, per unit of energy of ejected electron [cm2 eV-1], energy in eV,
 	virtual double operator() (double projectile_energy, double ejected_energy) const;
 	virtual double operator() (double ejected_energy) const;  // projectile energy must be assigned before function call,
 
 	// returns cross section (integrated on ejected electron energy), [cm2]
-	virtual double get_int_cs(double projectile_energy);
+	virtual double get_int_cs(double projectile_energy);  // integrated from 0. to (projectile energy - binding energy)/2
 	virtual double get_int_cs(double projectile_energy, double ej_energy_min, double ej_energy_max);
 
 	// returns energy in eV,
@@ -151,57 +184,39 @@ public:
 	// energy in eV;
 	void set_projectile_energy(double en) { proj_en = en; }
 
-	electron_impact_ionization();
+	electron_impact_ionization(const electron_ionization_data&, int verbosity);
 	virtual ~electron_impact_ionization();
 };
 
+
 // Relativistic cross section for electron impact ionization,
+class electron_impact_ionization_relativistic : public electron_impact_ionization
+{
+protected:
+	double srel;  // normalization parameter, [cm2]
+	double bp;    // orbital binding energy normalized by electron rest energy mc^2;
+	double up;    // orbital kinetic energy normalized by electron rest energy mc^2;
+	double beta_b2, beta_u2;
 
-
-
-// Binary-Encounter-Dipole (BED) model for all species
-// dissociative recombination cross section is about 10 per cent - is not taken into account here (Yoon et al., J.Phys. Chem. Ref. Data 37, 913, 2008)
-// H2 + e- -> H2+ + e- + e-
-class h2_electron_impact_ionization : public electron_impact_ionization {
 public:
-	h2_electron_impact_ionization(int verbosity);
+	// returns differential cross section, per unit of energy of ejected electron [cm2 eV-1], energy in eV,
+	double operator() (double projectile_energy, double ejected_energy) const;
+	double operator() (double ejected_energy) const;
+
+	virtual double get_int_cs(double projectile_energy);
+	virtual double get_int_cs(double projectile_energy, double ej_energy_min, double ej_energy_max);
+
+	electron_impact_ionization_relativistic(const electron_ionization_data&, int verbosity);
+	~electron_impact_ionization_relativistic();
 };
 
-// only single ionization of helium is considered,
-// He + e- -> He+ + e- + e-  (total cross section is about 3e-17 cm2 at the peak about 100 eV),
-// double ionization of helium is about 1e-19 cm2 at the peak at energy 250 eV, Ralchenko et al., Atomic Data and Nuclear Data Tables 94, 603 (2008)
-class he_electron_impact_ionization : public electron_impact_ionization {
-public:
-	he_electron_impact_ionization(int verbosity);
-};
-
-// H + e- -> H+ + e- + e-
-class h_electron_impact_ionization : public electron_impact_ionization {
-public:
-	h_electron_impact_ionization(int verbosity);
-};
-
-// He+ + e- -> He++ + e- + e-
-// Binary-Encounter-Dipole (BED) model, 
-// for one-electron ions the differential oscillator strength as for H atom (Kim & Rudd, 1994),
-class hep_electron_impact_ionization : public electron_impact_ionization {
-public:
-	hep_electron_impact_ionization(int verbosity);
-};
-
-// H2+ + e- -> H+ + H+ + e- + e-,
-// is accompanied by ion destruction
-class h2p_electron_impact_ionization : public electron_impact_ionization {
-public:
-	h2p_electron_impact_ionization(int verbosity);
-};
-
-
+//
+// Auxiliary classes for the calculation of ionization rates and electron spectra evolution,
 class cross_section_integral_2d
 {
 protected:
 	double err, x1, x2, z1, z2;
-	electron_impact_ionization* el_ion;
+	electron_impact_ionization* ionization;
 
 public:
 	double operator() (double x);
@@ -213,15 +228,16 @@ public:
 	cross_section_integral_2d(electron_impact_ionization* ei, double err);
 };
 
+//
 class cross_section_integral_weight
 {
 protected:
 	double err, x1, x2, y1, y2, z1, z2;
-	electron_impact_ionization* el_ion;
+	electron_impact_ionization* ionization;
 
 public:
 	double operator() (double x);
-	// x - initial projectile energy, 
+	// x - initial projectile electron energy, 
 	// y - final projectile energy (fastest electron after collision), 
 	// z - energy of the ejected electron, z <= y,
 	// returns integral of diff. cross section on [x1, x2] and [z1, z2] but the scattered energy is lying in the given interval [y1, y2], [cm2 eV],
@@ -229,6 +245,38 @@ public:
 
 	cross_section_integral_weight(electron_impact_ionization* ei, double err);
 };
+
+
+//
+// Vibrationally-resolved electronic excitation of H2 ground state S1g+(X), 
+// Scarlett et al., Atomic Data and Nuclear Data Tables 137, 101361 (2021), 
+// Scarlett et al., Physical Review A 104, L040801 (2021);
+// molecular convergent close-coupling method (MCCC), 
+// cross section values in the data file are in a0^2 (Bohr radius squared), a0 = 0.529e-8 cm
+class cross_section_table_mccc : public cross_section_table
+{
+public:
+	// path to the data folder, and file name with the path within the data folder must be given:
+	cross_section_table_mccc(const std::string& data_path, const std::string& name);
+	~cross_section_table_mccc() { ; }
+};
+
+
+//
+// Excitation of H2 vibration states,
+// Janev et al. "Collision Processes in Low-Temperature Hydrogen Plasmas", FZ-Juelich Report No. 4105 (2003)
+class h2_excitation_vibr02_cs : public cross_section
+{
+protected:
+	double alpha, gamma;
+
+public:
+	double operator() (double energy) const;
+	h2_excitation_vibr02_cs();
+};
+
+
+
 
 
 // HeI excitation by electron impact,
