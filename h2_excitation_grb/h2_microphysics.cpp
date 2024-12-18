@@ -243,6 +243,7 @@ electron_impact_ionization::electron_impact_ionization(const electron_ionization
 	ne = data.ne;
 	orbital_bind_en = data.orbital_bind_en;
 	orbital_kin_en = data.orbital_kin_en;
+	name = data.name;
 
 	u = orbital_kin_en / orbital_bind_en;
 	s = 4. * M_PI * BOHR_RADIUS * BOHR_RADIUS * ne
@@ -582,8 +583,22 @@ cross_section_table_mccc::cross_section_table_mccc(const std::string& data_path,
 		cs_arr[i] = csv[i];
 	}
 
-	en_thr = en_arr[0];  // the cross section at this energy is zero,
-	gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 3]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 3]);
+	// the cross section at this energy may not be zero - the reaction without threshold,
+	en_thr = en_arr[0];
+	
+	// 3 last points are used in the extrapolation (check the dependence on this number),
+	if ((cs_arr[nb_cs - 3] > cs_arr[nb_cs - 2]) && (cs_arr[nb_cs - 3] > cs_arr[nb_cs - 1])) {
+		gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 3]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 3]);
+	}
+	// only 2 last points are used in the extrapolation,
+	else if (cs_arr[nb_cs - 2] > cs_arr[nb_cs - 1]) {
+		gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 2]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 2]);
+	}
+	else { // no energy dependence in this case,
+		gamma = 0.;
+		cout << "Warning: the cross section does not decreases with increasing energy, file " << endl
+			<< "	" << name << endl;
+	}
 }
 
 

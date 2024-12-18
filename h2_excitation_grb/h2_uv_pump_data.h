@@ -3,10 +3,8 @@
 #include <vector>
 #include "spectroscopy.h"
 
-// Must be deleted,
-// Rotational level nb of the initial vibrational state of the ground electronic state for which the excitation vi -> vf is taken into account 
-// must be <= nb of levels of the initial vibrational state, maximal for vi = 0 is 29, 
-#define MAX_J_H2_VIBR_INIT 15
+// Maximal number of rotational levels of the ground electronic state (for vibrational state v = 0),
+#define MAX_J_H2 32  // 0,1,..,31
 
 
 // Nb of vibrational states of electronic state taken into account,
@@ -72,7 +70,7 @@ void print_statistics(std::string output_path, std::string name, const energy_di
 
 
 //
-// Honl-London factors,
+// Honl-London factors, normalized,
 // Whiting & Nicholls, ApJ Suppl. Ser. 235, 27 (1974); 
 // additional: Gay et al. ApJ 746, 78 (2012);
 class honl_london {
@@ -81,13 +79,14 @@ public:
 	virtual double operator()(int j, int dj) { return 0.; }
 };
 
-// for S1g+(X) -> S1u+(B), adsorption, j -> j + dj
+// S1g(X) -> S1u(B), S1u(Bp), dL = 0, dJ = +/-1 (absorption)
 class honl_london_singlet_dl0 : public honl_london {
 public:
 	double operator()(int j, int dj);
 	honl_london_singlet_dl0() { ; }
 };
 
+// S1g(X) -> P1u(C), P1u(D), dL = 1, dJ = -1, 0, 1
 class honl_london_singlet_dl1 : public honl_london {
 public:
 	double operator()(int j, int dj);

@@ -346,7 +346,8 @@ void print_statistics(std::string output_path, std::string name, const energy_di
 
 
 //
-// Honl-London factors,
+// Honl-London factors, normalized, 
+// (j, j - 1) + (j, j + 1) = 1
 double honl_london_singlet_dl0::operator()(int j, int dj)
 {
 	double f(0.);
@@ -359,6 +360,7 @@ double honl_london_singlet_dl0::operator()(int j, int dj)
 	return f;
 }
 
+// (j, j - 1) + (j, j) + (j, j + 1) = 1
 double honl_london_singlet_dl1::operator()(int j, int dj)
 {
 	double f(0.);
@@ -368,6 +370,7 @@ double honl_london_singlet_dl1::operator()(int j, int dj)
 		f = 0.5 * (2. * j + 1.);
 	else  // R(j) transition, j -> j + 1
 		f = 0.5 * (j + 2.);
-
+	
+	f /= (2. * j + 1.);
 	return f;
 }

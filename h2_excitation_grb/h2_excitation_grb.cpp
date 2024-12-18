@@ -38,7 +38,7 @@
 #include "h2_elspectrum_eqs.h"
 #include "h2_saving_data.h"
 
-#define MAX_TEXT_LINE_WIDTH 1500  // maximal size of the comment lines in the files,
+#define MAX_TEXT_LINE_WIDTH 3350  // maximal size of the comment lines in the files in symbols,
 #define SOURCE_NAME "h2_excitation_grb.cpp"
 
 using namespace std;
@@ -46,17 +46,16 @@ using namespace std;
 
 //
 // Simulations of the excitation of H2 molecules in the gas (plasma)
-void simulate_h2_excitation(const string& data_path, const string& sim_path, const string& output_path, double op_ratio_h2,
-    bool test_mode);
+void simulate_h2_excitation(const string& data_path, const string& sim_path, const string& output_path);
 
 void init_electron_energy_grid(vector<double>& electron_energies_grid, vector<double>& electron_energy_bin_size);
 
 // sim_path - path to the folder with simulation data (GRB propagation results)
 // output_path - path to the folder where data of the current simulations must be saved,
+void init_specimen_conc(const string& sim_path, double& conc_h_tot, vector<double>& layer_centre_distances, vector<dynamic_array>& d);
 void init_dust_abund(const string& sim_path, vector<double>& d, double& grain_radius_init, double& grain_nb_density, double& grain_material_density);
-void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& d, const vector<double>& electron_energies_grid, 
-	vector<double>& layers_coordinates, bool test_mode);
-void init_specimen_conc(const string& sim_path, double& conc_h_tot, vector<dynamic_array>& d);
+void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& d, const vector<double>& electron_energies_grid);
+void init_h2_population_density(const string& sim_path, vector<dynamic_array>& d);
 
 
 int f_elsp(realtype t, N_Vector y, N_Vector ydot, void* user_data) {
@@ -65,9 +64,7 @@ int f_elsp(realtype t, N_Vector y, N_Vector ydot, void* user_data) {
 
 int main()
 {
-	bool test_mode;
 	int nb_processors(4);
-	double op_ratio_h2;
 	
 	string data_path;    // path to the input_data folder with spectroscopic, collisional data and etc.
 	string output_path;  // path to the folder where data of the current simulation must be saved,
@@ -87,14 +84,11 @@ int main()
 #endif
 
 	sim_path = "C:/Users/Александр/Documents/Данные и графики/paper Fitting of the xray spectra of GRBs/2024_04_1e3_dist100/";
-	output_path = "C:/Users/Александр/Documents/Данные и графики/H2 excitation in induced by GRB radiation/electron_spectrum/";
+	output_path = "C:/Users/Александр/Documents/Данные и графики/H2 excitation in induced by GRB radiation/h2_excitation/";
 	data_path = "C:/Users/Александр/Documents/input_data/";
-
-	// be careful about test simulations,
-	test_mode = false;
-	op_ratio_h2 = 1.;
 	
-	simulate_h2_excitation(data_path, sim_path, output_path, op_ratio_h2, test_mode);
+	// check test mode in the file with parameters, h2_parameters.h
+	simulate_h2_excitation(data_path, sim_path, output_path);
 	save_cross_section_table(output_path, data_path);
 }
 
@@ -131,25 +125,26 @@ void init_electron_energy_grid(vector<double>& electron_energies_grid, vector<do
 }
 
 
-void simulate_h2_excitation(const string& data_path, const string& sim_path, const string& output_path, double op_ratio_h2, bool test_mode)
+void simulate_h2_excitation(const string& data_path, const string& sim_path, const string& output_path)
 {
 	const int verbosity = 1;
 	
 	bool dust_is_presented(true), must_be_saved;
-	int i, k, nb_of_time_moments, lay_nb, time_nb, step_nb, flag, nb_of_equat, nb_of_el_energies,
-		nb_lev_h2, nb_lev_hei, h2eq_nb, heieq_nb, physeq_nb;
+	int i, k, nb_of_time_moments, lay_nb, time_nb, step_nb, flag, nb_of_equat, nb_of_el_energies, nb_lev_h2, nb_lev_hei, 
+		h2eq_nb, heieq_nb, physeq_nb;
 	long int nb_steps_tot;
-	double x1, x2, x3, x4, x5, x6, x7, x8, x9, rel_tol, dt, model_time, model_time_aux, model_time_step, model_time_out, conc_h_tot, grain_radius_init, grain_nb_density, grain_material_density, grain_radius,
+	double x1, x2, x3, x4, x5, x6, x7, x8, x9, rel_tol, dt, model_time, model_time_aux, model_time_aux_prev, model_time_step, model_time_out,
+		conc_h_tot, grain_radius_init, grain_nb_density, grain_material_density, grain_radius, dust_mass, gas_mass, grb_distance,
 		enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_vibr, enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_coloumb_ions,
 		enloss_rate_coloumb_el, enloss_rate_hei, enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_h2_singlet, enloss_h2_triplet, enloss_ioniz, enloss_coloumb_ions,
 		enloss_coloumb_el, enloss_hei, h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate,
-		h2_solomon_diss, h2_diss_exc_singlet, h2_diss_exc_triplet, hei_exc, dust_mass, gas_mass, grb_distance;
+		h2_solomon_diss, h2_diss_exc_singlet, h2_diss_exc_triplet, hei_exc;
 
 	time_t timer;
 	char* ctime_str;
 
 	vector<double> time_cloud_arr;      // in s
-	vector<double> layers_coordinates;  // in cm
+	vector<double> layer_centre_distances;  // in cm
 	vector<double> electron_energies_grid, electron_energy_bin_size;  // in eV,
 
 	// Energy loss rate in [eV cm-3 s-1], as a function of time
@@ -171,9 +166,11 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 
 	// Spectrum[layer nb][energy bin] in [cm-3 eV-1], vector index - layer nb, array index - energy bin nb (specimen nb, H2 level nb),
 	vector<dynamic_array> el_spectrum_init_data, specimen_conc_init_data; 
+	vector<dynamic_array> h2_pop_dens_init_data;
 	
-	// Spectrum[time nb][energy bin] in [cm-3], vector index - time moment nb, array index - energy bin nb (specimen nb, level nb)
+	// Electron spectrum[time nb][energy bin] in [cm-3], vector index - time moment nb, array index - energy bin nb 
 	vector<dynamic_array> el_spectrum_evol;
+	// Concentration[time nb][specimen nb], or [level nb]
 	vector<dynamic_array> specimen_conc_evol, h2_popdens_evol, h2_popdens_v_evol, hei_popul_dens_evol;  // in [cm-3]
 
 	cout << scientific;
@@ -191,11 +188,14 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 
 	init_dust_abund(sim_path, dg_ratio_cloud_data, grain_radius_init, grain_nb_density, grain_material_density); 
 	
-	// gas density is initialized here,
-	init_specimen_conc(sim_path, conc_h_tot, specimen_conc_init_data); 
+	// gas density and layer coordinates are initialized here,
+	init_specimen_conc(sim_path, conc_h_tot, layer_centre_distances, specimen_conc_init_data);
 
 	// electron spectrum in the file has the dimension [cm-3 eV-1],	
-	init_electron_spectra(sim_path, output_path, el_spectrum_init_data, electron_energies_grid, layers_coordinates, test_mode);
+	init_electron_spectra(sim_path, output_path, el_spectrum_init_data, electron_energies_grid);
+
+	// population density in the file has dimension [cm-3],
+	init_h2_population_density(sim_path, h2_pop_dens_init_data);
 
 	elspectra_evolution_data user_data(data_path, conc_h_tot, electron_energies_grid, verbosity);
 
@@ -273,7 +273,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	if (lay_nb > (int)el_spectrum_init_data.size())
 		lay_nb = (int)el_spectrum_init_data.size() - 1;
 
-	grb_distance = layers_coordinates[lay_nb];
+	grb_distance = layer_centre_distances[lay_nb];
 
 	for (i = 0; i < nb_of_equat; i++) {
 		NV_Ith_S(y, i) = 0.;
@@ -286,10 +286,18 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 		NV_Ith_S(y, nb_of_el_energies + i) = specimen_conc_init_data[lay_nb].arr[i];
 	}
 
-	// the initial distribution of energy level populations is postulated,
-	NV_Ith_S(y, h2eq_nb) = NV_Ith_S(y, nb_of_el_energies + H2_NB) / (op_ratio_h2 + 1.);
-	NV_Ith_S(y, h2eq_nb + 1) = NV_Ith_S(y, nb_of_el_energies + H2_NB) * op_ratio_h2 / (op_ratio_h2 + 1.);
-
+	if (H2_POP_DENS_INIT) {
+		// population densities must be in [cm-3],
+		for (i = 0; i < nb_lev_h2 && i < h2_pop_dens_init_data[lay_nb].dim; i++) {
+			NV_Ith_S(y, h2eq_nb + i) = h2_pop_dens_init_data[lay_nb].arr[i];
+		}
+	}
+	else {
+		// the initial distribution of energy level populations is postulated, [cm-3]
+		NV_Ith_S(y, h2eq_nb) = NV_Ith_S(y, nb_of_el_energies + H2_NB) / (ORTHO_TO_PARA_RATIO + 1.);
+		NV_Ith_S(y, h2eq_nb + 1) = NV_Ith_S(y, nb_of_el_energies + H2_NB) * ORTHO_TO_PARA_RATIO / (ORTHO_TO_PARA_RATIO + 1.);
+	}
+	
 	// the initial distribution of HeI levels,
 	NV_Ith_S(y, heieq_nb) = NV_Ith_S(y, nb_of_el_energies + HE_NB);
 
@@ -354,7 +362,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	for (i = 0; i < nb_lev_h2; i++) {
 		k = user_data.get_vibr_nb_h2(i);
 		if (k >= 0)
-			h2_pop_v.arr[k] += NV_Ith_S(y, i);
+			h2_pop_v.arr[k] += NV_Ith_S(y, h2eq_nb + i);
 	}
 	h2_popdens_v_evol.push_back(h2_pop_v);
 
@@ -411,7 +419,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	{	
 		flag = CV_SUCCESS;
 		must_be_saved = false;
-		x1 = model_time_aux;
+		model_time_aux_prev = model_time_aux;
 
 		if (model_time < time_cloud_arr[time_nb]) 
 		{
@@ -446,7 +454,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 			// update the members of user_data class,
 			f_elsp(model_time_aux, y, ydot, &user_data);
 			
-			dt = 0.5 * (model_time_aux - x1);
+			dt = 0.5 * (model_time_aux - model_time_aux_prev);
 
 			x1 = enloss_rate_mt;
 			x2 = enloss_rate_h2_rot;
@@ -492,8 +500,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 			}
 		
 			// saving data,
-			if (must_be_saved) 
-			{
+			if (must_be_saved) {
 				for (i = 0; i < nb_of_el_energies; i++) {
 					el_spectrum.arr[i] = NV_Ith_S(y, i);  // number of electrons in the energy interval (is not divided by energy bin),
 				}
@@ -513,7 +520,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 				for (i = 0; i < nb_lev_h2; i++) {
 					k = user_data.get_vibr_nb_h2(i);
 					if (k >= 0)
-						h2_pop_v.arr[k] += NV_Ith_S(y, i);
+						h2_pop_v.arr[k] += NV_Ith_S(y, h2eq_nb + i);
 				}
 				h2_popdens_v_evol.push_back(h2_pop_v);
 
@@ -616,6 +623,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 }
 
 
+//
 // please, check the value of MAX_TEXT_LINE_WIDTH
 void init_dust_abund(const string& sim_path, vector<double>& d, double & grain_radius_init, double& grain_nb_density, double& grain_material_density)
 {
@@ -663,11 +671,10 @@ void init_dust_abund(const string& sim_path, vector<double>& d, double & grain_r
 }
 
 // 
-void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& init_data, const vector<double>& en_grid, 
-	vector<double> & layers_coordinates, bool test_mode)
-{
-	const double conc_electrons_test = 0.1;  // cm-3
-	const int lay_nb = 0;  // layer nb for which the electron spectra is saved (initial and after rescaling of energy grid),
+void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& init_data, const vector<double>& en_grid)
+{ 
+	// layer nb for which the electron spectra is saved (initial and after rescaling of energy grid),
+	const int lay_nb_test = 0; 
 	
 	int i, j, l, k, nb_l, en_nb_f, en_nb, nb_bins;
 	char ch, text_line[MAX_TEXT_LINE_WIDTH];
@@ -701,7 +708,6 @@ void init_electron_spectra(const string& sim_path, const string& output_path, ve
 	input >> str >> str;
 	for (i = 0; i < nb_l; i++) {
 		input >> x;
-		layers_coordinates.push_back(x);
 	}
 
 	for (j = 0; j < nb_l; j++) {
@@ -719,10 +725,10 @@ void init_electron_spectra(const string& sim_path, const string& output_path, ve
 			input >> x;
 
 			// vector index - layer nb, array index - electron energy bin nb,	
-			if (test_mode) {
+			if (ELECTRON_SPECTRUM_TEST) {
 				file_data[l].arr[i] = 0.;
 				if (i == en_nb_f - 1)
-					file_data[l].arr[i] = conc_electrons_test / (2. * de);
+					file_data[l].arr[i] = ELECTRON_CONCENTRATION_TEST / (2. * de);
 			}
 			else {
 				file_data[l].arr[i] = x;
@@ -756,26 +762,26 @@ void init_electron_spectra(const string& sim_path, const string& output_path, ve
 		}
 	}
 
-	// Saving electronspectra for test,
+	// Saving electron spectra for test,
 	fname = output_path + "electron_spectra_file.txt";
 	output.open(fname.c_str());
 	output << scientific;
 	
-	output << left << "! Initial electron spectra from file with simulation data," << endl
-		<< "! Histogram, energy (eV), spectra [cm-3 eV-1] (as in the file with simulation data), layer nb: " << lay_nb << endl;
+	output << left << "!Electron spectra from file with simulation data," << endl
+		<< "!Histogram, energy (eV), spectra [cm-3 eV-1] (as in the file with simulation data), layer nb: " << lay_nb_test << endl;
 
 	for (i = 0; i < en_nb_f; i++) {
 		output.precision(5);
-		output << left << setw(14) << en_grid_file[i];
+		output << left << setw(14) << en_grid_file[i] * 1.0001; 
 		
 		output.precision(3);
-		output << left << setw(12) << file_data[lay_nb].arr[i] << endl;
+		output << left << setw(12) << file_data[lay_nb_test].arr[i] << endl;
 
 		output.precision(5);
-		output << left << setw(14) << en_grid_file[i + 1] * 1.0001;
+		output << left << setw(14) << en_grid_file[i + 1];
 
 		output.precision(3);
-		output << left << setw(12) << file_data[lay_nb].arr[i] << endl;
+		output << left << setw(12) << file_data[lay_nb_test].arr[i] << endl;
 	}
 	output.close();
 
@@ -783,26 +789,27 @@ void init_electron_spectra(const string& sim_path, const string& output_path, ve
 	output.open(fname.c_str());
 	output << scientific;
 
-	output << left << "! Initial electron spectra from file with simulation data," << endl
-		<< "! Histogram, energy (eV), spectra [cm-3 eV-1] (as in the file with simulation data), layer nb: " << lay_nb << endl;
+	output << left << "!Initial electron spectra in simulations," << endl
+		<< "!Histogram, energy (eV), spectra [cm-3 eV-1], layer nb: " << lay_nb_test << endl;
 
 	for (i = 0; i < en_nb; i++) {
 		output.precision(5);
-		output << left << setw(14) << en_grid[i];
+		output << left << setw(14) << en_grid[i]* 1.0001;
 
 		output.precision(3);
-		output << left << setw(12) << init_data[lay_nb].arr[i] << endl;
+		output << left << setw(12) << init_data[lay_nb_test].arr[i] << endl;
 
 		output.precision(5);
-		output << left << setw(14) << en_grid[i + 1] * 1.0001;
+		output << left << setw(14) << en_grid[i + 1];
 
 		output.precision(3);
-		output << left << setw(12) << init_data[lay_nb].arr[i] << endl;
+		output << left << setw(12) << init_data[lay_nb_test].arr[i] << endl;
 	}
 	output.close();
 }
 
-void init_specimen_conc(const string& path, double& conc_h_tot, vector<dynamic_array>& d)
+//
+void init_specimen_conc(const string& path, double& conc_h_tot, vector<double>& layer_centre_distances, vector<dynamic_array>& d)
 {
 	int i, j, k, nb_l, nb_sp;
 	double x;
@@ -811,6 +818,7 @@ void init_specimen_conc(const string& path, double& conc_h_tot, vector<dynamic_a
 	string fname, sn;
 	stringstream ss;
 	ifstream input;
+
 	vector<string> chemical_species_file;
 	dynamic_array specimen_conc(NB_OF_CHEM_SPECIES);
 
@@ -846,7 +854,9 @@ void init_specimen_conc(const string& path, double& conc_h_tot, vector<dynamic_a
 
 	for (i = 0; i < nb_l; i++) {
 		d.push_back(specimen_conc);
+		
 		input >> j >> x;
+		layer_centre_distances.push_back(x);
 
 		for (j = 0; j < nb_sp; j++) {
 			input >> x;
@@ -860,6 +870,48 @@ void init_specimen_conc(const string& path, double& conc_h_tot, vector<dynamic_a
 	input.close();
 }
 
+// In the file, the levels are denoted by the number,
+// Note, there is no check yet about the consistency of energy levels used in this code and those used in the simulations before, 
+void init_h2_population_density(const string& path, vector<dynamic_array>& d)
+{
+	int i, j, nb_l, nb_lev_h2_f;
+	double x, conc_h_tot;
+	char ch, text_line[MAX_TEXT_LINE_WIDTH];
+
+	string fname, sn;
+	stringstream ss;
+	ifstream input;
+
+	fname = path + "grb_h2_popdens.txt";
+	input.open(fname.c_str(), ios_base::in);
+
+	if (!input.is_open()) {
+		cout << "Error in " << SOURCE_NAME << ": can't open " << fname << endl;
+		exit(1);
+	}
+
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+
+	input >> ch >> conc_h_tot >> nb_l >> nb_lev_h2_f;
+
+	dynamic_array population_densities(nb_lev_h2_f);
+
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);  // reading the end of the previous line
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+
+	for (i = 0; i < nb_l; i++) {
+		d.push_back(population_densities);
+		input >> j >> x;
+
+		for (j = 0; j < nb_lev_h2_f; j++) {
+			input >> x;
+			d[i].arr[j] = x;  // vector index - layer nb, array index - molecule level nb,
+		}
+	}
+	input.close();
+}
 
 
 // calculation of data tables for electron Coulomb scattering

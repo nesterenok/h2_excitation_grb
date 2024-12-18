@@ -35,7 +35,7 @@ protected:
 public:
 	// energy in eV, the cross section in cm2 is returned,
 	// if the energy is < min energy, the cross section at minimal energy is returned,
-	// if the energy is > max energy, the cross section approximation is used: sigma = sigma_0*(E/E_0)^(gamma)
+	// if the energy is > max energy, the cross section approximation is used: sigma = sigma_0*(E/E_0)^(gamma), E0 - maximal energy for which data are available,
 	virtual double operator() (double energy) const;
 
 	// parameter gamma must be initialized in the constructor:

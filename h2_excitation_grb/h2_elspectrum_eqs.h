@@ -12,7 +12,7 @@
 
 //
 // Electronic H2 states, taken into account: 
-//      ground state - S1g+(X), 
+//      ground state   - S1g+(X), 
 //      singlet states - S1u+(B,Bp), P1u(C+-,D+-)
 //      triplet states - 
 //      triplet states (dissociative) - S3u+(b)
@@ -37,16 +37,6 @@ struct spectra_data {
     spectra_data() : i0(0), w1(0), w2(0) { ; }
 };
 
-struct spectra_data_adv {
-    int i0, nb;
-    double* weights;
-
-    spectra_data_adv() : i0(0), nb(0), weights(0) { ; }
-    spectra_data_adv(const spectra_data_adv& obj);
-    spectra_data_adv& operator = (const spectra_data_adv& obj);
-};
-
-
 class elspectra_evolution_data
 {
 protected:
@@ -59,17 +49,20 @@ protected:
         hei_min_nb, nb_coll_trans_hei, nb_of_el_energies, nb_of_equat, h2eq_nb, heieq_nb, physeq_nb, min_grain_charge;
     
     double conc_h_tot, grain_cs, grain_nb_density,
-        enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_vibr, enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz,
-        enloss_rate_coloumb_ions, enloss_rate_coloumb_el, enloss_rate_hei, conc_n, conc_i, energy_gain_n, energy_gain_i, nb_gain_n, nb_gain_i, 
+        enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_vibr, enloss_rate_h2_singlet, enloss_diss_h2_singlet, enloss_diss_h2_triplet, 
+        enloss_rate_ioniz, enloss_rate_coloumb_ions, enloss_rate_coloumb_el, enloss_rate_hei, conc_n, conc_i, energy_gain_n, energy_gain_i, nb_gain_n, nb_gain_i, 
         h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate;
 
     // in eV, in electron_energies - the centre of energy interval is provided,
     double* electron_energies_grid, * electron_energy_bin_size, *electron_energies, *electron_velocities;      
     
-    // energy loss values are positive in the array,
     double* el_enloss_h2_mt, * el_enloss_he_mt; 
     double* h2_ioniz_rates_tot, * he_ioniz_rates_tot, * h_ioniz_rates_tot, * h2p_ioniz_rates_tot, * hep_ioniz_rates_tot;
     double** h2_ioniz_rates, ** he_ioniz_rates, ** h_ioniz_rates, ** h2p_ioniz_rates, ** hep_ioniz_rates;
+
+    double** h2_bstate_rates, ** h2_cstate_rates, ** h2_bpstate_rates, ** h2_dstate_rates;
+    double** h2_bstate_diss_rates, ** h2_cstate_diss_rates, ** h2_bpstate_diss_rates, ** h2_dstate_diss_rates, ** h2_3bstate_diss_rates;
+    double** h2_rot_rates, ** h2_rovibr_rates;
 
     const energy_diagram* hei_di, *h2_di, *h2_di_b, * h2_di_cminus, * h2_di_cplus, *h2_di_bp, * h2_di_dminus, * h2_di_dplus;
     const einstein_coeff* h2_einst, *hei_einst;
@@ -82,121 +75,75 @@ protected:
    
     cross_section_table_mccc** h2_bstate_cs, ** h2_cstate_cs, ** h2_bpstate_cs, ** h2_dstate_cs;
     cross_section_table_mccc** h2_bstate_diss_cs, ** h2_cstate_diss_cs, ** h2_bpstate_diss_cs, ** h2_dstate_diss_cs, ** h2_3bstate_diss_cs;
+    cross_section_table_mccc** h2_rot_cs, **h2_rovibr_cs;
 
     electron_impact_ionization* h2_ioniz_cs, * he_ioniz_cs, * h_ioniz_cs, * h2p_ioniz_cs, * hep_ioniz_cs;
-
-    double** h2_bstate_rates;
+    
+    spectra_data** h2_ioniz_indexes, ** he_ioniz_indexes, ** h_ioniz_indexes, ** h2p_ioniz_indexes, ** hep_ioniz_indexes;
 
     honl_london_singlet_dl0 hl_singlet_dl0;
     honl_london_singlet_dl1 hl_singlet_dl1;
-
     err_func error_function;
 
-    // OLD
-    const cross_section_table_vs1 *rot_h2_j02_cs, * rot_h2_j13_cs, * rot_h2_j24_cs, * rot_h2_j35_cs, *vibr_h2_v01_cs;
-    const h2_excitation_vibr02_cs* vibr_h2_v02_cs;
-    
-    cross_section_table_mccc* h2_v0_bstate_diss_cs, *h2_v1_bstate_diss_cs, *h2_v0_cstate_diss_cs, *h2_v1_cstate_diss_cs, 
-        * h2_v0_bpstate_diss_cs, * h2_v1_bpstate_diss_cs, * h2_v0_dstate_diss_cs, * h2_v1_dstate_diss_cs, 
-        * h2_v0_3bstate_diss_cs, * h2_v1_3bstate_diss_cs;
-    
-    cross_section_table_mccc** h2_v0_bstate_cs, ** h2_v1_bstate_cs, ** h2_v0_cstate_cs, ** h2_v1_cstate_cs, 
-        ** h2_v0_bpstate_cs, ** h2_v1_bpstate_cs, ** h2_v0_dstate_cs, ** h2_v1_dstate_cs;
-    
-    std::vector<int> hei_level_nbs;
-    std::vector<const hei_electron_excitation*> hei_cs;
-
-
-    double* h2_j02_rates, * h2_j24_rates, * h2_j13_rates, * h2_j35_rates, * h2_j20_rates, * h2_j42_rates, * h2_j31_rates, * h2_j53_rates,
-        * h2_v01_rates, * h2_v02_rates, * elel_scatt_rates, * elion_scatt_rates,
-        * h2_v0_bstate_diss_rates, * h2_v1_bstate_diss_rates, * h2_v0_cstate_diss_rates, * h2_v1_cstate_diss_rates,
-        * h2_v0_bpstate_diss_rates, * h2_v1_bpstate_diss_rates, * h2_v0_dstate_diss_rates, * h2_v1_dstate_diss_rates,
-        * h2_v0_3bstate_diss_rates, * h2_v1_3bstate_diss_rates;
-
-
-    double** h2_v0_bstate_rates, ** h2_v1_bstate_rates, ** h2_v0_cstate_rates, ** h2_v1_cstate_rates, ** h2_v0_bpstate_rates, ** h2_v1_bpstate_rates,
-        ** h2_v0_dstate_rates, ** h2_v1_dstate_rates, ** coloumb_rates, ** hei_rates;
-
-    // weights are dimensionless, the sum of weights is equal to 1:
-    spectra_data* h2_j02_indexes, * h2_j13_indexes, * h2_j24_indexes, * h2_j35_indexes,
-        * h2_j20_indexes, * h2_j31_indexes, * h2_j42_indexes, * h2_j53_indexes;
-    spectra_data** h2_v01_indexes, ** h2_v02_indexes;
-    spectra_data** h2_ioniz_indexes, ** he_ioniz_indexes, ** h_ioniz_indexes, ** h2p_ioniz_indexes, ** hep_ioniz_indexes;
-    spectra_data** h2_v0_bstate_indexes, ** h2_v1_bstate_indexes, ** h2_v0_cstate_indexes, ** h2_v1_cstate_indexes,
-        ** h2_v0_bpstate_indexes, ** h2_v1_bpstate_indexes, ** h2_v0_dstate_indexes, ** h2_v1_dstate_indexes,
-        ** h2_v0_bstate_diss_indexes, ** h2_v1_bstate_diss_indexes, ** h2_v0_cstate_diss_indexes, ** h2_v1_cstate_diss_indexes,
-        ** h2_v0_bpstate_diss_indexes, ** h2_v1_bpstate_diss_indexes, ** h2_v0_dstate_diss_indexes, ** h2_v1_dstate_diss_indexes,
-        ** h2_v0_3bstate_diss_indexes, ** h2_v1_3bstate_diss_indexes,
-        ** coloumb_indexes, ** hei_indexes;
-    //
-
+    // Ionization,
     // version without averaging over energy intervals,
     void init_tables_ionization(electron_impact_ionization*, double *& rates_tot, double**& rates, spectra_data**& indexes, 
         int &el_ion_min_nb, int verbosity = 1);
     
-    // parameter 'rate' stores the rate of the current reaction, while energy losses are summed
+    // Note: parameter 'rate' stores the rate of the current reaction, while energy losses are summed
     void derivatives_ionization(const realtype* y_data, realtype* ydot_data, const electron_impact_ionization*, 
         double** rates, const double* rates_tot, spectra_data** indexes, int el_ion_min_nb, int target_nb, double& rate, double& enloss_rate);
 
-    // 
-    void init_tables_h2_electronic_exc(const energy_diagram* h2_di_elexc, cross_section_table_mccc**, double**& rates,
-        int vibr_qnb_final_max, int& el_min_nb, int verbosity = 1);
+    // H2 electronic excitation,
+    void init_tables_h2_electronic_exc(cross_section_table_mccc**, double**& rates, int vibr_qnb_final_max, int verbosity = 1);
 
-   // S1g(X) -> S1u(B), S1u(Bp) dJ = +/-1, electronic states
-   // S1g(X) -> P1u(C), P1u(D), dJ = -1, 0, 1
-   // all parameters with & are summed
-   // thermal_energy - kinetic energy released in the dissociation, in erg cm-3 s-1,
-    void derivatives_h2_electronic_exc(const realtype* y_data, realtype* ydot_data, const energy_diagram* h2_di_exc, 
-        const std::vector<h2_energy_level_param> h2_exc_state_data, cross_section_table_mccc** , double** rates, 
-        int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double& diss_rate, double& thermal_energy);
+    // calculation the nb of electron energy interval that corresponds to the collisional transition with the minimal energy, 
+    int calc_min_energy_of_transition(const energy_diagram* h2_di_elexc, int vibr_qnb_final_max);
+ 
+    // all parameters with & are summed
+    // thermal_energy - kinetic energy released in the dissociation, in erg cm-3 s-1,
+    // S1g(X) -> S1u(B), S1u(Bp), dL = 0, dJ = +/-1,
+    void derivatives_h2_electronic_exc_dl0(const realtype* y_data, realtype* ydot_data, const energy_diagram* h2_di_exc, 
+        const std::vector<h2_energy_level_param> h2_exc_state_data, double** rates, 
+        int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double& diss_rate, double& th_energy_deriv);
 
+    // S1g(X) -> P1u(C), P1u(D), dJ = -1, 0, 1
+    void derivatives_h2_electronic_exc_dl1(const realtype* y_data, realtype* ydot_data, 
+        const energy_diagram* h2_di_plus, const energy_diagram* h2_di_minus,
+        const std::vector<h2_energy_level_param> h2_state_plus_data, const std::vector<h2_energy_level_param> h2_state_minus_data, 
+        double** rates, int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double& diss_rate, double& th_energy_deriv);
 
-    // OLD
-    // rotational excitation and de-excitation are taken into account,
-    void init_tables_h2_rotational_exc(const cross_section*, double*& rates_up, spectra_data*& indexes_up, 
-        double*& rates_down, spectra_data*& indexes_down, int j0, int verbosity = 1);
-    void init_tables_h2_vibrational_exc(const cross_section*, double*& rates, spectra_data**& indexes, int vibr_qnb_final, int verbosity = 1);
-
-    // the nb of final electronic sate of H2 is used in the routine (determines the nb of branches),
-    void init_tables_h2_electronic_exc_old(const energy_diagram * h2_di_elexc, cross_section_table_mccc**, double**& rates, spectra_data**& indexes,
-        int vibr_qnb_init, int max_h2_vstates, int & el_min_nb, int verbosity = 1);
-
+    // H2 dissociation 
+    // through electronic excitation (direct),
     // the energy lost by the electron is equal to the threshold value given in the cross section data file 
     // (minus the energy of the initial state of H2 with given J),
-    void init_tables_h2_electronic_diss(cross_section_table_mccc*, double*& rates, spectra_data**& indexes,
-        int vibr_qnb_init, int& el_min_nb, int verbosity = 1);
+    void init_tables_h2_electronic_diss(cross_section_table_mccc**, double**& rates, int& el_min_nb, int verbosity = 1);
 
+    // all parameters with & (energy loss and dissociation rate) are summed,
+    void derivatives_h2_electronic_diss(const realtype* y_data, realtype* ydot_data, cross_section_table_mccc** cs, double** rates, int el_min_nb,
+        double& enloss_rate, double& diss_rate);
+
+    // pure H2 rotational excitation,
+    void init_tables_h2_rotational_exc(cross_section_table_mccc**, double**& rates, int verbosity = 1);
+
+    void derivatives_h2_rotational_exc(const realtype* y_data, realtype* ydot_data, double**& rates, double& enloss_rate);
+
+    // H2 ro-vibrational excitation, vibration nb initial != final,
+    void init_tables_h2_rovibr_exc(cross_section_table_mccc**, double**& rates, int verbosity = 1);
+
+    void derivatives_h2_rovibr_exc(const realtype* y_data, realtype* ydot_data, double**& rates, double& enloss_rate);
+
+    // He
+    std::vector<int> hei_level_nbs;
+    std::vector<const hei_electron_excitation*> hei_cs;
+    
+    double **hei_rates;
+    spectra_data** hei_indexes;
+    
     // All data relevant to HeI excitation are initialized in this subroutine, no input parameters, class members are used,
     void init_tables_hei_electronic_exc(const std::string& data_path);
 
-
-    // j0 - the angular momentum of the lower H2 level, energy losses are summed
-    void derivatives_h2_rotational_exc(const realtype* y_data, realtype* ydot_data, const double* rates_up, const spectra_data* indexes_up, 
-        const double* rates_down, const spectra_data* indexes_down, int j0, double & enloss_rate);
-
-    void derivatives_h2_vibrational_exc(const realtype* y_data, realtype* ydot_data,
-        const double* rates, spectra_data** indexes, int vibr_qnb_final, double & enloss_rate);
-
-    // S1g(X) -> S1u(B, Bp), dJ = +/-1, 
-    // thermal_energy - kinetic energy released in the dissociation, in erg cm-3 s-1,
-    // final vibration quantum nb is 0,1,..,vibr_qnb_final_max-1
-    // all parameters with & are summed
-    void derivatives_h2_electronic_exc_old(const realtype* y_data, realtype* ydot_data, const energy_diagram* h2_di_exc, 
-        const std::vector<h2_energy_level_param> h2_exc_state_data, double** rates, spectra_data** indexes, 
-        int vibr_qnb_init, int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double &diss_rate, double &thermal_energy);
-
-    // S1g(X) -> P1u(C), dJ = -1, 0, 1,
-    void derivatives_h2_electronic_exc_2(const realtype* y_data, realtype* ydot_data, 
-        const energy_diagram* h2_di_plus, const energy_diagram* h2_di_minus, 
-        const std::vector<h2_energy_level_param> h2_state_plus_data, const std::vector<h2_energy_level_param> h2_state_minus_data,
-        double** rates, spectra_data** indexes, int vibr_qnb_init, int vibr_qnb_final_max, int el_min_nb, 
-        double& enloss_rate, double& diss_rate, double& thermal_energy);
-
-    // all parameters with & (energy loss and dissociation rate) are summed,
-    void derivatives_h2_electronic_diss(const realtype* y_data, realtype* ydot_data,
-        const double* rates, spectra_data** indexes, int vibr_qnb_init, int el_min_nb, double& enloss_rate, double& diss_rate);
-
-    // all parameters with & (energy loss and dissociation rate) are summed,
+    // all parameters with & (energy loss and excitation rate) are summed,
     void derivatives_hei_exc(const realtype* y_data, realtype* ydot_data, double& enloss_rate, double& exc_rate);
 
 public:
@@ -223,17 +170,77 @@ public:
     // through excitation of singlet states of H2 (diss_exc) and triplet (diss_exc_tr),
     void get_h2_process_rates(double & sol_diss, double & diss_exc, double & diss_exc_tr, double & hei_exc);
 
-    const energy_diagram* get_pointer_h2_levels() const { return h2_di; }
-    const energy_diagram* get_pointer_hei_levels() const { return hei_di; }
-
     double get_electron_energy(int i) const;      // returns the centre of the interval [i, i+1], energy in eV
     double get_electron_energy_bin(int i) const;  // returns the energy bin size, in eV,
+
+    int get_nb_electron_energy_array(double energy) const;
     int get_nb_electron_energy_array(double energy, int i) const;  // given energy in eV, seed of nb value have to be given
 
     void set_tolerances(N_Vector abs_tol);
 
     // concentration in cm-3, electron energy in eV,
-    // parameters of electron sepctra are given,
     elspectra_evolution_data(const std::string& data_path, double conc_h_tot, const std::vector<double> &electron_energies_grid, int verb);
     ~elspectra_evolution_data();
 };
+
+
+
+/*
+* // OLD
+* 
+    // OLD
+    const cross_section_table_vs1* rot_h2_j02_cs, * rot_h2_j13_cs, * rot_h2_j24_cs, * rot_h2_j35_cs, * vibr_h2_v01_cs;
+    const h2_excitation_vibr02_cs* vibr_h2_v02_cs;
+
+    double* h2_j02_rates, * h2_j24_rates, * h2_j13_rates, * h2_j35_rates, * h2_j20_rates, * h2_j42_rates, * h2_j31_rates, * h2_j53_rates,
+        * h2_v01_rates, * h2_v02_rates, * elel_scatt_rates, * elion_scatt_rates;
+    
+    // weights are dimensionless, the sum of weights is equal to 1:
+    spectra_data* h2_j02_indexes, * h2_j13_indexes, * h2_j24_indexes, * h2_j35_indexes,
+        * h2_j20_indexes, * h2_j31_indexes, * h2_j42_indexes, * h2_j53_indexes;
+    spectra_data** h2_v01_indexes, ** h2_v02_indexes;
+    spectra_data** coloumb_indexes, ** hei_indexes;
+
+    // rotational excitation and de-excitation are taken into account,
+    void init_tables_h2_rotational_exc_old(const cross_section*, double*& rates_up, spectra_data*& indexes_up, 
+        double*& rates_down, spectra_data*& indexes_down, int j0, int verbosity = 1);
+    void init_tables_h2_vibrational_exc_old(const cross_section*, double*& rates, spectra_data**& indexes, int vibr_qnb_final, int verbosity = 1);
+
+    // the nb of final electronic sate of H2 is used in the routine (determines the nb of branches),
+    void init_tables_h2_electronic_exc_old(const energy_diagram * h2_di_elexc, cross_section_table_mccc**, double**& rates, spectra_data**& indexes,
+        int vibr_qnb_init, int max_h2_vstates, int & el_min_nb, int verbosity = 1);
+
+    // the energy lost by the electron is equal to the threshold value given in the cross section data file 
+    // (minus the energy of the initial state of H2 with given J),
+    void init_tables_h2_electronic_diss_old(cross_section_table_mccc*, double*& rates, spectra_data**& indexes,
+        int vibr_qnb_init, int& el_min_nb, int verbosity = 1);
+
+    
+
+    // j0 - the angular momentum of the lower H2 level, energy losses are summed
+    void derivatives_h2_rotational_exc_old(const realtype* y_data, realtype* ydot_data, const double* rates_up, const spectra_data* indexes_up, 
+        const double* rates_down, const spectra_data* indexes_down, int j0, double & enloss_rate);
+
+    void derivatives_h2_vibrational_exc_old(const realtype* y_data, realtype* ydot_data,
+        const double* rates, spectra_data** indexes, int vibr_qnb_final, double & enloss_rate);
+
+    // S1g(X) -> S1u(B, Bp), dL = 0, dJ = +/-1, 
+    // thermal_energy - kinetic energy released in the dissociation, in erg cm-3 s-1,
+    // final vibration quantum nb is 0,1,..,vibr_qnb_final_max-1
+    // all parameters with & are summed
+    void derivatives_h2_electronic_exc_old(const realtype* y_data, realtype* ydot_data, const energy_diagram* h2_di_exc, 
+        const std::vector<h2_energy_level_param> h2_exc_state_data, double** rates, spectra_data** indexes, 
+        int vibr_qnb_init, int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double &diss_rate, double &thermal_energy);
+
+    // S1g(X) -> P1u(C), dJ = -1, 0, 1,
+    void derivatives_h2_electronic_exc_2(const realtype* y_data, realtype* ydot_data, 
+        const energy_diagram* h2_di_plus, const energy_diagram* h2_di_minus, 
+        const std::vector<h2_energy_level_param> h2_state_plus_data, const std::vector<h2_energy_level_param> h2_state_minus_data,
+        double** rates, spectra_data** indexes, int vibr_qnb_init, int vibr_qnb_final_max, int el_min_nb, 
+        double& enloss_rate, double& diss_rate, double& thermal_energy);
+
+    // all parameters with & (energy loss and dissociation rate) are summed,
+    void derivatives_h2_electronic_diss_old(const realtype* y_data, realtype* ydot_data,
+        const double* rates, spectra_data** indexes, int vibr_qnb_init, int el_min_nb, double& enloss_rate, double& diss_rate);
+
+*/

@@ -46,15 +46,31 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 #define ELECTRON_ENERGY_FIXED 1.   // eV, the energy grid intervals are equal at E < E_fixed,
 #define MAX_ELECTRON_ENERGY 1.e+6  // eV
 #define MIN_MODEL_TIME 1.e+2   // in s, minimal model time at which data are saved,
-#define MAX_MODEL_TIME 1.e+7   // maximal model time in s
+#define MAX_MODEL_TIME 3.e+7   // maximal model time in s (the simulations are done up to this time),
 
-// the number of vibrational states of the ground electronic state taken into account in the simulations,
-// must be less or equal than maximal, H2_VSTATES_X1SU
-#define NB_OF_H2_VSTATES_X1SU 3
+// the number of vibrational states of the ground electronic state of H2 taken into account in the simulations,
+// must be less or equal than maximal, MAX_H2_VSTATES_X1SU
+#define NB_OF_H2_VSTATES_X1SU 5
 
 // ----------------------------------------------------
 // Electron spectra evolution
 //-----------------------------------------------------
+
+// this constant is used in the initialization of the electron spectrum data,
+#define ELECTRON_SPECTRUM_TEST 0
+#define ELECTRON_CONCENTRATION_TEST  0.1  // cm-3
+
+// 1 - initialization of H2 population densities from file,
+// 0 - H2 molecules are in lowest energy levels, J = 0 and 1,
+// Note, there is no check yet about the consistency of energy levels used in this code and those used in the simulations before, 
+#define H2_POP_DENS_INIT 0
+// this parameter is used if H2 population densities are not read from file,  
+#define ORTHO_TO_PARA_RATIO 1
+
+// Parameters of the electron energy losses
+// 1 - switch on, 0 - switch off,
+#define ROVIBRATIONAL_EXC_LOSSES 1
+
 // Weingartner & Draine, ApJSS 134, 263 (2001)
 #define ELECTRON_DUST_SCATTERING_PROB 0.5
 #define CALC_COLOUMB_EL_LOSSES 0
