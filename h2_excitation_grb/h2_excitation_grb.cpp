@@ -55,7 +55,7 @@ void init_electron_energy_grid(vector<double>& electron_energies_grid, vector<do
 void init_specimen_conc(const string& sim_path, double& conc_h_tot, vector<double>& layer_centre_distances, vector<dynamic_array>& d);
 void init_dust_abund(const string& sim_path, vector<double>& d, double& grain_radius_init, double& grain_nb_density, double& grain_material_density);
 void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& d, const vector<double>& electron_energies_grid);
-void init_h2_population_density(const string& sim_path, vector<dynamic_array>& d);
+void init_h2_population_density(const string& sim_path, vector<dynamic_array>& d, vector<int>& qnb_v_arr, vector<int>& qnb_j_arr);
 
 
 int f_elsp(realtype t, N_Vector y, N_Vector ydot, void* user_data) {
@@ -83,13 +83,21 @@ int main()
 	}
 #endif
 
-	sim_path = "C:/Users/Александр/Documents/Данные и графики/paper Fitting of the xray spectra of GRBs/2024_04_1e3_dist100/";
-	output_path = "C:/Users/Александр/Documents/Данные и графики/H2 excitation in induced by GRB radiation/h2_excitation/";
+	//
 	data_path = "C:/Users/Александр/Documents/input_data/";
 	
+	//sim_path = "C:/Users/Александр/Documents/Данные и графики/paper Fitting of the xray spectra of GRBs/2024_04_1e3_dist100/";
+	//output_path = "C:/Users/Александр/Documents/Данные и графики/H2 excitation in induced by GRB radiation/h2_excitation_1e3/";
+	
+	sim_path = "C:/Users/Александр/Documents/Данные и графики/paper Fitting of the xray spectra of GRBs/2024_12_1e4_dist100/";
+	output_path = "C:/Users/Александр/Documents/Данные и графики/H2 excitation in induced by GRB radiation/h2_excitation_1e4/";
+	
 	// check test mode in the file with parameters, h2_parameters.h
-	simulate_h2_excitation(data_path, sim_path, output_path);
+	//simulate_h2_excitation(data_path, sim_path, output_path);
+	
+	output_path = "C:/Users/Александр/Documents/Данные и графики/H2 excitation in induced by GRB radiation/";
 	save_cross_section_table(output_path, data_path);
+	//calc_helium_lifetimes(output_path, data_path);
 }
 
 
@@ -134,22 +142,23 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 		h2eq_nb, heieq_nb, physeq_nb;
 	long int nb_steps_tot;
 	double x1, x2, x3, x4, x5, x6, x7, x8, x9, rel_tol, dt, model_time, model_time_aux, model_time_aux_prev, model_time_step, model_time_out,
-		conc_h_tot, grain_radius_init, grain_nb_density, grain_material_density, grain_radius, dust_mass, gas_mass, grb_distance,
-		enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_vibr, enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_coloumb_ions,
-		enloss_rate_coloumb_el, enloss_rate_hei, enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_h2_singlet, enloss_h2_triplet, enloss_ioniz, enloss_coloumb_ions,
+		conc_h_tot, grain_radius_init, grain_nb_density, grain_material_density, grain_radius, dust_mass, gas_mass, grb_distance, hcolumn_dens,
+		enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_vibr, enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_coulomb_ions,
+		enloss_rate_coulomb_el, enloss_rate_hei, enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_h2_singlet, enloss_h2_triplet, enloss_ioniz, enloss_coloumb_ions,
 		enloss_coloumb_el, enloss_hei, h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate,
 		h2_solomon_diss, h2_diss_exc_singlet, h2_diss_exc_triplet, hei_exc;
 
 	time_t timer;
 	char* ctime_str;
 
+	vector<int>    qnb_v_arr, qnb_j_arr;
 	vector<double> time_cloud_arr;      // in s
 	vector<double> layer_centre_distances;  // in cm
 	vector<double> electron_energies_grid, electron_energy_bin_size;  // in eV,
 
 	// Energy loss rate in [eV cm-3 s-1], as a function of time
 	vector<double> enloss_rate_mt_arr, enloss_rate_h2_rot_arr, enloss_rate_h2_vibr_arr, enloss_rate_h2_singlet_arr, enloss_rate_h2_triplet_arr,
-		enloss_rate_ioniz_arr, enloss_rate_coloumb_ions_arr, enloss_rate_coloumb_el_arr, enloss_rate_hei_arr;
+		enloss_rate_ioniz_arr, enloss_rate_coulomb_ions_arr, enloss_rate_coulomb_el_arr, enloss_rate_hei_arr;
 
 	// Energy loss in [eV cm-3] during the time interval [0, t] as a function of time t,
 	vector<double> enloss_mt_arr, enloss_h2_rot_arr, enloss_h2_vibr_arr, enloss_h2_singlet_arr, enloss_h2_triplet_arr, enloss_ioniz_arr,
@@ -195,9 +204,9 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	init_electron_spectra(sim_path, output_path, el_spectrum_init_data, electron_energies_grid);
 
 	// population density in the file has dimension [cm-3],
-	init_h2_population_density(sim_path, h2_pop_dens_init_data);
+	init_h2_population_density(sim_path, h2_pop_dens_init_data, qnb_v_arr, qnb_j_arr);
 
-	elspectra_evolution_data user_data(data_path, conc_h_tot, electron_energies_grid, verbosity);
+	elspectra_evolution_data user_data(data_path, output_path, conc_h_tot, electron_energies_grid, verbosity);
 
 	nb_of_el_energies = (int)electron_energies_grid.size() - 1;
 	nb_of_equat = user_data.get_nb_of_equat();
@@ -273,7 +282,10 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	if (lay_nb > (int)el_spectrum_init_data.size())
 		lay_nb = (int)el_spectrum_init_data.size() - 1;
 
+	// distance from the GRB source to the centre of the particular cloud layer,
 	grb_distance = layer_centre_distances[lay_nb];
+	// H column density from the cloud boundary to the cloud layer (not including it, the layer width is the same for all layers)
+	hcolumn_dens = conc_h_tot * (layer_centre_distances[lay_nb] - layer_centre_distances[0]);
 
 	for (i = 0; i < nb_of_equat; i++) {
 		NV_Ith_S(y, i) = 0.;
@@ -288,8 +300,12 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 
 	if (H2_POP_DENS_INIT) {
 		// population densities must be in [cm-3],
-		for (i = 0; i < nb_lev_h2 && i < h2_pop_dens_init_data[lay_nb].dim; i++) {
-			NV_Ith_S(y, h2eq_nb + i) = h2_pop_dens_init_data[lay_nb].arr[i];
+		for (i = 0; i < h2_pop_dens_init_data[lay_nb].dim; i++) 
+		{
+			k = user_data.get_level_nb_h2(qnb_v_arr[i], qnb_j_arr[i]);
+			if (k >= 0) {
+				NV_Ith_S(y, h2eq_nb + k) = h2_pop_dens_init_data[lay_nb].arr[i];
+			}
 		}
 	}
 	else {
@@ -334,7 +350,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	f_elsp(model_time, y, ydot, &user_data);
 
 	enloss_rate_mt = enloss_rate_h2_rot = enloss_rate_h2_vibr = enloss_rate_h2_singlet = enloss_rate_h2_triplet
-		= enloss_rate_ioniz = enloss_rate_coloumb_ions = enloss_rate_coloumb_el = enloss_rate_hei = 0.;
+		= enloss_rate_ioniz = enloss_rate_coulomb_ions = enloss_rate_coulomb_el = enloss_rate_hei = 0.;
 
 	enloss_mt = enloss_h2_rot = enloss_h2_vibr = enloss_h2_singlet = enloss_h2_triplet = enloss_ioniz = enloss_coloumb_ions
 		= enloss_coloumb_el = enloss_hei = 0.;
@@ -377,8 +393,8 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	enloss_rate_h2_singlet_arr.push_back(enloss_rate_h2_singlet);
 	enloss_rate_h2_triplet_arr.push_back(enloss_rate_h2_triplet);
 	enloss_rate_ioniz_arr.push_back(enloss_rate_ioniz);
-	enloss_rate_coloumb_ions_arr.push_back(enloss_rate_coloumb_ions);
-	enloss_rate_coloumb_el_arr.push_back(enloss_rate_coloumb_el);
+	enloss_rate_coulomb_ions_arr.push_back(enloss_rate_coulomb_ions);
+	enloss_rate_coulomb_el_arr.push_back(enloss_rate_coulomb_el);
 	enloss_rate_hei_arr.push_back(enloss_rate_hei);
 
 	enloss_mt_arr.push_back(enloss_mt);
@@ -461,21 +477,21 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 			x3 = enloss_rate_h2_vibr;
 			x4 = enloss_rate_h2_singlet;
 			x5 = enloss_rate_ioniz;
-			x6 = enloss_rate_coloumb_ions;
-			x7 = enloss_rate_coloumb_el;
+			x6 = enloss_rate_coulomb_ions;
+			x7 = enloss_rate_coulomb_el;
 			x8 = enloss_rate_hei;
 			x9 = enloss_rate_h2_triplet;
 
 			user_data.get_el_energy_losses(enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_vibr, enloss_rate_h2_singlet, enloss_rate_h2_triplet,
-				enloss_rate_ioniz, enloss_rate_coloumb_ions, enloss_rate_coloumb_el, enloss_rate_hei);
+				enloss_rate_ioniz, enloss_rate_coulomb_ions, enloss_rate_coulomb_el, enloss_rate_hei);
 
 			enloss_mt += (x1 + enloss_rate_mt) * dt;
 			enloss_h2_rot += (x2 + enloss_rate_h2_rot) * dt;
 			enloss_h2_vibr += (x3 + enloss_rate_h2_vibr) * dt;
 			enloss_h2_singlet += (x4 + enloss_rate_h2_singlet) * dt;
 			enloss_ioniz += (x5 + enloss_rate_ioniz) * dt;
-			enloss_coloumb_ions += (x6 + enloss_rate_coloumb_ions) * dt;
-			enloss_coloumb_el += (x7 + enloss_rate_coloumb_el) * dt;
+			enloss_coloumb_ions += (x6 + enloss_rate_coulomb_ions) * dt;
+			enloss_coloumb_el += (x7 + enloss_rate_coulomb_el) * dt;
 			enloss_hei += (x8 + enloss_rate_hei) * dt;
 			enloss_h2_triplet += (x9 + enloss_rate_h2_triplet) * dt;
 
@@ -535,8 +551,8 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 				enloss_rate_h2_singlet_arr.push_back(enloss_rate_h2_singlet);
 				enloss_rate_h2_triplet_arr.push_back(enloss_rate_h2_triplet);
 				enloss_rate_ioniz_arr.push_back(enloss_rate_ioniz);
-				enloss_rate_coloumb_ions_arr.push_back(enloss_rate_coloumb_ions);
-				enloss_rate_coloumb_el_arr.push_back(enloss_rate_coloumb_el);
+				enloss_rate_coulomb_ions_arr.push_back(enloss_rate_coulomb_ions);
+				enloss_rate_coulomb_el_arr.push_back(enloss_rate_coulomb_el);
 				enloss_rate_hei_arr.push_back(enloss_rate_hei);
 
 				enloss_mt_arr.push_back(enloss_mt);
@@ -559,27 +575,27 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 				dust_charge_arr.push_back(NV_Ith_S(y, physeq_nb + 2) * grain_nb_density);  // dust charge per cm3
 
 				save_electron_spectrum_evolution(output_path, electron_energies_grid, electron_energy_bin_size, time_cloud_arr, el_spectrum_evol, 
-					grb_distance, conc_h_tot);
+					grb_distance, hcolumn_dens, conc_h_tot);
 
-				save_specimen_conc_evolution(output_path, time_cloud_arr, specimen_conc_evol, grb_distance, conc_h_tot);
+				save_specimen_conc_evolution(output_path, time_cloud_arr, specimen_conc_evol, grb_distance, hcolumn_dens, conc_h_tot);
 
 				save_h2_populations_evolution(output_path, time_cloud_arr, h2_popdens_evol, h2_popdens_v_evol,
-					grb_distance, conc_h_tot, nb_lev_h2);
+					grb_distance, hcolumn_dens, conc_h_tot, nb_lev_h2);
 			
-				save_hei_populations_evolution(output_path, time_cloud_arr, hei_popul_dens_evol, grb_distance, conc_h_tot, nb_lev_hei);
+				save_hei_populations_evolution(output_path, time_cloud_arr, hei_popul_dens_evol, grb_distance, hcolumn_dens, conc_h_tot, nb_lev_hei);
 
-				save_electron_energy_loss_rates(output_path, grb_distance, conc_h_tot, time_cloud_arr,
+				save_electron_energy_loss_rates(output_path, grb_distance, hcolumn_dens, conc_h_tot, time_cloud_arr,
 					enloss_rate_mt_arr, 
 					enloss_rate_h2_rot_arr,
 					enloss_rate_h2_vibr_arr,
 					enloss_rate_h2_singlet_arr,
 					enloss_rate_h2_triplet_arr,
 					enloss_rate_ioniz_arr, 
-					enloss_rate_coloumb_ions_arr, 
-					enloss_rate_coloumb_el_arr, 
+					enloss_rate_coulomb_ions_arr, 
+					enloss_rate_coulomb_el_arr, 
 					enloss_rate_hei_arr);
 
-				save_electron_energy_losses(output_path, grb_distance, conc_h_tot, time_cloud_arr,
+				save_electron_energy_losses(output_path, grb_distance, hcolumn_dens, conc_h_tot, time_cloud_arr,
 					enloss_mt_arr,
 					enloss_h2_rot_arr,
 					enloss_h2_vibr_arr,
@@ -591,10 +607,10 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 					enloss_hei_arr);
 
 				save_diss_excit_data(output_path, time_cloud_arr, h2_solomon_diss_arr, h2_diss_exc_singlet_arr, h2_diss_exc_triplet_arr,
-					hei_exc_arr, grb_distance, conc_h_tot);
+					hei_exc_arr, grb_distance, hcolumn_dens, conc_h_tot);
 
 				save_phys_parameters(output_path, time_cloud_arr, neutral_temp_arr, ion_temp_arr, dust_charge_arr, specimen_conc_evol, 
-					grb_distance, conc_h_tot);
+					grb_distance, hcolumn_dens, conc_h_tot);
 			}
 		}
 		else {
@@ -678,7 +694,7 @@ void init_electron_spectra(const string& sim_path, const string& output_path, ve
 	
 	int i, j, l, k, nb_l, en_nb_f, en_nb, nb_bins;
 	char ch, text_line[MAX_TEXT_LINE_WIDTH];
-	double e, de, x, min_en, max_en;
+	double e, de, x, min_en, max_en, conc_h_tot;
 
 	string fname, str;
 	ifstream input;
@@ -702,7 +718,7 @@ void init_electron_spectra(const string& sim_path, const string& output_path, ve
 	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
 	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
 	
-	input >> ch >> min_en >> max_en >> nb_bins >> en_nb_f >> nb_l;
+	input >> ch >> conc_h_tot >> min_en >> max_en >> nb_bins >> en_nb_f >> nb_l;
 	dynamic_array el_spectrum_file(en_nb_f), el_spectrum(en_nb);
 
 	input >> str >> str;
@@ -872,9 +888,9 @@ void init_specimen_conc(const string& path, double& conc_h_tot, vector<double>& 
 
 // In the file, the levels are denoted by the number,
 // Note, there is no check yet about the consistency of energy levels used in this code and those used in the simulations before, 
-void init_h2_population_density(const string& path, vector<dynamic_array>& d)
+void init_h2_population_density(const string& path, vector<dynamic_array>& d, vector<int>& qnb_v_arr, vector<int>& qnb_j_arr)
 {
-	int i, j, nb_l, nb_lev_h2_f;
+	int i, j, v, nb, nb_l, nb_lev_h2_f;
 	double x, conc_h_tot;
 	char ch, text_line[MAX_TEXT_LINE_WIDTH];
 
@@ -882,6 +898,31 @@ void init_h2_population_density(const string& path, vector<dynamic_array>& d)
 	stringstream ss;
 	ifstream input;
 
+	// Reading the data file with the list of H2 levels of the ground electronic state,
+	// these levels were used in GRB propagation simulations,
+	qnb_j_arr.clear();
+	qnb_v_arr.clear();
+
+	fname = path + "grb_h2_levels.txt";
+	input.open(fname.c_str(), ios_base::in);
+
+	if (!input.is_open()) {
+		cout << "Error in " << SOURCE_NAME << ": can't open " << fname << endl;
+		exit(1);
+	}
+
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+
+	input >> nb_lev_h2_f;
+	for (i = 0; i < nb_lev_h2_f; i++) {
+		input >> nb >> v >> j >> x;
+		qnb_v_arr.push_back(v);
+		qnb_j_arr.push_back(j);
+	}
+	input.close();
+
+	// reading the data file with the population densitities of H2 molecule,
 	fname = path + "grb_h2_popdens.txt";
 	input.open(fname.c_str(), ios_base::in);
 

@@ -40,7 +40,7 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 
 #define MAX_NB_STEPS 15
 #define NB_OF_BINS_PER_ORDER_EL 100
-#define NB_OF_BINS_PER_ORDER_TIME 10
+#define NB_OF_BINS_PER_ORDER_TIME 15
 #define MINIMAL_ABUNDANCE 1.e-99  // for saving in file
 
 #define ELECTRON_ENERGY_FIXED 1.   // eV, the energy grid intervals are equal at E < E_fixed,
@@ -49,7 +49,8 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 #define MAX_MODEL_TIME 3.e+7   // maximal model time in s (the simulations are done up to this time),
 
 // the number of vibrational states of the ground electronic state of H2 taken into account in the simulations,
-// must be less or equal than maximal, MAX_H2_VSTATES_X1SU
+// must be less or equal than maximal, MAX_H2_VSTATES_X1SU,
+// v qnb = 0, 1,.., NB_OF_H2_VSTATES_X1SU-1
 #define NB_OF_H2_VSTATES_X1SU 5
 
 // ----------------------------------------------------
@@ -70,7 +71,15 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 // Parameters of the electron energy losses
 // 1 - switch on, 0 - switch off,
 #define ROVIBRATIONAL_EXC_LOSSES 1
+#define HELIUM_EXC_LOSSES 1
 
-// Weingartner & Draine, ApJSS 134, 263 (2001)
-#define ELECTRON_DUST_SCATTERING_PROB 0.5
-#define CALC_COLOUMB_EL_LOSSES 0
+
+//
+// The energy loss of fast electron on thermal electrons, approximate formula,
+// Swartz et al. "Analytic expression for the energy-transfer from photoelectrons to thermal electrons", J. of Geophys. Res. 76, p. 8425, 1971;
+#define CALC_EL_LOSSES_THERMAL_EL 1
+
+// in eV, T[eV] = 8.618e-5 * T[K]
+#define THERMAL_EL_TEMPERATURE (8.618e-5 * 100.)  // in eV 
+
+#define IONIZATION_FRACTION_THERMAL_EL 1.e-6

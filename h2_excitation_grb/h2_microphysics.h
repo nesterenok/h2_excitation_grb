@@ -7,7 +7,18 @@
 // Saving cross section table
 void save_cross_section_table(const std::string& output_path, const std::string& data_path);
 
+// Calculation of lifetimes of HeI states,
+void calc_helium_lifetimes(const std::string& output_path, const std::string& data_path);
 
+// The energy loss of fast electron on thermal electrons, approximate formula,
+// Swartz et al. "Analytic expression for the energy-transfer from photoelectrons to thermal electrons", J. of Geophys. Res. 76, p. 8425, 1971;
+// input - fast electron energy [eV],
+// concentration of thermal electrons in [cm-3], 
+// electron temperature in [eV],
+// output - dE/dt, [eV s-1]
+double calc_coulomb_losses_thermal_electrons(double energy, double ne, double te);
+
+//
 // pure virtual class:
 class cross_section
 {
@@ -35,7 +46,7 @@ protected:
 public:
 	// energy in eV, the cross section in cm2 is returned,
 	// if the energy is < min energy, the cross section at minimal energy is returned,
-	// if the energy is > max energy, the cross section approximation is used: sigma = sigma_0*(E/E_0)^(gamma), E0 - maximal energy for which data are available,
+	// if the energy is > max energy, the cross section extrapolation is used: sigma = sigma_0*(E/E_0)^(gamma), E0 - maximal energy for which data are available,
 	virtual double operator() (double energy) const;
 
 	// parameter gamma must be initialized in the constructor:
@@ -176,6 +187,9 @@ public:
 	// returns cross section (integrated on ejected electron energy), [cm2]
 	virtual double get_int_cs(double projectile_energy);  // integrated from 0. to (projectile energy - binding energy)/2
 	virtual double get_int_cs(double projectile_energy, double ej_energy_min, double ej_energy_max);
+	
+	// returns energy loss of one electron per H2, [cm2 eV]
+	virtual double get_energy_loss(double projectile_energy);
 
 	// returns energy in eV,
 	double get_binding_energy() const { return orbital_bind_en; }
@@ -205,12 +219,14 @@ public:
 
 	virtual double get_int_cs(double projectile_energy);
 	virtual double get_int_cs(double projectile_energy, double ej_energy_min, double ej_energy_max);
+	virtual double get_energy_loss(double projectile_energy);
 
 	electron_impact_ionization_relativistic(const electron_ionization_data&, int verbosity);
 	~electron_impact_ionization_relativistic();
 };
 
-//
+
+// Is not used,
 // Auxiliary classes for the calculation of ionization rates and electron spectra evolution,
 class cross_section_integral_2d
 {
@@ -228,7 +244,7 @@ public:
 	cross_section_integral_2d(electron_impact_ionization* ei, double err);
 };
 
-//
+// is not used
 class cross_section_integral_weight
 {
 protected:
@@ -253,6 +269,7 @@ public:
 // Scarlett et al., Physical Review A 104, L040801 (2021);
 // molecular convergent close-coupling method (MCCC), 
 // cross section values in the data file are in a0^2 (Bohr radius squared), a0 = 0.529e-8 cm
+// at higher energies, the cross sections are extrapolated as a power low,
 class cross_section_table_mccc : public cross_section_table
 {
 public:
@@ -260,23 +277,6 @@ public:
 	cross_section_table_mccc(const std::string& data_path, const std::string& name);
 	~cross_section_table_mccc() { ; }
 };
-
-
-//
-// Excitation of H2 vibration states,
-// Janev et al. "Collision Processes in Low-Temperature Hydrogen Plasmas", FZ-Juelich Report No. 4105 (2003)
-class h2_excitation_vibr02_cs : public cross_section
-{
-protected:
-	double alpha, gamma;
-
-public:
-	double operator() (double energy) const;
-	h2_excitation_vibr02_cs();
-};
-
-
-
 
 
 // HeI excitation by electron impact,
@@ -314,4 +314,18 @@ class hei_electron_excitation_spin_forbidden : public hei_electron_excitation
 public:
 	double operator() (double en) const;
 	hei_electron_excitation_spin_forbidden(double aa1, double aa2, double aa3, double aa4, double aa5, double aa6, double en_thr, int stat_weight);
+};
+
+
+// Is not used,
+// Excitation of H2 vibration states,
+// Janev et al. "Collision Processes in Low-Temperature Hydrogen Plasmas", FZ-Juelich Report No. 4105 (2003)
+class h2_excitation_vibr02_cs : public cross_section
+{
+protected:
+	double alpha, gamma;
+
+public:
+	double operator() (double energy) const;
+	h2_excitation_vibr02_cs();
 };
