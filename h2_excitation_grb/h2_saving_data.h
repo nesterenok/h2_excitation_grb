@@ -7,6 +7,11 @@
 #include "spectroscopy.h"
 #include "h2_elspectrum_eqs.h"
 
+
+// Saving parameters of the model
+void save_model_parameters(const std::string& output_path, double grb_cloud_distance, double grb_distance, double hcolumn_dens, double conc_h_tot,
+    double op_ratio_h2, double dust_gas_mass_ratio, double grain_radius, double grain_nb_density, int layer_nb);
+
 // Evolution of electron spectrum with time,  
 // Note, the data unit is the number of electrons in the energy interval per cm3 (is not divided by energy bin),
 void save_electron_spectrum_evolution(const std::string& output_path, const std::vector<double>& electron_energies_grid, const std::vector<double>& electron_energy_bin_size, 
@@ -50,7 +55,8 @@ void save_electron_energy_losses(const std::string& output_path, double grb_dist
 // Dissociated or excited number of species per cm3 up to a given time, as a function of time,
 void save_diss_excit_data(const std::string& output_path, const std::vector<double>& time_moments, 
     const std::vector<double>& h2_solomon_diss_arr, const std::vector<double>& h2_diss_exc_singlet_arr,
-    const std::vector<double>& h2_diss_exc_triplet_arr, const std::vector<double>& hei_exc_arr, double grb_distance, double hcolumn_dens, double conc_h_tot);
+    const std::vector<double>& h2_diss_exc_triplet_arr, const std::vector<double>& hei_exc_arr, const std::vector<double>& neutral_heating_coll_arr,
+    double grb_distance, double hcolumn_dens, double conc_h_tot);
 
 //
 void save_phys_parameters(const std::string& output_path, const std::vector<double>& time_moments,

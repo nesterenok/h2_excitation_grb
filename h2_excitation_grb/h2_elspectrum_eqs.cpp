@@ -33,7 +33,8 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	enloss_rate_mt(0.), enloss_rate_h2_rot(0.), enloss_rate_h2_vibr(0.), enloss_rate_h2_singlet(0.), enloss_diss_h2_triplet(0.),
 	enloss_rate_ioniz(0.), enloss_rate_coulomb_ions(0.), enloss_rate_coulomb_el(0.), enloss_rate_hei(0.), 
 	conc_n(0.), conc_i(0.), energy_gain_n(0.), energy_gain_i(0.), nb_gain_n(0.), nb_gain_i(0.), 
-	h2_solomon_diss_rate(0.), h2_diss_exc_singlet_rate(0.), h2_diss_exc_triplet_rate(0.), hei_exc_rate(0.)
+	h2_solomon_diss_rate(0.), h2_diss_exc_singlet_rate(0.), h2_diss_exc_triplet_rate(0.), hei_exc_rate(0.), 
+	neutral_heating_coll_rate(0.), indices(0), coll_partn_conc(0), h2_coll(0)
 {
 	int i, j, dj, li, lf, vi, vf, isotope, electronic_state, verbosity = 1;
 	double en, den, vel;
@@ -197,6 +198,12 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	h2_excited_state_data(data_path, h2_dplus_state_data, h2_di_dplus, dplus_band_h2, verbosity);
 	h2_excited_state_data(data_path, h2_dminus_state_data, h2_di_dminus, dminus_band_h2, verbosity);
 
+	// H2 collisional data
+	// Check the collisional data sets that are used (defining constants in the header file coll_rates_h2.h)
+#if (H2_COLLISIONS_WITH_H2_HE)
+	h2_coll = new h2_collisions(data_path, h2_di, verbosity);
+#endif
+	
 	// HeI spectroscopic data
 	// the number of levels with principal quantum number of active electron n <= 4 is 31,
 	// there are cross sections for the transitions for l-resolved atomic terms for n <= 4 (Ralchenko et al., 2008),
@@ -553,7 +560,7 @@ elspectra_evolution_data::~elspectra_evolution_data()
 	delete h2_di_dminus;
 	delete h2_di_dplus;
 	delete h2_einst;
-
+	
 	delete[] electron_energies_grid;
 	delete[] electron_energy_bin_size;
 	delete[] electron_energies;
@@ -568,6 +575,10 @@ elspectra_evolution_data::~elspectra_evolution_data()
 	delete[] h_ioniz_rates_tot;
 	delete[] h2p_ioniz_rates_tot;
 	delete[] hep_ioniz_rates_tot;
+
+	delete h2_coll;
+	delete[] coll_partn_conc;
+	delete[] indices;
 
 	free_2d_array(h2_ioniz_rates);
 	free_2d_array(he_ioniz_rates);
@@ -924,8 +935,8 @@ void elspectra_evolution_data::init_hei_cross_sections(const std::string& data_p
 
 void elspectra_evolution_data::init_tables_hei_electronic_exc(const string& data_path)
 {
-	int i, k, m;
-	double z, en_min, en;
+	int i, m;
+	double en_min, en;
 
 	nb_coll_trans_hei = (int)hei_cs.size();
 	hei_rates = alloc_2d_array<double>(nb_coll_trans_hei, nb_of_el_energies);
@@ -1021,19 +1032,21 @@ void elspectra_evolution_data::get_el_energy_losses(double& mt, double& h2_rot, 
 	hei = enloss_rate_hei;
 }
 
-void elspectra_evolution_data::get_h2_process_rates(double& sol_diss, double& diss_exc_sin, double& diss_exc_tri, double & hei_exc)
+void elspectra_evolution_data::get_h2_process_rates(double& sol_diss, double& diss_exc_sin, double& diss_exc_tri, double & hei_exc, double & neut_heat)
 {
 	// [cm-3 s-1]
 	sol_diss = h2_solomon_diss_rate;  
 	diss_exc_sin = h2_diss_exc_singlet_rate;
 	diss_exc_tri = h2_diss_exc_triplet_rate;
 	hei_exc = hei_exc_rate;
+	// [eV cm-3 s-1]
+	neut_heat = neutral_heating_coll_rate;
 }
 
 int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 {
 	int i, j;
-	double x, rate, log_coulomb, th_energy_deriv;  // z, vel_i;
+	double x, rate, log_coulomb, th_energy_deriv, conc_ph2, down_rate, up_rate;
 
 	realtype* y_data, * ydot_data;
 	y_data = NV_DATA_S(y);
@@ -1196,6 +1209,56 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 			}
 		}
 	}
+
+	// Collisional excitation and de-excitation of H2 molecules:
+	neutral_heating_coll_rate = 0.;
+
+#if (H2_COLLISIONS_WITH_H2_HE)
+	// evaluation of the concentrations of para-H2,
+	conc_ph2 = 0.;
+	for (i = 0; i < nb_lev_h2; i++) {
+		if (rounding(h2_di->lev_array[i].spin) == 0) {
+			conc_ph2 += y_data[h2eq_nb + i];
+		}
+	}
+
+	// temp_n, temp_e, conc_he, conc_ph2, conc_oh2, conc_h, conc_e
+	h2_coll->set_gas_param(THERMAL_NEUTRAL_TEMPERATURE, THERMAL_EL_TEMPERATURE, 
+		y_data[he_nb], conc_ph2, y_data[h2_nb] - conc_ph2, 0., 0., coll_partn_conc, indices);
+
+	x = 0.;
+#pragma omp parallel reduction(+: x) private(i, j, down_rate, up_rate)
+	{
+		double* arr = new double[nb_lev_h2];
+		memset(arr, 0, nb_lev_h2 * sizeof(double));
+
+#pragma omp for schedule(dynamic, 1)
+		for (j = 0; j < nb_lev_h2 - 1; j++) {
+			for (i = j + 1; i < nb_lev_h2; i++)
+			{
+				h2_coll->get_rate_neutrals(h2_di->lev_array[i], h2_di->lev_array[j], down_rate, up_rate, THERMAL_NEUTRAL_TEMPERATURE,
+					coll_partn_conc, indices);
+
+				down_rate *= y_data[h2eq_nb + i];  // [cm-3 s-1]
+				up_rate *= y_data[h2eq_nb + j];
+
+				arr[i] += up_rate - down_rate;
+				arr[j] += down_rate - up_rate;
+
+				x += (down_rate - up_rate) * (h2_di->lev_array[i].energy - h2_di->lev_array[j].energy);  // level energy is in cm-1;
+			}
+		}
+#pragma omp critical
+		{
+			for (i = 0; i < nb_lev_h2; i++) {
+				ydot_data[h2eq_nb + i] += arr[i];
+			}
+		}
+		delete[] arr;
+	}
+	neutral_heating_coll_rate = x * CM_INVERSE_TO_EV;         // heating/cooling units are [eV cm-3 s-1];
+	energy_gain_n += neutral_heating_coll_rate * EV_TO_ERGS;  // [erg cm-3 s-1]
+#endif
 
 	// Excitation of HeI by electron impact
 	enloss_rate_hei = hei_exc_rate = 0.;

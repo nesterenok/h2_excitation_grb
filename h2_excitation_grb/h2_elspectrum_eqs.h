@@ -7,6 +7,7 @@
 #include "special_functions.h"
 #include "h2_microphysics.h"
 #include "spectroscopy.h"
+#include "coll_rates_h2.h"
 #include "h2_uv_pump_data.h"
 #include <cstring>
 
@@ -20,6 +21,9 @@
 //      S1g+(X) -> S1u(B,Bp),    singlet transition, dLambda = 0, Lambda = S = 0 
 //      S1g+(X) -> P1u(C+-,D+-), singlet transition, dLambda = 1, Lambda = P = 1 
 //
+
+// Contribution of triplet states to the dissociation (cross section at maximum):
+// S3u+(b) - 1.64*a0^2, S3u+(e) - 0.024*a0^2, S3u+(h) - 0.045*a0^2,
 
 //
 // Structure of the data array:
@@ -47,11 +51,12 @@ protected:
         h2_b1su_min_nb, h2_c1pu_min_nb, h2_bp1su_min_nb, h2_d1pu_min_nb, 
         h2_b1su_diss_min_nb, h2_c1pu_diss_min_nb, h2_bp1su_diss_min_nb, h2_d1pu_diss_min_nb, h2_b3su_diss_min_nb,
         hei_min_nb, nb_coll_trans_hei, nb_of_el_energies, nb_of_equat, h2eq_nb, heieq_nb, physeq_nb, min_grain_charge;
-    
+    int* indices;
+
     double conc_h_tot, grain_cs, grain_nb_density,
         enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_vibr, enloss_rate_h2_singlet, enloss_diss_h2_singlet, enloss_diss_h2_triplet, 
         enloss_rate_ioniz, enloss_rate_coulomb_ions, enloss_rate_coulomb_el, enloss_rate_hei, conc_n, conc_i, energy_gain_n, energy_gain_i, nb_gain_n, nb_gain_i, 
-        h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate;
+        h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate, neutral_heating_coll_rate;
 
     // in eV, in electron_energies - the centre of energy interval is provided,
     double* electron_energies_grid, * electron_energy_bin_size, *electron_energies, *electron_velocities;      
@@ -64,9 +69,12 @@ protected:
     double** h2_bstate_diss_rates, ** h2_cstate_diss_rates, ** h2_bpstate_diss_rates, ** h2_dstate_diss_rates, ** h2_3bstate_diss_rates;
     double** h2_rot_rates, ** h2_rovibr_rates;
     double** hei_rates;
+    double*  coll_partn_conc;
 
     const energy_diagram* hei_di, *h2_di, *h2_di_b, * h2_di_cminus, * h2_di_cplus, *h2_di_bp, * h2_di_dminus, * h2_di_dplus;
     const einstein_coeff* h2_einst, *hei_einst;
+    
+    const h2_collisions*  h2_coll;
 
     std::vector<transition> lyman_band_h2, werner_plus_band_h2, werner_minus_band_h2, bp_band_h2, dplus_band_h2, dminus_band_h2;
     std::vector<h2_energy_level_param> h2_b_state_data, h2_cplus_state_data, h2_cminus_state_data, 
@@ -171,7 +179,8 @@ public:
     
     // rate of dissociation [cm-3 s-1],
     // through excitation of singlet states of H2 (diss_exc) and triplet (diss_exc_tr),
-    void get_h2_process_rates(double & sol_diss, double & diss_exc, double & diss_exc_tr, double & hei_exc);
+    // neutral heating rate due to collisions H2-H2, H2-He, [eV cm-3 s-1]
+    void get_h2_process_rates(double & sol_diss, double & diss_exc, double & diss_exc_tr, double & hei_exc, double & neutral_heating_coll_rate);
 
     double get_electron_energy(int i) const;      // returns the centre of the interval [i, i+1], energy in eV
     double get_electron_energy_bin(int i) const;  // returns the energy bin size, in eV,

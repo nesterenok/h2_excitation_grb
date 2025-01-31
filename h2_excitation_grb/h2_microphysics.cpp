@@ -24,11 +24,11 @@ using namespace std;
 
 double calc_coulomb_losses_thermal_electrons(double energy, double ne, double te)
 {
-	if (energy < te)
+	if (energy < KELVIN_TO_EV * te)  // energy in eV, temperature in K
 		return 0.;
 
 	double losses = 2.e-4 * pow(ne, 0.97)
-		* pow((energy - te) / (energy - 0.53 * te), 2.36) / pow(energy, 0.44);  // [eV s-1]
+		* pow((energy - KELVIN_TO_EV * te) / (energy - 0.53 * KELVIN_TO_EV * te), 2.36) / pow(energy, 0.44);  // [eV s-1]
 	
 	return losses;
 }
@@ -1019,6 +1019,9 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	cross_section_table_mccc * h2_3bstate_diss_cs 
 		= new cross_section_table_mccc(data_path, fname);
 	
+
+
+	// Saving energy losses:
 	fname = output_path + "energy_loss_electron_h2.txt";
 	output.open(fname.c_str());
 

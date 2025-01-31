@@ -14,7 +14,7 @@ void calc_helium_lifetimes(const std::string& output_path, const std::string& da
 // Swartz et al. "Analytic expression for the energy-transfer from photoelectrons to thermal electrons", J. of Geophys. Res. 76, p. 8425, 1971;
 // input - fast electron energy [eV],
 // concentration of thermal electrons in [cm-3], 
-// electron temperature in [eV],
+// electron temperature in [K],
 // output - dE/dt, [eV s-1]
 double calc_coulomb_losses_thermal_electrons(double energy, double ne, double te);
 

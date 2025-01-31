@@ -151,7 +151,10 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\input_data\mathematics\integration.cpp" />
     <ClCompile Include="..\..\..\input_data\mathematics\interpolation.cpp" />
+    <ClCompile Include="..\..\..\input_data\mathematics\linear_algebra.cpp" />
     <ClCompile Include="..\..\..\input_data\mathematics\special_functions.cpp" />
+    <ClCompile Include="..\..\c_type_shock\c_type_shock\coll_rates.cpp" />
+    <ClCompile Include="..\..\c_type_shock\c_type_shock\coll_rates_h2.cpp" />
     <ClCompile Include="..\..\c_type_shock\c_type_shock\spectroscopy.cpp" />
     <ClCompile Include="dynamic_array.cpp" />
     <ClCompile Include="h2_elspectrum_eqs.cpp" />
@@ -164,8 +167,11 @@
     <ClInclude Include="..\..\..\input_data\mathematics\constants.h" />
     <ClInclude Include="..\..\..\input_data\mathematics\integration.h" />
     <ClInclude Include="..\..\..\input_data\mathematics\interpolation.h" />
+    <ClInclude Include="..\..\..\input_data\mathematics\linear_algebra.h" />
     <ClInclude Include="..\..\..\input_data\mathematics\special_functions.h" />
     <ClInclude Include="..\..\..\input_data\mathematics\utils.h" />
+    <ClInclude Include="..\..\c_type_shock\c_type_shock\coll_rates.h" />
+    <ClInclude Include="..\..\c_type_shock\c_type_shock\coll_rates_h2.h" />
     <ClInclude Include="..\..\c_type_shock\c_type_shock\spectroscopy.h" />
     <ClInclude Include="dynamic_array.h" />
     <ClInclude Include="h2_elspectrum_eqs.h" />
