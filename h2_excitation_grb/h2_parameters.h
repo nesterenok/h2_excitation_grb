@@ -43,18 +43,21 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 #define MINIMAL_ABUNDANCE 1.e-99  // for saving in file
 
 // time nb per order is used to initiate the time grid, 
-// this number can not be very large (otherwise the data files with electron spectra will be large);
-#define NB_OF_BINS_PER_ORDER_TIME 15  
+// this number can not be very large (otherwise the data arrays with electron spectra will be large);
+#define NB_OF_BINS_PER_ORDER_TIME 30
+#define NB_OF_TIME_STEPS 1  // for saving electron spectra, the spectra is saved with this step in time point numbers, 
+
 
 #define ELECTRON_ENERGY_FIXED 1.   // eV, the energy grid intervals are equal at E < E_fixed,
-#define MAX_ELECTRON_ENERGY 1.e+6  // eV
+#define MAX_ELECTRON_ENERGY 1.e+6  // eV, may be lower than in the input file with initial spectrum,
 #define MIN_MODEL_TIME 1.e+2   // in s, minimal model time at which data are saved,
-#define MAX_MODEL_TIME 3.e+7   // maximal model time in s (the simulations are done up to this time),
+#define MAX_MODEL_TIME 1.e+8   // maximal model time in s (the simulations are done up to this time),
 
 // the number of vibrational states of the ground electronic state of H2 taken into account in electron-impact excitation,
 // must be less or equal than maximal, MAX_H2_VSTATES_X1SU,
 // v qnb = 0, 1,.., NB_OF_H2_VSTATES_X1SU-1
-#define NB_OF_H2_VSTATES_X1SU 5
+// very small difference between nb = 5 and 15;
+#define NB_OF_H2_VSTATES_X1SU 10
 
 // ----------------------------------------------------
 // Electron spectra evolution
@@ -72,9 +75,12 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 #define ORTHO_TO_PARA_RATIO 0.1
 
 // Parameters of the electron energy losses
-// 1 - switch on, 0 - switch off,
+// 1 - switch on, 0 - switch off,      
 #define ROVIBRATIONAL_EXC_LOSSES 1
 #define HELIUM_EXC_LOSSES 1
+
+// if switch off, ionization of species is not taken into account, the number of electrons must be conserved:
+#define IONIZATION_LOSSES 1
 
 //
 // The energy loss of fast electron on thermal electrons, approximate formula,
@@ -87,5 +93,5 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 #define IONIZATION_FRACTION_THERMAL_EL 1.e-6
 
 // collisions of H2 with H2, He
-#define H2_COLLISIONS_WITH_H2_HE 0
+#define H2_COLLISIONS_WITH_H2_HE 1
 #define THERMAL_NEUTRAL_TEMPERATURE 15.  // in K

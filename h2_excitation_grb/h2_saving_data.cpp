@@ -18,7 +18,6 @@ using namespace std;
 void save_model_parameters(const std::string& output_path, double grb_cloud_distance, double grb_distance, double hcolumn_dens, double conc_h_tot, 
 	double op_ratio_h2, double dust_gas_mass_ratio, double grain_radius, double grain_nb_density, int layer_nb)
 {
-	int i, imax;
 	time_t timer;
 	char* ctime_str;
 
@@ -87,8 +86,8 @@ void save_electron_spectrum_evolution(const string& output_path, const vector<do
 		<< setw(7) << nb_of_el_energies << setw(7) << nb_of_times << endl;
 
 	output.precision(4);
-	output << left << setw(28) << "!";
-	for (l = 0; l < nb_of_times; l++) {
+	output << left << setw(28) << "!" << setw(13) << time_moments[0];
+	for (l = 1; l < nb_of_times; l += NB_OF_TIME_STEPS) {
 		output << left << setw(13) << time_moments[l];
 	}
 	output << endl;
@@ -101,7 +100,9 @@ void save_electron_spectrum_evolution(const string& output_path, const vector<do
 		output << left << setw(14) << en + 0.5 * d_en << setw(14) << 0.5 * d_en;
 
 		output.precision(4);
-		for (l = 0; l < nb_of_times; l++) { 
+		output << left << setw(13) << spectrum_data[0].arr[i] / d_en;
+		
+		for (l = 1; l < nb_of_times; l += NB_OF_TIME_STEPS) {
 			// spectrum in the data array - nb of electrons in the energy interval per cm3 [cm-3]
 			output << left << setw(13) << spectrum_data[l].arr[i] / d_en; 
 		}
@@ -322,7 +323,9 @@ void save_hei_populations_evolution(const string& output_path, const vector<doub
 void save_electron_energy_loss_rates(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const vector<double>& time_moments,
 	const vector<double>& enloss_rates_mt,
 	const vector<double>& enloss_rates_h2_rot, 
+	const vector<double>& enloss_rates_h2_rot_pos,
 	const vector<double>& enloss_rates_h2_vibr, 
+	const vector<double>& enloss_rates_h2_vibr_pos,
 	const vector<double>& enloss_rates_h2_singlet, 
 	const vector<double>& enloss_rates_h2_triplet, 
 	const vector<double>& enloss_rates_ioniz, 
@@ -344,8 +347,10 @@ void save_electron_energy_loss_rates(const string& output_path, double grb_dista
 	output << left << "!Energy loss rates of electrons, parameter < 0 if electrons lose energy, rate in [eV cm-3 s-1]," << endl
 		<< "!tot - total rate, " << endl
 		<< "!mt - momentum transfer, " << endl
-		<< "!rot - H2 rotational excitation," << endl
-		<< "!vibr_int - H2 ro-vibrational excitation (within the ground electronic state, including pure rotational transitions)," << endl
+		<< "!rot      - H2 rotational excitation," << endl
+		<< "!rot_pos  - H2 rotational excitation, electrons gain energy," << endl
+		<< "!vibr     - H2 ro-vibrational excitation (within the ground electronic state, including pure rotational transitions)," << endl
+		<< "!vibr_pos - H2 ro-vibrational excitation, electrons gain energy" << endl
 		<< "!elec_s - H2 electronic states excitation (singlet)," << endl
 		<< "!elec_t - H2 electronic states excitation (triplet)," << endl
 		<< "!ion - molecule/atom ionization," << endl
@@ -358,8 +363,8 @@ void save_electron_energy_loss_rates(const string& output_path, double grb_dista
 		<< setw(7) << (int)enloss_rates_mt.size() << endl;
 	
 	output << left << setw(13) << "!time(s)"
-		<< setw(11) << "tot" << setw(11) << "mt" << setw(11) << "rot" << setw(11) << "vibr" << setw(11) << "elec_s" << setw(11) << "elec_t"
-		<< setw(11) << "ion" << setw(11) << "couli" << setw(11) << "coule" << setw(11) << "hei" << endl;
+		<< setw(11) << "tot" << setw(11) << "mt" << setw(11) << "rot" << setw(11) << "rot_pos" << setw(11) << "vibr" << setw(11) << "vibr_pos" 
+		<< setw(11) << "elec_s" << setw(11) << "elec_t" << setw(11) << "ion" << setw(11) << "couli" << setw(11) << "coule" << setw(11) << "hei" << endl;
 
 	// losses on vibrational excitation of H2 include pure rotational excitation, 
 	for (i = 0; i < (int)enloss_rates_mt.size(); i++) {
@@ -373,7 +378,9 @@ void save_electron_energy_loss_rates(const string& output_path, double grb_dista
 		output << left << setw(11) << tot 
 			<< setw(11) << enloss_rates_mt[i]
 			<< setw(11) << enloss_rates_h2_rot[i]
+			<< setw(11) << enloss_rates_h2_rot_pos[i]
 			<< setw(11) << enloss_rates_h2_vibr[i]
+			<< setw(11) << enloss_rates_h2_vibr_pos[i]
 			<< setw(11) << enloss_rates_h2_singlet[i]
 			<< setw(11) << enloss_rates_h2_triplet[i]
 			<< setw(11) << enloss_rates_ioniz[i]
@@ -460,6 +467,7 @@ void save_electron_energy_losses(const string& output_path, double grb_distance,
 
 
 void save_diss_excit_data(const string& output_path, const vector<double>& time_moments,
+	const vector<double>& h2_excit_rate_electr_arr, const vector<double>& h2_excit_rate_vibr_arr, const vector<double>& h2_excit_rate_rot_arr,
 	const vector<double>& h2_solomon_diss_arr, const vector<double>& h2_diss_exc_singlet_arr, const vector<double>& h2_diss_exc_triplet_arr,
 	const vector<double>& hei_exc_arr, const vector<double>& neutral_heating_coll_arr, double grb_distance, double hcolumn_dens, double conc_h_tot)
 {
@@ -480,14 +488,18 @@ void save_diss_excit_data(const string& output_path, const vector<double>& time_
 		<< "!de_s_int - dissociative excitation of H2 (via singlet states)," << endl
 		<< "!de_t_int - dissociative excitation of H2 (via triplet states)," << endl
 		<< "!hei_int  - HeI excitation [cm-3];" << endl
-		<< "!nh_int   - neutral heating rate due to collisions H2-H2, H2-He, [eV cm-3]" << endl;
+		<< "!nh_int   - neutral heating rate due to collisions H2-H2, H2-He, [eV cm-3]" << endl
+		<< "!h2_exc_el- H2 electronic excitation rate, in [cm-3 s-1]," << endl
+		<< "!h2_exc_v - H2 ro-vibrational excitation rate, includes pure rotational excitation, in [cm-3 s-1]," << endl
+		<< "!h2_exc_r - H2 pure rotational excitation, in [cm-3 s-1]," << endl;
 
 	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
 		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
 		<< setw(7) << (int)h2_solomon_diss_arr.size() << endl;
 
 	output << left << setw(13) << "!time(s)" << setw(12) << "tot_int(H2)"
-		<< setw(12) << "sol_int" << setw(12) << "de_s_int" << setw(12) << "de_t_int" << setw(12) << "hei_int" << setw(12) << "nh_int" << endl;
+		<< setw(12) << "sol_int" << setw(12) << "de_s_int" << setw(12) << "de_t_int" << setw(12) << "hei_int" << setw(12) << "nh_int" 
+		<< setw(12) << "h2_exc_el" << setw(12) << "h2_exc_v" << setw(12) << "h2_exc_r" << endl;
 
 	for (i = 0; i < (int)h2_solomon_diss_arr.size(); i++) {
 		tot_int = h2_solomon_diss_arr[i] + h2_diss_exc_singlet_arr[i] + h2_diss_exc_triplet_arr[i];
@@ -501,7 +513,10 @@ void save_diss_excit_data(const string& output_path, const vector<double>& time_
 			<< setw(12) << h2_diss_exc_singlet_arr[i]
 			<< setw(12) << h2_diss_exc_triplet_arr[i]
 			<< setw(12) << hei_exc_arr[i]
-			<< setw(12) << neutral_heating_coll_arr[i] << endl;
+			<< setw(12) << neutral_heating_coll_arr[i] 
+			<< setw(12) << h2_excit_rate_electr_arr[i] 
+			<< setw(12) << h2_excit_rate_vibr_arr[i] 
+			<< setw(12) << h2_excit_rate_rot_arr[i] << endl;
 	}
 	output.close();
 }

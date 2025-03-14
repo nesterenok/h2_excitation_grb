@@ -1,0 +1,10 @@
+# Nb of processors used by OpenMP,
+4
+# path to the directory with data tables (spectroscopic data, collision rates and etc.),
+C:/Users/Александр/Documents/input_data/
+# path to the directory with the simulation data (GRB propagation)
+C:/Users/Александр/Documents/Данные и графики/paper Fitting of the xray spectra of GRBs/2025_02_1e4_dist100/
+# path to the directory for the output,
+C:/Users/Александр/Documents/Данные и графики/paper GRB - H2 excitation in induced by radiation/h2_excitation_1e4/
+# H column density in [cm-2] from the cloud boundary to the cloud layer centre,
+2.e+22

@@ -212,7 +212,7 @@ hep_electron_ionization_data::hep_electron_ionization_data()
 	orbital_bind_en = 54.416;  // in eV, Draine, "Physics of the interstellar and intergalactic medium" (2011)
 	orbital_kin_en = 0.;       // for one-electron ions is set to zero,
 
-	// Kim & Rudd (1994), oscillation strength coefficients as for H atom
+	// Kim & Rudd (1994), oscillation strength coefficients as for H atom (for one-electron ions)
 	ne = 1;
 	ni = -1.;
 	af = 0.;
@@ -223,13 +223,14 @@ hep_electron_ionization_data::hep_electron_ionization_data()
 	ff = 0.;
 }
 
+// may be, BEB model must be used
 h2p_electron_ionization_data::h2p_electron_ionization_data()
 {
 	name = "H2+ + e- -> H+ + H+ + e- + e-";
 	orbital_bind_en = 16.25;  // in eV, Wikipedia
 	orbital_kin_en = 0.;      // for one-electron ions is set to zero,
 
-	// Kim & Rudd (1994), oscillation strength coefficients as for H atom 
+	// Kim & Rudd (1994), oscillation strength coefficients as for H atom (for one-electron ions)
 	// BED model is used, possibly more simple BEQ or BEB model should be used
 	ne = 1;
 	ni = -1.;
@@ -645,26 +646,28 @@ cross_section_table_mccc::cross_section_table_mccc(const std::string& data_path,
 		cs_arr[i] = csv[i];
 	}
 
+	// By default, the abrupt cutoff of energy cross sections is used at high energies,
 	// the cross section at this energy may not be zero - the reaction without threshold,
 	en_thr = en_arr[0];
-	
-	// 4 last points are used in the extrapolation (check the dependence on this number),
-	if ((cs_arr[nb_cs - 4] > cs_arr[nb_cs - 3]) && (cs_arr[nb_cs - 4] > cs_arr[nb_cs - 2]) && (cs_arr[nb_cs - 4] > cs_arr[nb_cs - 1])) {
-		gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 4]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 4]);
+}
+
+// be careful with processes having energy threshold,
+double cross_section_table_mccc::operator()(double energy) const
+{
+	int l;
+	double answ;
+	// if values in question are out of range of the array with a dimension dim, returned index < 0 or index >= dim-1
+	locate_index(en_arr, nb_cs, energy, l);
+
+	if (l < 0) {
+		answ = cs_arr[0];  // no energy threshold
 	}
-	// 3 last points are used in the extrapolation,
-	else if ((cs_arr[nb_cs - 3] > cs_arr[nb_cs - 2]) && (cs_arr[nb_cs - 3] > cs_arr[nb_cs - 1])) {
-		gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 3]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 3]);
+	else if (l >= nb_cs - 1) {
+		answ = 0.;
 	}
-	// only 2 last points are used in the extrapolation,
-	else if (cs_arr[nb_cs - 2] > cs_arr[nb_cs - 1]) {
-		gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 2]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 2]);
-	}
-	else { // no energy dependence in this case,
-		gamma = 0.;
-		cout << "Warning: the cross section does not decreases with increasing energy, file " << endl
-			<< "	" << name << endl;
-	}
+	else answ = cs_arr[l] + (energy - en_arr[l]) * (cs_arr[l + 1] - cs_arr[l]) / (en_arr[l + 1] - en_arr[l]);
+
+	return answ;
 }
 
 //
@@ -745,12 +748,13 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	const double thermal_electron_temp = 1.e-3;  // eV
 
 	const double energy_min = 0.01;  // eV
-	const double energy_max = 1.e+6;
+	const double energy_max = 1.e+7;
 	const int nb_of_bins_per_order = 30;
 
 	int i, nb_of_energies, vi, vf, ji, verbosity = 1;
 	double t, enloss_mt_h2, enloss_ion_h2, enloss_ion_h2_rel, enloss_rot_h2, enloss_vibr_h2_01, enloss_vibr_h2_02,
-		enloss_singlet_h2, enloss_diss_singlet_h2, enloss_diss_triplet_h2, enloss_mt_he, enloss_ion_he, enloss_ion_he_rel, enloss_coulomb;
+		enloss_singlet_h2, enloss_diss_singlet_h2, enloss_diss_triplet_h2, enloss_mt_he, enloss_ion_he, enloss_ion_he_rel, enloss_coulomb,
+		cs_vibr_h2_01, cs_vibr_h2_02, cs_vibr_h2_03, cs_singlet_h2, cs_diss_singlet_h2, cs_diss_triplet_h2;
 	double *electron_energies, *electron_velocities;
 
 	string path, fname;
@@ -796,7 +800,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		= new cross_section_table_mccc(data_path, fname);
 	
 	// H2 vibrational excitation, 
-	// v = 0 -> 1,
+	// the sum of (v, J) = (0, ji) -> (1, ji) and (0, ji) -> (1, ji + 2)
 	ji = 0;
 	
 	ss.clear();
@@ -862,6 +866,39 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	fname = ss.str();
 
 	cross_section_table_mccc* h2_vibr_rot_cs2_2
+		= new cross_section_table_mccc(data_path, fname);
+
+	// v = 0 -> 3,
+	ss.clear();
+	ss.str("");
+
+	ss << "coll_h2/MCCC-el-H2-rot-X-X/vi=0/Ji=";
+	ss << ji;
+	ss << "/MCCC-el-H2-X1Sg_vf=3_Jf=";
+	ss << ji;
+	ss << ".X1Sg_vi=0_Ji=";
+	ss << ji;
+	ss << ".txt";
+
+	fname = ss.str();
+
+	cross_section_table_mccc* h2_vibr_rot_cs3_0
+		= new cross_section_table_mccc(data_path, fname);
+
+	ss.clear();
+	ss.str("");
+
+	ss << "coll_h2/MCCC-el-H2-rot-X-X/vi=0/Ji=";
+	ss << ji;
+	ss << "/MCCC-el-H2-X1Sg_vf=3_Jf=";
+	ss << (ji + 2);
+	ss << ".X1Sg_vi=0_Ji=";
+	ss << ji;
+	ss << ".txt";
+
+	fname = ss.str();
+
+	cross_section_table_mccc* h2_vibr_rot_cs3_2
 		= new cross_section_table_mccc(data_path, fname);
 
 	// H2 electronic excitation (singlet)
@@ -1005,6 +1042,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	cross_section_table_mccc * h2_dstate_diss_cs 
 		= new cross_section_table_mccc(data_path, fname);
 	
+	// dissociative excitation to triplet states,
 	// S1g(X) -> S3u+(b) (dissociative state),
 	ss.clear();
 	ss.str("");
@@ -1019,23 +1057,50 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	cross_section_table_mccc * h2_3bstate_diss_cs 
 		= new cross_section_table_mccc(data_path, fname);
 	
+	// S1g(X) -> S3u+(h) (bound state),
+	ss.clear();
+	ss.str("");
 
+	ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+	ss << vi;
+	ss << "/MCCC-el-H2-h3Sg_DE.X1Sg_vi=";
+	ss << vi;
+	ss << ".txt";
+
+	fname = ss.str();
+	cross_section_table_mccc* h2_3hstate_diss_cs
+		= new cross_section_table_mccc(data_path, fname);
+
+	// S1g(X) -> S3u+(e) (bound state),
+	ss.clear();
+	ss.str("");
+
+	ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+	ss << vi;
+	ss << "/MCCC-el-H2-e3Su_DE.X1Sg_vi=";
+	ss << vi;
+	ss << ".txt";
+
+	fname = ss.str();
+	cross_section_table_mccc* h2_3estate_diss_cs
+		= new cross_section_table_mccc(data_path, fname);
 
 	// Saving energy losses:
 	fname = output_path + "energy_loss_electron_h2.txt";
 	output.open(fname.c_str());
 
-	output << left << "!Energy losses in [cm2 eV] of electron in the H2," << endl
+	output << left << "!Energy losses in [cm2 eV] of electron in the H2 (normalized to one H2 molecule)," << endl
 		<< "!for MCCC cross sections - at higher energies, the cross sections are extrapolated as a power law, cs = cs_0*(E/E_0)^(gamma)" << endl
-		<< "!Coulomb losses - Swartz et al., J. of Geophys. Res. 76, p. 8425 (1971);" << endl;
+		<< "!Coulomb losses - Swartz et al., J. of Geophys. Res. 76, p. 8425 (1971);" << endl
+		<< "!Vibrational excitation v = 0 -> 1: the sum of (v,j) = (0,0) -> (1,0) and (0,0) -> (1,2); the same for v = 0 -> 2;" << endl;
 
 	output << left << setw(14) << "!Energy(eV) "
-		<< setw(12) << "m.t. "
-		<< setw(12) << "ioniz "
-		<< setw(12) << "ioniz_rel "
-		<< setw(12) << "J=0-2 " 
-		<< setw(12) << "v=0-1 "
-		<< setw(12) << "v=0-2 "
+		<< setw(12) << "m.t."
+		<< setw(12) << "ioniz"
+		<< setw(12) << "ioniz_rel"
+		<< setw(12) << "J=0-2" 
+		<< setw(12) << "v=0-1"
+		<< setw(12) << "v=0-2"
 		<< setw(12) << "el-singlet " 
 		<< setw(12) << "diss-singlet " 
 		<< setw(12) << "diss-triplet " 
@@ -1058,7 +1123,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		enloss_rot_h2 = (*h2_rot_cs02)(electron_energies[i]) * h2_rot_cs02->get_threshold_energy();
 		output << left << setw(12) << enloss_rot_h2;
 
-		// v = 0 -> 1
+		// (v, J) = (0,0) -> (1,0) and (0,0) -> (1,2)
 		enloss_vibr_h2_01 = (*h2_vibr_rot_cs1_0)(electron_energies[i]) * h2_vibr_rot_cs1_0->get_threshold_energy();
 		enloss_vibr_h2_01 += (*h2_vibr_rot_cs1_2)(electron_energies[i]) * h2_vibr_rot_cs1_2->get_threshold_energy();
 		output << left << setw(12) << enloss_vibr_h2_01;
@@ -1094,6 +1159,9 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		output << left << setw(12) << enloss_diss_singlet_h2;
 
 		enloss_diss_triplet_h2 = (*h2_3bstate_diss_cs)(electron_energies[i]) * h2_3bstate_diss_cs->get_threshold_energy();
+		//enloss_diss_triplet_h2 += (*h2_3hstate_diss_cs)(electron_energies[i]) * h2_3hstate_diss_cs->get_threshold_energy();
+		//enloss_diss_triplet_h2 += (*h2_3estate_diss_cs)(electron_energies[i]) * h2_3estate_diss_cs->get_threshold_energy();
+
 		output << left << setw(12) << enloss_diss_triplet_h2;
 
 		// energy loss in [eV cm2], per H2,
@@ -1105,16 +1173,23 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	}
 	output.close();
 
+	// Saving cross sections,
     fname = output_path + "cs_electron_h2.txt";
 	output.open(fname.c_str());
 
 	output << left << "!Cross sections in [cm2] of electron interaction with the H2," << endl
 		<< "!for MCCC cross sections - at higher energies, the cross sections are extrapolated as a power law, cs = cs_0*(E/E_0)^(gamma)" << endl
 		<< setw(14) << "!Energy(eV) "
-		<< setw(12) << "H2(mt) "
-		<< setw(12) << "H2(ion) "
-		<< setw(12) << "H2(ion_rel) "
-		<< setw(12) << "H2(J=0-2) " << endl;
+		<< setw(12) << "m.t."
+		<< setw(12) << "ion"
+		<< setw(12) << "ion_rel"
+		<< setw(12) << "J=0-2" 
+		<< setw(12) << "v=0-1" 
+		<< setw(12) << "v=0-2"
+		<< setw(12) << "v=0-3"
+		<< setw(12) << "el-singlet " 
+		<< setw(12) << "diss-singlet "
+		<< setw(12) << "diss-triplet " << endl;
 
 	for (i = 0; i < nb_of_energies; i++)
 	{
@@ -1125,7 +1200,92 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		output << left << setw(12) << (*elastic_h2_el_cs)(electron_energies[i])
 			<< setw(12) << h2_ioniz_cs->get_int_cs(electron_energies[i])
 			<< setw(12) << h2_ioniz_cs_rel->get_int_cs(electron_energies[i])
-			<< setw(12) << (*h2_rot_cs02)(electron_energies[i]) << endl;
+			<< setw(12) << (*h2_rot_cs02)(electron_energies[i]);
+
+		// (v, J) = (0,0) -> (1,0) and (0,0) -> (1,2)
+		cs_vibr_h2_01 = (*h2_vibr_rot_cs1_0)(electron_energies[i]);
+		cs_vibr_h2_01 += (*h2_vibr_rot_cs1_2)(electron_energies[i]);
+		output << left << setw(12) << cs_vibr_h2_01;
+
+		// v = 0 -> 2
+		cs_vibr_h2_02 = (*h2_vibr_rot_cs2_0)(electron_energies[i]);
+		cs_vibr_h2_02 += (*h2_vibr_rot_cs2_2)(electron_energies[i]);
+		output << left << setw(12) << cs_vibr_h2_02;
+
+		// v = 0 -> 3
+		cs_vibr_h2_03 = (*h2_vibr_rot_cs3_0)(electron_energies[i]);
+		cs_vibr_h2_03 += (*h2_vibr_rot_cs3_2)(electron_energies[i]);
+		output << left << setw(12) << cs_vibr_h2_03;
+
+		cs_singlet_h2 = 0.;
+		for (vf = 0; vf < MAX_H2_VSTATES_B1SU; vf++) {
+			cs_singlet_h2 += (*h2_bstate_cs[vf])(electron_energies[i]);
+		}
+
+		for (vf = 0; vf < MAX_H2_VSTATES_C1PU; vf++) {
+			cs_singlet_h2 += (*h2_cstate_cs[vf])(electron_energies[i]);
+		}
+
+		for (vf = 0; vf < MAX_H2_VSTATES_BP1SU; vf++) {
+			cs_singlet_h2 += (*h2_bpstate_cs[vf])(electron_energies[i]);
+		}
+
+		for (vf = 0; vf < MAX_H2_VSTATES_D1PU; vf++) {
+			cs_singlet_h2 += (*h2_dstate_cs[vf])(electron_energies[i]);
+		}
+		output << left << setw(12) << cs_singlet_h2;
+
+
+		cs_diss_singlet_h2 = (*h2_bstate_diss_cs)(electron_energies[i]);
+		cs_diss_singlet_h2 += (*h2_cstate_diss_cs)(electron_energies[i]);
+		cs_diss_singlet_h2 += (*h2_bpstate_diss_cs)(electron_energies[i]);
+		cs_diss_singlet_h2 += (*h2_dstate_diss_cs)(electron_energies[i]);
+
+		output << left << setw(12) << cs_diss_singlet_h2;
+
+		cs_diss_triplet_h2 = (*h2_3bstate_diss_cs)(electron_energies[i]);
+		//cs_diss_triplet_h2 += (*h2_3hstate_diss_cs)(electron_energies[i]);
+		//cs_diss_triplet_h2 += (*h2_3estate_diss_cs)(electron_energies[i]);
+
+		output << left << setw(12) << cs_diss_triplet_h2;
+		output << endl;
+	}
+	output.close();
+
+	// Saving cross sections,
+	// only vibrational excitations,
+	fname = output_path + "cs_electron_h2_rovibr.txt";
+	output.open(fname.c_str());
+
+	output << left << "!Cross sections in [cm2] of electron interaction with the H2," << endl
+		<< "!for MCCC cross sections - at higher energies, the cross sections are extrapolated as a power law, cs = cs_0*(E/E_0)^(gamma)" << endl
+		<< "!(v_low - v_up) j_low - j_up" << endl
+		<< setw(14) << "!Energy(eV) "
+		<< setw(12) << "(0-1)0-0"
+		<< setw(12) << "(0-1)0-2"
+		<< setw(12) << "(0-2)0-0"
+		<< setw(12) << "(0-2)0-2"
+		<< setw(12) << "(0-3)0-0"
+		<< setw(12) << "(0-3)0-2" << endl;
+
+	for (i = 0; i < nb_of_energies / 2; i++)
+	{
+		output.precision(6);
+		output << left << setw(14) << electron_energies[i];
+		output.precision(3);
+
+		// (v, J) = (0,0) -> (1,0) and (0,0) -> (1,2)
+		output << left << setw(12) << (*h2_vibr_rot_cs1_0)(electron_energies[i]) 
+			<< setw(12) << (*h2_vibr_rot_cs1_2)(electron_energies[i]);
+		// v = 0 -> 2
+		output << left << setw(12) << (*h2_vibr_rot_cs2_0)(electron_energies[i])
+			<< setw(12) << (*h2_vibr_rot_cs2_2)(electron_energies[i]);
+		
+		// v = 0 -> 3
+		output << left << setw(12) << (*h2_vibr_rot_cs3_0)(electron_energies[i])
+			<< setw(12) << (*h2_vibr_rot_cs3_2)(electron_energies[i]);
+
+		output << endl;
 	}
 	output.close();
 

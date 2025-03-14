@@ -269,10 +269,15 @@ public:
 // Scarlett et al., Physical Review A 104, L040801 (2021);
 // molecular convergent close-coupling method (MCCC), 
 // cross section values in the data file are in a0^2 (Bohr radius squared), a0 = 0.529e-8 cm
-// at higher energies, the cross sections are extrapolated as a power low,
+// at high energies, the cross sections are equal to 0.,
 class cross_section_table_mccc : public cross_section_table
 {
-public:
+public:	
+	// energy in eV, the cross section in cm2 is returned,
+	// if the energy is < min energy, the cross section at minimal energy is returned,
+	// if the energy is > max energy, the cross section is equal 0.,
+	double operator() (double energy) const;
+
 	// path to the data folder, and file name with the path within the data folder must be given:
 	cross_section_table_mccc(const std::string& data_path, const std::string& name);
 	~cross_section_table_mccc() { ; }
