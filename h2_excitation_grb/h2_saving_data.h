@@ -39,9 +39,10 @@ void save_electron_energy_loss_rates(const std::string& output_path, double grb_
     const std::vector<double>& enloss_rates_h2_singlet,
     const std::vector<double>& enloss_rates_h2_triplet,
     const std::vector<double>& enloss_rates_ioniz,
-    const std::vector<double>& enloss_rates_coloumb_ions,
-    const std::vector<double>& enloss_rates_coloumb_el,
-    const std::vector<double>& enloss_rates_hei);
+    const std::vector<double>& enloss_rates_hei,
+    const std::vector<double>& enloss_rates_coulomb_el,
+    const std::vector<double>& enloss_rates_neut_heat,
+    const std::vector<double>& neut_heat_coll_rates);
 
 void save_electron_energy_losses(const std::string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const std::vector<double>& time_moments,
     const std::vector<double>& enloss_mt,
@@ -50,16 +51,16 @@ void save_electron_energy_losses(const std::string& output_path, double grb_dist
     const std::vector<double>& enloss_h2_singlet,
     const std::vector<double>& enloss_h2_triplet,
     const std::vector<double>& enloss_ioniz,
-    const std::vector<double>& enloss_coloumb_ions,
-    const std::vector<double>& enloss_coloumb_el,
-    const std::vector<double>& enloss_hei);
+    const std::vector<double>& enloss_hei,
+    const std::vector<double>& enloss_coulomb_el,
+    const std::vector<double>& enloss_neut_heat,
+    const std::vector<double>& neut_heat_coll);
 
 // Dissociated or excited number of species per cm3 up to a given time, as a function of time,
 void save_diss_excit_data(const std::string& output_path, const std::vector<double>& time_moments, 
     const std::vector<double>& h2_excit_rate_electr_arr, const std::vector<double>& h2_excit_rate_vibr_arr, const std::vector<double>& h2_excit_rate_rot_arr,
-    const std::vector<double>& h2_solomon_diss_arr, const std::vector<double>& h2_diss_exc_singlet_arr,
-    const std::vector<double>& h2_diss_exc_triplet_arr, const std::vector<double>& hei_exc_arr, const std::vector<double>& neutral_heating_coll_arr,
-    double grb_distance, double hcolumn_dens, double conc_h_tot);
+    const std::vector<double>& h2_solomon_diss_arr, const std::vector<double>& h2_diss_exc_singlet_arr, const std::vector<double>& h2_diss_exc_triplet_arr, 
+    const std::vector<double>& hei_exc_arr, double grb_distance, double hcolumn_dens, double conc_h_tot);
 
 //
 void save_phys_parameters(const std::string& output_path, const std::vector<double>& time_moments,

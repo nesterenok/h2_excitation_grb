@@ -272,6 +272,8 @@ public:
 // at high energies, the cross sections are equal to 0.,
 class cross_section_table_mccc : public cross_section_table
 {
+private:
+	bool is_extrapolation_on;
 public:	
 	// energy in eV, the cross section in cm2 is returned,
 	// if the energy is < min energy, the cross section at minimal energy is returned,
@@ -279,7 +281,7 @@ public:
 	double operator() (double energy) const;
 
 	// path to the data folder, and file name with the path within the data folder must be given:
-	cross_section_table_mccc(const std::string& data_path, const std::string& name);
+	cross_section_table_mccc(const std::string& data_path, const std::string& name, bool is_extrapolation_on);
 	~cross_section_table_mccc() { ; }
 };
 

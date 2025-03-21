@@ -55,8 +55,8 @@ protected:
 
     double conc_h_tot, grain_cs, grain_nb_density,
         enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos,
-        enloss_rate_h2_singlet, enloss_diss_h2_singlet, enloss_diss_h2_triplet, enloss_rate_ioniz, enloss_rate_coulomb_ions, enloss_rate_coulomb_el, 
-        enloss_rate_hei, conc_n, conc_i, energy_gain_n, energy_gain_i, nb_gain_n, nb_gain_i, neutral_heating_coll_rate,
+        enloss_rate_h2_singlet, enloss_diss_h2_singlet, enloss_diss_h2_triplet, enloss_rate_ioniz,
+        enloss_rate_hei, enloss_rate_coulomb_el, conc_n, conc_i, energy_gain_n, energy_gain_e, nb_gain_n, nb_gain_i, neutral_heating_coll_rate,
         h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate, h2_excit_rate_electr, h2_excit_rate_rot, h2_excit_rate_vibr;
 
     // in eV, in electron_energies - the centre of energy interval is provided,
@@ -178,13 +178,14 @@ public:
     // energy losses are < 0 if electrons loses energy, [eV cm-3 s-1]
     // energy loss via excitation of singlet (h2_electr_sin) and triplet states (h2_electr_tri), including excitation and dissociative excitation for singlet states,
     void get_el_energy_losses(double & mt, double & h2_rot, double& h2_rot_p, double &h2_vibr, double& h2_vibr_p, 
-        double & h2_electr_sin, double & h2_electr_tri, double & ion, double & col_ions, double & col_el, double & hei) const;
+        double & h2_electr_sin, double & h2_electr_tri, double & ion, double & hei, double& el_coul, 
+        double & neut_heat, double & neut_heat_coll) const;
     
     // rate of dissociation [cm-3 s-1],
     // through excitation of singlet states of H2 (diss_exc) and triplet (diss_exc_tr),
     // neutral heating rate due to collisions H2-H2, H2-He, [eV cm-3 s-1]
     void get_h2_process_rates(double & exc_rate_electr, double & exc_rate_vibr, double& exc_rate_rot, double & sol_diss, double & diss_exc, 
-        double & diss_exc_tr, double & hei_exc, double & neutral_heating_coll_rate);
+        double & diss_exc_tr, double & hei_exc);
 
     double get_electron_energy(int i) const;      // returns the centre of the interval [i, i+1], energy in eV
     double get_electron_energy_bin(int i) const;  // returns the energy bin size, in eV,

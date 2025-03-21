@@ -46,7 +46,9 @@ using namespace std;
 
 //
 // Simulations of the excitation of H2 molecules in the gas (plasma)
-void simulate_h2_excitation(const string& data_path, const string& sim_path, const string& output_path, double hcolumn_density);
+void simulate_h2_excitation(const string& data_path, const string& sim_path, const string& output_path, double hcolumn_density, 
+	int is_h2_pop_dens_init, double op_ratio_h2,
+	int test_fast_electron_yields, double test_electron_conc, double test_electron_energy, double test_he_abund, double test_conc_h_tot);
 
 void init_electron_energy_grid(vector<double>& electron_energies_grid, vector<double>& electron_energy_bin_size);
 
@@ -55,6 +57,8 @@ void init_electron_energy_grid(vector<double>& electron_energies_grid, vector<do
 void init_specimen_conc(const string& sim_path, double& conc_h_tot, vector<double>& layer_centre_distances, vector<dynamic_array>& d);
 void init_dust_abund(const string& sim_path, vector<double>& d, double& grain_radius_init, double& grain_nb_density, double& grain_material_density);
 void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& d, const vector<double>& electron_energies_grid);
+void init_electron_spectra_test(const string& output_path, dynamic_array & init_data_test, const vector<double>& en_grid, 
+	double test_electron_conc, double test_electron_energy);
 void init_h2_population_density(const string& sim_path, vector<dynamic_array>& d, vector<int>& qnb_v_arr, vector<int>& qnb_j_arr);
 
 
@@ -65,7 +69,8 @@ int f_elsp(realtype t, N_Vector y, N_Vector ydot, void* user_data) {
 int main()
 {
 	int nb_processors(4);
-	double hcolumn_density;
+	int test_fast_electron_yields, is_h2_pop_dens_init;
+	double hcolumn_density, op_ratio_h2, test_electron_conc, test_electron_energy, test_he_abund, test_conc_h_tot;
 
 	char text_line[MAX_TEXT_LINE_WIDTH];
 	
@@ -136,10 +141,75 @@ int main()
 		ss.str(text_line);
 		ss >> hcolumn_density;
 
+		// H2 populations are read from file, 0 - no, 1 - yes,
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> is_h2_pop_dens_init;
+
+		// ortho-to-para-H2 ratio, this parameter is used if H2 population densities are not read from file, 
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> op_ratio_h2;
+
+		//
+		// test simulations - electrons have fixed energy
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> test_fast_electron_yields;
+
+		// electron concentration in test simulations in [cm-3]
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> test_electron_conc;
+
+		// Electron energy in test simulations in[eV]
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> test_electron_energy;
+
+		// Helium abundance in test simulations(only H2 and He are taken into account),
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> test_he_abund;
+
+		// H total concentration for test simulations, [cm-3],
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> test_conc_h_tot;
+		
 		input.close();
 
 		// check test mode in the file with parameters, h2_parameters.h
-		simulate_h2_excitation(data_path, sim_path, output_path, hcolumn_density);
+		simulate_h2_excitation(data_path, sim_path, output_path, hcolumn_density, is_h2_pop_dens_init, op_ratio_h2, 
+			test_fast_electron_yields, test_electron_conc, test_electron_energy, test_he_abund, test_conc_h_tot);
 	}
 
 	output_path = "C:/Users/Александр/Documents/Данные и графики/paper GRB in molecular cloud/python_scripts_ism/";
@@ -180,7 +250,9 @@ void init_electron_energy_grid(vector<double>& electron_energies_grid, vector<do
 }
 
 
-void simulate_h2_excitation(const string& data_path, const string& sim_path, const string& output_path, double hcolumn_density)
+void simulate_h2_excitation(const string& data_path, const string& sim_path, const string& output_path, double hcolumn_density, 
+	int is_h2_pop_dens_init, double op_ratio_h2,
+	int test_fast_electron_yields, double test_electron_conc, double test_electron_energy, double test_he_abund, double test_conc_h_tot)
 {
 #ifdef __linux__
 	stringstream lin_out;
@@ -204,14 +276,14 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	int i, k, nb_of_time_moments, lay_nb, time_nb, step_nb, flag, nb_of_equat, nb_of_el_energies, nb_lev_h2, nb_lev_hei, 
 		h2eq_nb, heieq_nb, physeq_nb;
 	long int nb_steps_tot;
-	double x1, x2, x3, x4, x5, x6, x7, x8, x9, rel_tol, dt, model_time, model_time_aux, model_time_aux_prev, model_time_step, model_time_out,
+	double x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, rel_tol, dt, model_time, model_time_aux, model_time_aux_prev, model_time_step, model_time_out,
 		conc_h_tot, grain_radius_init, grain_nb_density, grain_material_density, grain_radius, dust_mass, gas_mass, grb_distance,
 		enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos, 
-		enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_coulomb_ions,
-		enloss_rate_coulomb_el, enloss_rate_hei, enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_h2_singlet, enloss_h2_triplet, enloss_ioniz, enloss_coloumb_ions,
-		enloss_coloumb_el, enloss_hei, h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate, neutral_heating_coll_rate,
-		h2_excit_rate_electr, h2_excit_rate_vibr, h2_excit_rate_rot, h2_solomon_diss, h2_diss_exc_singlet, h2_diss_exc_triplet, hei_exc, neutral_heating_coll,
-		op_ratio_h2, grb_cloud_distance;
+		enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, neutral_heating_rate, 
+		neutral_heating_coll_rate, enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_h2_singlet, enloss_h2_triplet, enloss_ioniz, enloss_hei, 
+		enloss_coulomb_el, neutral_heating, neutral_heating_coll, h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, 
+		hei_exc_rate, h2_excit_rate_electr, h2_excit_rate_vibr, h2_excit_rate_rot, h2_solomon_diss, h2_diss_exc_singlet, h2_diss_exc_triplet, 
+		hei_exc, dg_ratio, grb_cloud_distance;
 
 	time_t timer;
 	char* ctime_str;
@@ -223,18 +295,18 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 
 	// Energy loss rate in [eV cm-3 s-1], as a function of time
 	vector<double> enloss_rate_mt_arr, enloss_rate_h2_rot_arr, enloss_rate_h2_rot_arr_pos, enloss_rate_h2_vibr_arr, enloss_rate_h2_vibr_arr_pos, 
-		enloss_rate_h2_singlet_arr, enloss_rate_h2_triplet_arr, enloss_rate_ioniz_arr, enloss_rate_coulomb_ions_arr, enloss_rate_coulomb_el_arr, 
-		enloss_rate_hei_arr;
+		enloss_rate_h2_singlet_arr, enloss_rate_h2_triplet_arr, enloss_rate_ioniz_arr, enloss_rate_hei_arr, 
+		enloss_rate_coulomb_el_arr, neutral_heating_rate_arr, neutral_heating_coll_rate_arr;
 
 	// Excitation rate in [cm-3 s-1], as a function of time
 	vector<double> h2_excit_rate_electr_arr, h2_excit_rate_vibr_arr, h2_excit_rate_rot_arr;
 
 	// Energy loss in [eV cm-3] during the time interval [0, t] as a function of time t,
-	vector<double> enloss_mt_arr, enloss_h2_rot_arr, enloss_h2_vibr_arr, enloss_h2_singlet_arr, enloss_h2_triplet_arr, enloss_ioniz_arr,
-		enloss_coloumb_ions_arr, enloss_coloumb_el_arr, enloss_hei_arr;
+	vector<double> enloss_mt_arr, enloss_h2_rot_arr, enloss_h2_vibr_arr, enloss_h2_singlet_arr, enloss_h2_triplet_arr, enloss_ioniz_arr, 
+		enloss_hei_arr, enloss_coulomb_el_arr, neutral_heating_arr, neutral_heating_coll_arr;
 
 	// Dissociated concentration of H2 in [cm-3] up to a given time, as a function of time
-	vector<double> h2_solomon_diss_arr, h2_diss_exc_singlet_arr, h2_diss_exc_triplet_arr, hei_exc_arr, neutral_heating_coll_arr;
+	vector<double> h2_solomon_diss_arr, h2_diss_exc_singlet_arr, h2_diss_exc_triplet_arr, hei_exc_arr;
 
 	// Physical parameters as a function of time,
 	vector<double> neutral_temp_arr, ion_temp_arr, dust_charge_arr;
@@ -243,7 +315,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	vector<double> dg_ratio_cloud_data, ioniz_cloud_data;
 
 	// Spectrum[layer nb][energy bin] in [cm-3 eV-1], vector index - layer nb, array index - energy bin nb (specimen nb, H2 level nb),
-	vector<dynamic_array> el_spectrum_init_data, specimen_conc_init_data; 
+ 	vector<dynamic_array> el_spectrum_init_data, specimen_conc_init_data; 
 	vector<dynamic_array> h2_pop_dens_init_data;
 	
 	// Electron spectrum[time nb][energy bin] in [cm-3], vector index - time moment nb, array index - energy bin nb 
@@ -262,40 +334,51 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 		<< "Initialization of the data..." << endl;
 
 	// initialization of the electron spectrum grid, that can be finer than the energy grid in the file with simulation data,
-	init_electron_energy_grid(electron_energies_grid, electron_energy_bin_size);
-
-	init_dust_abund(sim_path, dg_ratio_cloud_data, grain_radius_init, grain_nb_density, grain_material_density); 
+	init_electron_energy_grid(electron_energies_grid, electron_energy_bin_size);	
+	nb_of_el_energies = (int)electron_energies_grid.size() - 1;
 	
-	// gas density and layer coordinates are initialized here,
-	init_specimen_conc(sim_path, conc_h_tot, layer_centre_distances, specimen_conc_init_data);
+	dynamic_array el_spectrum_test(nb_of_el_energies);
+	if (test_fast_electron_yields) 
+	{
+		init_electron_spectra_test(output_path, el_spectrum_test, electron_energies_grid, test_electron_conc, test_electron_energy);
 
-	// electron spectrum in the file has the dimension [cm-3 eV-1],	
-	init_electron_spectra(sim_path, output_path, el_spectrum_init_data, electron_energies_grid);
-
-	// population density in the file has dimension [cm-3],
-	init_h2_population_density(sim_path, h2_pop_dens_init_data, qnb_v_arr, qnb_j_arr);
-
-	// distance from the GRB source to the cloud boundary (the layer width is the same for all layers),
-	grb_cloud_distance = layer_centre_distances[0] - 0.5 * (layer_centre_distances[1] - layer_centre_distances[0]);
-
-	// Simulations are carried out for fixed cloud layer,
-	// Calculation of layer nb:
-	for (lay_nb = 0; lay_nb < (int) layer_centre_distances.size(); lay_nb++) {
-		if (hcolumn_density <= conc_h_tot * (layer_centre_distances[lay_nb] - grb_cloud_distance))
-			break;
+		conc_h_tot = test_conc_h_tot;
+		grb_cloud_distance = 0.;
+		hcolumn_density = 0.;
+		grb_distance = 0.;
+		lay_nb = 0;
 	}
-	if (lay_nb > (int)el_spectrum_init_data.size())
-		lay_nb = (int)el_spectrum_init_data.size() - 1;
-	
-	// updating column density for given layer number,
-	hcolumn_density = conc_h_tot * (layer_centre_distances[lay_nb] - grb_cloud_distance);
+	else
+	{
+		init_dust_abund(sim_path, dg_ratio_cloud_data, grain_radius_init, grain_nb_density, grain_material_density);
 
-	// distance from the GRB source to the centre of the particular cloud layer,
-	grb_distance = layer_centre_distances[lay_nb];
+		// gas density and layer coordinates are initialized here,
+		init_specimen_conc(sim_path, conc_h_tot, layer_centre_distances, specimen_conc_init_data);
 
+		// electron spectrum in the file has the dimension [cm-3 eV-1],	
+		init_electron_spectra(sim_path, output_path, el_spectrum_init_data, electron_energies_grid);
+
+		// population density in the file has dimension [cm-3],
+		init_h2_population_density(sim_path, h2_pop_dens_init_data, qnb_v_arr, qnb_j_arr);
+
+		// distance from the GRB source to the cloud boundary (the layer width is the same for all layers),
+		grb_cloud_distance = layer_centre_distances[0] - 0.5 * (layer_centre_distances[1] - layer_centre_distances[0]);
+
+		// Simulations are carried out for fixed cloud layer,
+		// Calculation of layer nb:
+		for (lay_nb = 0; lay_nb < (int)layer_centre_distances.size(); lay_nb++) {
+			if (hcolumn_density <= conc_h_tot * (layer_centre_distances[lay_nb] - grb_cloud_distance))
+				break;
+		}
+
+		// updating column density for given layer number,
+		hcolumn_density = conc_h_tot * (layer_centre_distances[lay_nb] - grb_cloud_distance);
+
+		// distance from the GRB source to the centre of the particular cloud layer,
+		grb_distance = layer_centre_distances[lay_nb];
+	}
 	elspectra_evolution_data user_data(data_path, output_path, conc_h_tot, electron_energies_grid, verbosity);
 
-	nb_of_el_energies = (int)electron_energies_grid.size() - 1;
 	nb_of_equat = user_data.get_nb_of_equat();
 	nb_lev_h2 = user_data.get_nb_of_h2_lev();
 	nb_lev_hei = user_data.get_nb_of_hei_lev();
@@ -367,71 +450,104 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	for (i = 0; i < nb_of_equat; i++) {
 		NV_Ith_S(y, i) = 0.;
 	}
-	for (i = 0; i < nb_of_el_energies; i++) {
-		// the number of electrons in the interval:
-		NV_Ith_S(y, i) = el_spectrum_init_data[lay_nb].arr[i] * user_data.get_electron_energy_bin(i);
-	}
-	for (i = 0; i < NB_OF_CHEM_SPECIES; i++) {
-		NV_Ith_S(y, nb_of_el_energies + i) = specimen_conc_init_data[lay_nb].arr[i];
-	}
 
-	if (H2_POP_DENS_INIT) {
-		// population densities must be in [cm-3],
-		x1 = x2 = 0.;
-		for (i = 0; i < h2_pop_dens_init_data[lay_nb].dim; i++) 
-		{
-			k = user_data.get_level_nb_h2(qnb_v_arr[i], qnb_j_arr[i]);
-			if (k >= 0) {
-				NV_Ith_S(y, h2eq_nb + k) = h2_pop_dens_init_data[lay_nb].arr[i];
-			}
-
-			if (qnb_j_arr[i] % 2 == 0) {
-				x2 += h2_pop_dens_init_data[lay_nb].arr[i];
-			}
-			else {
-				x1 += h2_pop_dens_init_data[lay_nb].arr[i];
-			}
+	if (test_fast_electron_yields) {
+		for (i = 0; i < nb_of_el_energies; i++) {
+			// the number of electrons in the interval:
+			NV_Ith_S(y, i) = el_spectrum_test.arr[i] * user_data.get_electron_energy_bin(i);
 		}
-		// calculating of ortho-para-H2 ratio,
-		op_ratio_h2 = x1 / x2;
-	}
-	else {
+
+		NV_Ith_S(y, nb_of_el_energies + H2_NB) = 0.5 * conc_h_tot;
+		NV_Ith_S(y, nb_of_el_energies + HE_NB) = test_he_abund * conc_h_tot;
+
 		// the initial distribution of energy level populations is postulated, [cm-3]
-		NV_Ith_S(y, h2eq_nb) = NV_Ith_S(y, nb_of_el_energies + H2_NB) / (ORTHO_TO_PARA_RATIO + 1.);
-		NV_Ith_S(y, h2eq_nb + 1) = NV_Ith_S(y, nb_of_el_energies + H2_NB) * ORTHO_TO_PARA_RATIO / (ORTHO_TO_PARA_RATIO + 1.);
-		
-		op_ratio_h2 = ORTHO_TO_PARA_RATIO;
-	}
-	
-	// the initial distribution of HeI levels,
-	NV_Ith_S(y, heieq_nb) = NV_Ith_S(y, nb_of_el_energies + HE_NB);
+		NV_Ith_S(y, h2eq_nb) = NV_Ith_S(y, nb_of_el_energies + H2_NB) / (op_ratio_h2 + 1.);
+		NV_Ith_S(y, h2eq_nb + 1) = NV_Ith_S(y, nb_of_el_energies + H2_NB) * op_ratio_h2 / (op_ratio_h2 + 1.);
 
-	// Initial gas/dust temperature, in K
-	NV_Ith_S(y, physeq_nb) = NV_Ith_S(y, physeq_nb + 1) = 10.;
+		// the initial distribution of HeI levels,
+		NV_Ith_S(y, heieq_nb) = NV_Ith_S(y, nb_of_el_energies + HE_NB);
 
-	// Dust charge
-	NV_Ith_S(y, physeq_nb + 2) = 0.;
+		// Initial gas/dust temperature, in K
+		NV_Ith_S(y, physeq_nb) = NV_Ith_S(y, physeq_nb + 1) = 10.;
 
-	gas_mass = specimen_conc_init_data[lay_nb].arr[H_NB] + specimen_conc_init_data[lay_nb].arr[H_P_NB]
-		+ 2. * (specimen_conc_init_data[lay_nb].arr[H2_NB] + specimen_conc_init_data[lay_nb].arr[H2_P_NB])
-		+ 4. * (specimen_conc_init_data[lay_nb].arr[HE_NB] + specimen_conc_init_data[lay_nb].arr[HE_P_NB] + specimen_conc_init_data[lay_nb].arr[HE_PP_NB]);
-	gas_mass *= ATOMIC_MASS_UNIT;
+		// Dust charge
+		NV_Ith_S(y, physeq_nb + 2) = 0.;
 
-	// dust-gas mass ratio < 1.
-	dust_mass = gas_mass * dg_ratio_cloud_data[lay_nb] / (1. - dg_ratio_cloud_data[lay_nb]);
-
-	// calculation of grain cross section,
-	if (dg_ratio_cloud_data[lay_nb] <= numeric_limits<double>::epsilon()) {
 		dust_is_presented = false;
 		grain_radius = 0.;
+		grain_nb_density = 0.;
+		dg_ratio = 0.;
+
+		user_data.set_dust_parameters(dust_is_presented, grain_radius, grain_nb_density);
 	}
 	else {
-		dust_is_presented = true;
-		x1 = dust_mass * 3. / (grain_nb_density * grain_material_density * 4. * M_PI);
-		grain_radius = pow(x1, 1. / 3.);   // grain radius, cm
-	}
-	user_data.set_dust_parameters(dust_is_presented, grain_radius, grain_nb_density);
+		for (i = 0; i < nb_of_el_energies; i++) {
+			// the number of electrons in the interval:
+			NV_Ith_S(y, i) = el_spectrum_init_data[lay_nb].arr[i] * user_data.get_electron_energy_bin(i);
+		}
 
+		for (i = 0; i < NB_OF_CHEM_SPECIES; i++) {
+			NV_Ith_S(y, nb_of_el_energies + i) = specimen_conc_init_data[lay_nb].arr[i];
+		}
+
+		if (is_h2_pop_dens_init) {
+			// population densities must be in [cm-3],
+			x1 = x2 = 0.;
+			for (i = 0; i < h2_pop_dens_init_data[lay_nb].dim; i++) 
+			{
+				k = user_data.get_level_nb_h2(qnb_v_arr[i], qnb_j_arr[i]);
+				if (k >= 0) {
+					NV_Ith_S(y, h2eq_nb + k) = h2_pop_dens_init_data[lay_nb].arr[i];
+				}
+
+				if (qnb_j_arr[i] % 2 == 0) {
+					x2 += h2_pop_dens_init_data[lay_nb].arr[i];
+				}
+				else {
+					x1 += h2_pop_dens_init_data[lay_nb].arr[i];
+				}
+			}
+			// calculating of ortho-para-H2 ratio,
+			op_ratio_h2 = x1 / x2;
+		}
+		else {
+			// the initial distribution of energy level populations is postulated, [cm-3]
+			NV_Ith_S(y, h2eq_nb) = NV_Ith_S(y, nb_of_el_energies + H2_NB) / (op_ratio_h2 + 1.);
+			NV_Ith_S(y, h2eq_nb + 1) = NV_Ith_S(y, nb_of_el_energies + H2_NB) * op_ratio_h2 / (op_ratio_h2 + 1.);
+		}
+
+		// the initial distribution of HeI levels,
+		NV_Ith_S(y, heieq_nb) = NV_Ith_S(y, nb_of_el_energies + HE_NB);
+
+		// Initial gas/dust temperature, in K
+		NV_Ith_S(y, physeq_nb) = NV_Ith_S(y, physeq_nb + 1) = 10.;
+
+		// Dust charge
+		NV_Ith_S(y, physeq_nb + 2) = 0.;
+
+		gas_mass = specimen_conc_init_data[lay_nb].arr[H_NB] + specimen_conc_init_data[lay_nb].arr[H_P_NB]
+			+ 2. * (specimen_conc_init_data[lay_nb].arr[H2_NB] + specimen_conc_init_data[lay_nb].arr[H2_P_NB])
+			+ 4. * (specimen_conc_init_data[lay_nb].arr[HE_NB] + specimen_conc_init_data[lay_nb].arr[HE_P_NB] + specimen_conc_init_data[lay_nb].arr[HE_PP_NB]);
+		gas_mass *= ATOMIC_MASS_UNIT;
+
+		// dust-gas mass ratio < 1.
+		dust_mass = gas_mass * dg_ratio_cloud_data[lay_nb] / (1. - dg_ratio_cloud_data[lay_nb]);
+
+		// calculation of grain cross section,
+		if (dg_ratio_cloud_data[lay_nb] <= numeric_limits<double>::epsilon()) {
+			dust_is_presented = false;
+			grain_radius = 0.;
+			dg_ratio = 0.;
+		}
+		else {
+			dust_is_presented = true;
+			x1 = dust_mass * 3. / (grain_nb_density * grain_material_density * 4. * M_PI);
+			grain_radius = pow(x1, 1. / 3.);   // grain radius, cm
+			dg_ratio = dg_ratio_cloud_data[lay_nb];
+		}
+		user_data.set_dust_parameters(dust_is_presented, grain_radius, grain_nb_density);
+	}
+	
 	// restart of the solver with new values of initial conditions,
 	flag = CVodeReInit(cvode_mem, model_time, y);
 
@@ -439,13 +555,13 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	f_elsp(model_time, y, ydot, &user_data);
 
 	enloss_rate_mt = enloss_rate_h2_rot = enloss_rate_h2_rot_pos = enloss_rate_h2_vibr = enloss_rate_h2_vibr_pos = enloss_rate_h2_singlet 
-		= enloss_rate_h2_triplet = enloss_rate_ioniz = enloss_rate_coulomb_ions = enloss_rate_coulomb_el = enloss_rate_hei = 0.;
+		= enloss_rate_h2_triplet = enloss_rate_ioniz = enloss_rate_hei = enloss_rate_coulomb_el = neutral_heating_rate = neutral_heating_coll_rate = 0.;
 
-	enloss_mt = enloss_h2_rot = enloss_h2_vibr = enloss_h2_singlet = enloss_h2_triplet = enloss_ioniz = enloss_coloumb_ions
-		= enloss_coloumb_el = enloss_hei = 0.;
+	enloss_mt = enloss_h2_rot = enloss_h2_vibr = enloss_h2_singlet = enloss_h2_triplet = enloss_ioniz = enloss_hei 
+		= enloss_coulomb_el = neutral_heating = neutral_heating_coll  = 0.;
 
-	h2_solomon_diss_rate = h2_diss_exc_singlet_rate = h2_diss_exc_triplet_rate = hei_exc_rate = neutral_heating_coll_rate = 0.;
-	h2_solomon_diss = h2_diss_exc_singlet = h2_diss_exc_triplet = hei_exc = neutral_heating_coll = 0.;
+	h2_solomon_diss_rate = h2_diss_exc_singlet_rate = h2_diss_exc_triplet_rate = hei_exc_rate = 0.;
+	h2_solomon_diss = h2_diss_exc_singlet = h2_diss_exc_triplet = hei_exc  = 0.;
 	h2_excit_rate_electr = h2_excit_rate_vibr = h2_excit_rate_rot = 0.;
 
 	// for initial time moment:
@@ -486,9 +602,11 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	enloss_rate_h2_singlet_arr.push_back(enloss_rate_h2_singlet);
 	enloss_rate_h2_triplet_arr.push_back(enloss_rate_h2_triplet);
 	enloss_rate_ioniz_arr.push_back(enloss_rate_ioniz);
-	enloss_rate_coulomb_ions_arr.push_back(enloss_rate_coulomb_ions);
-	enloss_rate_coulomb_el_arr.push_back(enloss_rate_coulomb_el);
 	enloss_rate_hei_arr.push_back(enloss_rate_hei);
+
+	enloss_rate_coulomb_el_arr.push_back(enloss_rate_coulomb_el);
+	neutral_heating_rate_arr.push_back(neutral_heating_rate);
+	neutral_heating_coll_rate_arr.push_back(neutral_heating_coll_rate);
 
 	enloss_mt_arr.push_back(enloss_mt);
 	enloss_h2_rot_arr.push_back(enloss_h2_rot);
@@ -496,10 +614,12 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	enloss_h2_singlet_arr.push_back(enloss_h2_singlet);
 	enloss_h2_triplet_arr.push_back(enloss_h2_triplet);
 	enloss_ioniz_arr.push_back(enloss_ioniz);
-	enloss_coloumb_ions_arr.push_back(enloss_coloumb_ions);
-	enloss_coloumb_el_arr.push_back(enloss_coloumb_el);
 	enloss_hei_arr.push_back(enloss_hei);
 
+	enloss_coulomb_el_arr.push_back(enloss_coulomb_el);
+	neutral_heating_arr.push_back(neutral_heating);
+	neutral_heating_coll_arr.push_back(neutral_heating_coll);
+	
 	h2_excit_rate_electr_arr.push_back(h2_excit_rate_electr);
 	h2_excit_rate_vibr_arr.push_back(h2_excit_rate_vibr);
 	h2_excit_rate_rot_arr.push_back(h2_excit_rate_rot);
@@ -508,8 +628,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	h2_diss_exc_singlet_arr.push_back(h2_diss_exc_singlet);
 	h2_diss_exc_triplet_arr.push_back(h2_diss_exc_triplet);
 	hei_exc_arr.push_back(hei_exc);
-	neutral_heating_coll_arr.push_back(neutral_heating_coll);
-
+	
 	neutral_temp_arr.push_back(NV_Ith_S(y, physeq_nb));
 	ion_temp_arr.push_back(NV_Ith_S(y, physeq_nb + 1));
 	dust_charge_arr.push_back(NV_Ith_S(y, physeq_nb + 2) * grain_nb_density);  // dust charge per cm3
@@ -526,7 +645,7 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	}
 
 	save_model_parameters(output_path, grb_cloud_distance, grb_distance, hcolumn_density, conc_h_tot,
-		op_ratio_h2, dg_ratio_cloud_data[lay_nb], grain_radius, grain_nb_density, lay_nb);
+		op_ratio_h2, dg_ratio, grain_radius, grain_nb_density, lay_nb);
 
 	time_nb = 1;
 	// there is integration of the parameters over the time, this time step must be sufficiently small, 
@@ -573,44 +692,49 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 			
 			dt = 0.5 * (model_time_aux - model_time_aux_prev);
 
+			// Energy losses, 
 			x1 = enloss_rate_mt;
 			x2 = enloss_rate_h2_rot;
 			x3 = enloss_rate_h2_vibr;
 			x4 = enloss_rate_h2_singlet;
 			x5 = enloss_rate_ioniz;
-			x6 = enloss_rate_coulomb_ions;
-			x7 = enloss_rate_coulomb_el;
-			x8 = enloss_rate_hei;
-			x9 = enloss_rate_h2_triplet;
+			x6 = enloss_rate_hei;
+			x7 = enloss_rate_h2_triplet;
 
+			x8 = enloss_rate_coulomb_el;
+			x9 = neutral_heating_rate;
+			x10 = neutral_heating_coll_rate;
+			
 			user_data.get_el_energy_losses(enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos, 
-				enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_coulomb_ions, enloss_rate_coulomb_el, enloss_rate_hei);
+				enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, 
+				neutral_heating_rate, neutral_heating_coll_rate);
 
 			enloss_mt += (x1 + enloss_rate_mt) * dt;
 			enloss_h2_rot += (x2 + enloss_rate_h2_rot) * dt;
 			enloss_h2_vibr += (x3 + enloss_rate_h2_vibr) * dt;
 			enloss_h2_singlet += (x4 + enloss_rate_h2_singlet) * dt;
 			enloss_ioniz += (x5 + enloss_rate_ioniz) * dt;
-			enloss_coloumb_ions += (x6 + enloss_rate_coulomb_ions) * dt;
-			enloss_coloumb_el += (x7 + enloss_rate_coulomb_el) * dt;
-			enloss_hei += (x8 + enloss_rate_hei) * dt;
-			enloss_h2_triplet += (x9 + enloss_rate_h2_triplet) * dt;
+			enloss_hei += (x6 + enloss_rate_hei) * dt;
+			enloss_h2_triplet += (x7 + enloss_rate_h2_triplet) * dt;
 
+			enloss_coulomb_el += (x8 + enloss_rate_coulomb_el) * dt;
+			neutral_heating += (x9 + neutral_heating_rate) * dt;
+			neutral_heating_coll += (x10 + neutral_heating_coll_rate) * dt;
+			
+			// Excitation and other rates
 			x1 = h2_solomon_diss_rate;
 			x2 = h2_diss_exc_singlet_rate;
 			x3 = h2_diss_exc_triplet_rate;
 			x4 = hei_exc_rate;
-			x5 = neutral_heating_coll_rate;
-
+			
 			user_data.get_h2_process_rates(h2_excit_rate_electr, h2_excit_rate_vibr, h2_excit_rate_rot, h2_solomon_diss_rate, h2_diss_exc_singlet_rate,
-				h2_diss_exc_triplet_rate, hei_exc_rate, neutral_heating_coll_rate);
+				h2_diss_exc_triplet_rate, hei_exc_rate);
 			
 			h2_solomon_diss += (x1 + h2_solomon_diss_rate) * dt;
 			h2_diss_exc_singlet += (x2 + h2_diss_exc_singlet_rate) * dt;
 			h2_diss_exc_triplet += (x3 + h2_diss_exc_triplet_rate) * dt;
 			hei_exc += (x4 + hei_exc_rate) * dt;
-			neutral_heating_coll += (x5 + neutral_heating_coll_rate) * dt;
-
+			
 			flag = CVodeGetNumSteps(cvode_mem, &nb_steps_tot);
 
 			if (verbosity) {
@@ -658,18 +782,17 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 				enloss_rate_h2_singlet_arr.push_back(enloss_rate_h2_singlet);
 				enloss_rate_h2_triplet_arr.push_back(enloss_rate_h2_triplet);
 				enloss_rate_ioniz_arr.push_back(enloss_rate_ioniz);
-				enloss_rate_coulomb_ions_arr.push_back(enloss_rate_coulomb_ions);
-				enloss_rate_coulomb_el_arr.push_back(enloss_rate_coulomb_el);
 				enloss_rate_hei_arr.push_back(enloss_rate_hei);
-
+				enloss_rate_coulomb_el_arr.push_back(enloss_rate_coulomb_el);
+				neutral_heating_rate_arr.push_back(neutral_heating_rate);
+				neutral_heating_coll_rate_arr.push_back(neutral_heating_coll_rate);
+				
 				enloss_mt_arr.push_back(enloss_mt);
 				enloss_h2_rot_arr.push_back(enloss_h2_rot);
 				enloss_h2_vibr_arr.push_back(enloss_h2_vibr);
 				enloss_h2_singlet_arr.push_back(enloss_h2_singlet);
 				enloss_h2_triplet_arr.push_back(enloss_h2_triplet);
 				enloss_ioniz_arr.push_back(enloss_ioniz);
-				enloss_coloumb_ions_arr.push_back(enloss_coloumb_ions);
-				enloss_coloumb_el_arr.push_back(enloss_coloumb_el);
 				enloss_hei_arr.push_back(enloss_hei);
 
 				h2_excit_rate_electr_arr.push_back(h2_excit_rate_electr);
@@ -680,8 +803,10 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 				h2_diss_exc_singlet_arr.push_back(h2_diss_exc_singlet);
 				h2_diss_exc_triplet_arr.push_back(h2_diss_exc_triplet);
 				hei_exc_arr.push_back(hei_exc);
+				enloss_coulomb_el_arr.push_back(enloss_coulomb_el);
+				neutral_heating_arr.push_back(neutral_heating);
 				neutral_heating_coll_arr.push_back(neutral_heating_coll);
-
+				
 				neutral_temp_arr.push_back(NV_Ith_S(y, physeq_nb));
 				ion_temp_arr.push_back(NV_Ith_S(y, physeq_nb + 1));
 				dust_charge_arr.push_back(NV_Ith_S(y, physeq_nb + 2) * grain_nb_density);  // dust charge per cm3
@@ -705,9 +830,10 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 					enloss_rate_h2_singlet_arr,
 					enloss_rate_h2_triplet_arr,
 					enloss_rate_ioniz_arr, 
-					enloss_rate_coulomb_ions_arr, 
-					enloss_rate_coulomb_el_arr, 
-					enloss_rate_hei_arr);
+					enloss_rate_hei_arr, 
+					enloss_rate_coulomb_el_arr,
+					neutral_heating_rate_arr,
+					neutral_heating_coll_rate_arr);
 
 				save_electron_energy_losses(output_path, grb_distance, hcolumn_density, conc_h_tot, time_cloud_arr,
 					enloss_mt_arr,
@@ -716,12 +842,13 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 					enloss_h2_singlet_arr,
 					enloss_h2_triplet_arr,
 					enloss_ioniz_arr,
-					enloss_coloumb_ions_arr,
-					enloss_coloumb_el_arr,
-					enloss_hei_arr);
+					enloss_hei_arr, 
+					enloss_coulomb_el_arr, 
+					neutral_heating_arr, 
+					neutral_heating_coll_arr);
 
 				save_diss_excit_data(output_path, time_cloud_arr, h2_excit_rate_electr_arr, h2_excit_rate_vibr_arr, h2_excit_rate_rot_arr, 
-					h2_solomon_diss_arr, h2_diss_exc_singlet_arr, h2_diss_exc_triplet_arr, hei_exc_arr, neutral_heating_coll_arr, 
+					h2_solomon_diss_arr, h2_diss_exc_singlet_arr, h2_diss_exc_triplet_arr, hei_exc_arr,
 					grb_distance, hcolumn_density, conc_h_tot);
 
 				save_phys_parameters(output_path, time_cloud_arr, neutral_temp_arr, ion_temp_arr, dust_charge_arr, specimen_conc_evol, 
@@ -801,7 +928,31 @@ void init_dust_abund(const string& sim_path, vector<double>& d, double & grain_r
 	input.close();
 }
 
-// 
+// for test simulations,
+void init_electron_spectra_test(const string& output_path, dynamic_array & init_data_test, const vector<double>& en_grid, 
+	double test_electron_conc, double test_electron_energy)
+{
+	int i;
+	double de;
+
+	for (i = 0; i < (int)en_grid.size(); i++) {
+		if (en_grid[i] > test_electron_energy) {
+			i--;
+			break;
+		}
+	}
+
+	// in the case when test energy is very high,
+	if (i == (int)en_grid.size()) {
+		i = (int)en_grid.size() - 2;
+	}
+	de = en_grid[i + 1] - en_grid[i];
+
+	memset(init_data_test.arr, 0, init_data_test.dim * sizeof(double));
+	init_data_test.arr[i] = test_electron_conc / de;
+}
+
+
 void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& init_data, const vector<double>& en_grid)
 { 
 	// layer nb for which the electron spectra is saved (initial and after rescaling of energy grid),
@@ -854,16 +1005,8 @@ void init_electron_spectra(const string& sim_path, const string& output_path, ve
 
 		for (l = 0; l < nb_l; l++) {
 			input >> x;
-
 			// vector index - layer nb, array index - electron energy bin nb,	
-			if (ELECTRON_SPECTRUM_TEST) {
-				file_data[l].arr[i] = 0.;
-				if (i == en_nb_f - 1)
-					file_data[l].arr[i] = ELECTRON_CONCENTRATION_TEST / (2. * de);
-			}
-			else {
-				file_data[l].arr[i] = x;
-			}
+			file_data[l].arr[i] = x;
 		}
 	}
 	input.close();

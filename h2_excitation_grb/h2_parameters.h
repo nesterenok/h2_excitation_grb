@@ -63,17 +63,6 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 // Electron spectra evolution
 //-----------------------------------------------------
 
-// this constant is used in the initialization of the electron spectrum data,
-#define ELECTRON_SPECTRUM_TEST 0
-#define ELECTRON_CONCENTRATION_TEST  0.1  // cm-3
-
-// 1 - initialization of H2 population densities from file,
-// 0 - H2 molecules are in lowest energy levels, J = 0 and 1,
-// Note, there is no check yet about the consistency of energy levels used in this code and those used in the simulations before, 
-#define H2_POP_DENS_INIT 0
-// this parameter is used if H2 population densities are not read from file,  
-#define ORTHO_TO_PARA_RATIO 0.1
-
 // Parameters of the electron energy losses
 // 1 - switch on, 0 - switch off,      
 #define ROVIBRATIONAL_EXC_LOSSES 1
@@ -90,6 +79,8 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 // in K, T[eV] = 8.618e-5 * T[K]
 #define THERMAL_EL_TEMPERATURE 100.  // in K 
 
+// Casselli et al., The ionization fraction in dense cloud cores, ApJ 499, p.234 (1998);
+// 1.e-8 < x_e < 1.e-6
 #define IONIZATION_FRACTION_THERMAL_EL 1.e-6
 
 // collisions of H2 with H2, He
