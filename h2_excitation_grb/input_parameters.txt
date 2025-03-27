@@ -11,15 +11,19 @@ C:/Users/Александр/Documents/Visual Studio 2019/h2_excitation_grb/h2_excitation_
 # H2 populations are read from file, 0 - no, 1 - yes,
 # 1 - initialization of H2 population densities from file,  0 - H2 molecules are in lowest energy levels, J = 0 and 1,
 0
-# ortho-to-para-H2 ratio, this parameter is used if H2 population densities are not read from file,
-0.1
-# Test simulations - electrons have fixed energy, 0 - no, 1 - yes, 
+# ortho-to-para-H2 ratio, this parameter is used if H2 population densities are not read from file (and in test simulations),
+3.
+#
+# Below all parameters are for test simulations,
+# Test simulations - electrons have fixed energy, 0 - no, 1 - yes. 
 1
 # Electron concentration in test simulations in [cm-3],
-1.
+0.1
 # Electron energy in test simulations in [eV],
 1000.
 # Helium abundance in test simulations (only H2 and He are taken into account), He abundance must be > 0.
-0.1
-# H total concentration for test simulations, [cm-3]
-1.e+4
+1.e-9
+# H nuclei total concentration for test simulations, [cm-3]
+2.e+4
+# Ionization fraction x_e, number density of electrons n_e = n_{H,tot} * x_e,
+0.

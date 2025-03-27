@@ -24,7 +24,7 @@ void save_model_parameters(const std::string& output_path, double grb_cloud_dist
 	string fname;
 	ofstream output;
 
-	fname = output_path + "h2grb_parameters.txt";
+	fname = output_path + "h2grb_parameters_input.txt";
 	output.open(fname.c_str());
 	
 	output << scientific;
@@ -331,7 +331,7 @@ void save_electron_energy_loss_rates(const string& output_path, double grb_dista
 	const vector<double>& enloss_rates_ioniz, 
 	const vector<double>& enloss_rates_hei,
 	const vector<double>& enloss_rates_coulomb_el,
-	const vector<double>& enloss_rates_neut_heat,
+	const vector<double>& diss_decay_heating_rate,
 	const vector<double>& neut_heat_coll_rates)
 {
 	int i;
@@ -357,7 +357,7 @@ void save_electron_energy_loss_rates(const string& output_path, double grb_dista
 		<< "!ion - molecule/atom ionization," << endl
 		<< "!hei - HeI excitation by electron impact" << endl
 		<< "!ecoul - Coulomb loses on electrons," << endl
-		<< "!nheat - neutral heating rate (momentum transfer, H2 dissociation)," << endl
+		<< "!ndiss - neutral heating rate due to H2 dissociation, > 0" << endl
 		<< "!ncoll - neutral heating rate due to collisions H2-H2, H2-He," << endl;
 
 	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
@@ -366,7 +366,7 @@ void save_electron_energy_loss_rates(const string& output_path, double grb_dista
 	
 	output << left << setw(13) << "!time(s)"
 		<< setw(11) << "tot" << setw(11) << "mt" << setw(11) << "rot" << setw(11) << "rot_pos" << setw(11) << "vibr" << setw(11) << "vibr_pos" 
-		<< setw(11) << "elec_s" << setw(11) << "elec_t" << setw(11) << "ion" << setw(11) << "hei" << setw(11) << "ecoul" << setw(11) << "nheat" 
+		<< setw(11) << "elec_s" << setw(11) << "elec_t" << setw(11) << "ion" << setw(11) << "hei" << setw(11) << "ecoul" << setw(11) << "ndiss" 
 		<< setw(11) << "ncoll" << endl;
 
 	// losses on vibrational excitation of H2 include pure rotational excitation, 
@@ -389,7 +389,7 @@ void save_electron_energy_loss_rates(const string& output_path, double grb_dista
 			<< setw(11) << enloss_rates_ioniz[i]
 			<< setw(11) << enloss_rates_hei[i] 
 			<< setw(11) << enloss_rates_coulomb_el[i]
-			<< setw(11) << enloss_rates_neut_heat[i]
+			<< setw(11) << diss_decay_heating_rate[i]
 			<< setw(11) << neut_heat_coll_rates[i] << endl;
 	}
 	output.close();
@@ -405,7 +405,7 @@ void save_electron_energy_losses(const string& output_path, double grb_distance,
 	const vector<double>& enloss_ioniz,
 	const vector<double>& enloss_hei,
 	const vector<double>& enloss_coulomb_el,
-	const vector<double>& enloss_neut_heat,
+	const vector<double>& diss_decay_heating,
 	const vector<double>& neut_heat_coll)
 {
 	int i;
@@ -429,7 +429,7 @@ void save_electron_energy_losses(const string& output_path, double grb_distance,
 		<< "!ion_int - molecule/atom ionization," << endl
 		<< "!hei_int - HeI excitation by electron impact" << endl
 		<< "!ecoul_int - Coulomb loses on electrons," << endl
-		<< "!nheat_int - neutral heating rate (momentum transfer, H2 dissociation)," << endl
+		<< "!ndiss_int - neutral heating rate due to H2 dissociation, > 0" << endl
 		<< "!ncoll_int - neutral heating rate due to collisions H2-H2, H2-He," << endl;
 
 	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
@@ -446,7 +446,7 @@ void save_electron_energy_losses(const string& output_path, double grb_distance,
 		<< setw(11) << "ion_int"
 		<< setw(11) << "hei_int" 
 		<< setw(11) << "ecoul_int" 
-		<< setw(11) << "nheat_int"
+		<< setw(11) << "ndiss_int"
 		<< setw(11) << "ncoll_int" << endl;
 
 	// losses on vibrational excitation of H2 include pure rotational excitation, 
@@ -467,46 +467,97 @@ void save_electron_energy_losses(const string& output_path, double grb_distance,
 			<< setw(11) << enloss_ioniz[i]
 			<< setw(11) << enloss_hei[i] 
 			<< setw(11) << enloss_coulomb_el[i]
-			<< setw(11) << enloss_neut_heat[i]
+			<< setw(11) << diss_decay_heating[i]
 			<< setw(11) << neut_heat_coll[i] << endl;
 	}
 	output.close();
 }
 
 
-void save_diss_excit_data(const string& output_path, const vector<double>& time_moments,
-	const vector<double>& h2_excit_rate_electr_arr, const vector<double>& h2_excit_rate_vibr_arr, const vector<double>& h2_excit_rate_rot_arr,
-	const vector<double>& h2_solomon_diss_arr, const vector<double>& h2_diss_exc_singlet_arr, const vector<double>& h2_diss_exc_triplet_arr,
-	const vector<double>& hei_exc_arr, double grb_distance, double hcolumn_dens, double conc_h_tot)
+void save_diss_excit_rates(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const vector<double>& time_moments,
+	const vector<double>& h2_excit_electr_rate_arr, 
+	const vector<double>& h2_excit_vibr_rate_arr, 
+	const vector<double>& h2_excit_rot_rate_arr)
+{
+	int i;
+	string fname;
+	ofstream output;
+
+	fname = output_path + "h2grb_diss_excit_rates.txt";
+	output.open(fname.c_str());
+
+	output << scientific;
+	output.precision(6);
+
+	output << left << "!Dissociation / excitation rates," << endl
+		<< "!h2_exc_el- H2 electronic excitation rate, in [cm-3 s-1]," << endl
+		<< "!h2_exc_v - H2 vibrational excitation rate, vi = 0 -> vf > 0 (within the ground electronic state), in [cm-3 s-1]," << endl
+		<< "!h2_exc_r - H2 pure rotational excitation within v = 0, ji = 0,1 -> jf > 1, in [cm-3 s-1]," << endl;
+
+	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot
+		<< setw(7) << (int)h2_excit_electr_rate_arr.size() << endl;
+
+	output << left << setw(13) << "!time(s)" << setw(12) << "h2_exc_el" << setw(12) << "h2_exc_v" << setw(12) << "h2_exc_r" << endl;
+
+	for (i = 0; i < (int)h2_excit_electr_rate_arr.size(); i++) {
+		output.precision(3);
+		output << left << setw(13) << time_moments[i];
+
+		output.precision(2);
+		output << left << setw(12) << h2_excit_electr_rate_arr[i]
+			<< setw(12) << h2_excit_vibr_rate_arr[i]
+			<< setw(12) << h2_excit_rot_rate_arr[i] << endl;
+	}
+	output.close();
+}
+
+
+void save_diss_excit(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, 
+	const vector<double>& time_moments,
+	const vector<double>& h2_solomon_diss_arr, 
+	const vector<double>& h2_diss_exc_singlet_arr, 
+	const vector<double>& h2_diss_exc_triplet_arr,
+	const vector<double>& hei_exc_arr,
+	const vector<double>& h2_excit_electr_arr,
+	const vector<double>& h2_excit_electr_bs_arr,
+	const vector<double>& h2_excit_electr_cp_arr,
+	const vector<double>& h2_excit_vibr_arr,
+	const vector<double>& h2_excit_vibr_1_arr,
+	const vector<double>& h2_excit_vibr_2_arr)
 {
 	int i;
 	double tot_int;
 	string fname;
 	ofstream output;
 
-	fname = output_path + "h2grb_diss_excit_data.txt";
+	fname = output_path + "h2grb_diss_excit_int.txt";
 	output.open(fname.c_str());
 
 	output << scientific;
 	output.precision(6);
 
-	output << left << "!Reaction contribution," << endl
+	output << left << "!Number of dissociations/excitations up to a given time [cm-3]," << endl
 		<< "!tot_int(H2) - integrated amount of H2 dissociated [cm-3]," << endl
-		<< "!sol_int  -  Solomon process of H2 [cm-3], " << endl
+		<< "!sol_int  - dissociation following excitation to the singlet states (Solomon) [cm-3], " << endl
 		<< "!de_s_int - dissociative excitation of H2 (via singlet states)," << endl
 		<< "!de_t_int - dissociative excitation of H2 (via triplet states)," << endl
 		<< "!hei_int  - HeI excitation [cm-3];" << endl
-		<< "!h2_exc_el- H2 electronic excitation rate, in [cm-3 s-1]," << endl
-		<< "!h2_exc_v - H2 ro-vibrational excitation rate, includes pure rotational excitation, in [cm-3 s-1]," << endl
-		<< "!h2_exc_r - H2 pure rotational excitation, in [cm-3 s-1]," << endl;
+		<< "!el_int   - excitation to all H2 electronic states (that are taken into account in the model);" << endl
+		<< "!el_bs_int- excitation to B1S+u H2 electronic state;" << endl
+		<< "!el_cp_int- excitation to C1Pu H2 electronic state;" << endl
+		<< "!vibr_int - excitation to vibrational states within the ground electronic state, vi = 0 -> vf > 0;" << endl
+		<< "!v1_int   - excitation vi = 0 -> vf = 1 within the ground electronic state;" << endl
+		<< "!v2_int   - excitation vi = 0,1 -> vf = 2 within the ground electronic state;" << endl;
 
 	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
 		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
 		<< setw(7) << (int)h2_solomon_diss_arr.size() << endl;
 
 	output << left << setw(13) << "!time(s)" << setw(12) << "tot_int(H2)"
-		<< setw(12) << "sol_int" << setw(12) << "de_s_int" << setw(12) << "de_t_int" << setw(12) << "hei_int" 
-		<< setw(12) << "h2_exc_el" << setw(12) << "h2_exc_v" << setw(12) << "h2_exc_r" << endl;
+		<< setw(12) << "sol_int" << setw(12) << "de_s_int" << setw(12) << "de_t_int" << setw(12) << "hei_int"
+		<< setw(12) << "el_int" << setw(12) << "el_bs_int" << setw(12) << "el_cp_int" 
+		<< setw(12) << "vibr_int" << setw(12) << "v1_int" << setw(12) << "v2_int" << endl;
 
 	for (i = 0; i < (int)h2_solomon_diss_arr.size(); i++) {
 		tot_int = h2_solomon_diss_arr[i] + h2_diss_exc_singlet_arr[i] + h2_diss_exc_triplet_arr[i];
@@ -519,10 +570,13 @@ void save_diss_excit_data(const string& output_path, const vector<double>& time_
 			<< setw(12) << h2_solomon_diss_arr[i]
 			<< setw(12) << h2_diss_exc_singlet_arr[i]
 			<< setw(12) << h2_diss_exc_triplet_arr[i]
-			<< setw(12) << hei_exc_arr[i]
-			<< setw(12) << h2_excit_rate_electr_arr[i] 
-			<< setw(12) << h2_excit_rate_vibr_arr[i] 
-			<< setw(12) << h2_excit_rate_rot_arr[i] << endl;
+			<< setw(12) << hei_exc_arr[i] 
+			<< setw(12) << h2_excit_electr_arr[i]
+			<< setw(12) << h2_excit_electr_bs_arr[i]
+			<< setw(12) << h2_excit_electr_cp_arr[i] 
+			<< setw(12) << h2_excit_vibr_arr[i] 
+			<< setw(12) << h2_excit_vibr_1_arr[i] 
+			<< setw(12) << h2_excit_vibr_2_arr[i] << endl;
 	}
 	output.close();
 }

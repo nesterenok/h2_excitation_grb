@@ -50,7 +50,7 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 
 #define ELECTRON_ENERGY_FIXED 1.   // eV, the energy grid intervals are equal at E < E_fixed,
 #define MAX_ELECTRON_ENERGY 1.e+6  // eV, may be lower than in the input file with initial spectrum,
-#define MIN_MODEL_TIME 1.e+2   // in s, minimal model time at which data are saved,
+#define MIN_MODEL_TIME 1.e+1   // in s, minimal model time at which data are saved,
 #define MAX_MODEL_TIME 1.e+8   // maximal model time in s (the simulations are done up to this time),
 
 // the number of vibrational states of the ground electronic state of H2 taken into account in electron-impact excitation,
@@ -81,7 +81,7 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 
 // Casselli et al., The ionization fraction in dense cloud cores, ApJ 499, p.234 (1998);
 // 1.e-8 < x_e < 1.e-6
-#define IONIZATION_FRACTION_THERMAL_EL 1.e-6
+#define IONIZATION_FRACTION_THERMAL_EL 1.e-7
 
 // collisions of H2 with H2, He
 #define H2_COLLISIONS_WITH_H2_HE 1

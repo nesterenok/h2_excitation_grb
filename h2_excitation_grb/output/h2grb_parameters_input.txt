@@ -1,4 +1,4 @@
-!H2-GRB model parameters, date Fri Mar 21 10:22:12 2025
+!H2-GRB model parameters, date Wed Mar 26 10:57:47 2025
 !Molecular cloud parameters:
 !Cloud layer number:
 0
@@ -9,15 +9,15 @@
 !H column density passed by the GRB, from the cloud boundary to the cloud layer centre [cm-2]:
 0.00000e+00
 !H nuclei concentration [cm-3]:
-1.00000e+04
+2.00000e+04
 !Initial H2 concentration [cm-3]:
-5.00000e+03
+1.00000e+04
 !Initial H2 OPR:
-1.00000e-01
+3.00000e+00
 !Coulomb losses (0/1):
 1
 !Ionization fraction of thermal electrons:
-1.00000e-06
+1.00000e-07
 !Thermal electron temperature [K]:
 1.00000e+02
 !Collisions of H2 with H2, He included (0/1):
@@ -25,7 +25,7 @@
 !Temperature of the neutral gas in the cloud [K]:
 1.50000e+01
 !Nb of H2 vibrational states taking into account in electron-impact excitation:
-10
+5
 !Dust parameters:
 !Dust-gas mass ratio:
 0.00000e+00
