@@ -39,8 +39,8 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 
 
 #define MAX_NB_STEPS 15
-#define NB_OF_BINS_PER_ORDER_EL 100
-#define MINIMAL_ABUNDANCE 1.e-99  // for saving in file
+#define NB_OF_BINS_PER_ORDER_EL 100  // may differ from the number of bins per order in the file with initial spectrum data;
+#define MINIMAL_ABUNDANCE 1.e-99     // for saving in file
 
 // time nb per order is used to initiate the time grid, 
 // this number can not be very large (otherwise the data arrays with electron spectra will be large);
@@ -58,6 +58,10 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 // v qnb = 0, 1,.., NB_OF_H2_VSTATES_X1SU-1
 // very small difference between nb = 5 and 15;
 #define NB_OF_H2_VSTATES_X1SU 10
+
+// Calculation of the electronic pumping rate of the particular vibrational state of the ground electronic state
+#define CALC_EL_PUMPING_VSTATE_NB 3
+
 
 // ----------------------------------------------------
 // Electron spectra evolution

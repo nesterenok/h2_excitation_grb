@@ -55,7 +55,10 @@ void save_model_parameters(const std::string& output_path, double grb_cloud_dist
 	output << left << "!Dust parameters:" << endl
 		<< "!Dust-gas mass ratio:" << endl << dust_gas_mass_ratio << endl
 		<< "!Initial grain radius [cm]:" << endl << grain_radius << endl
-		<< "!Grain number density [cm-3]:" << endl << grain_nb_density << endl;		
+		<< "!Grain number density [cm-3]:" << endl << grain_nb_density << endl;	
+
+	output << left << "!Nb of bins per order in the electron energy grid (default 100):" << endl
+		<< NB_OF_BINS_PER_ORDER_EL << endl;
 	output.close();
 }
 
@@ -474,7 +477,7 @@ void save_electron_energy_losses(const string& output_path, double grb_distance,
 }
 
 
-void save_diss_excit_rates(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const vector<double>& time_moments,
+void save_excit_rates(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const vector<double>& time_moments,
 	const vector<double>& h2_excit_electr_rate_arr, 
 	const vector<double>& h2_excit_vibr_rate_arr, 
 	const vector<double>& h2_excit_rot_rate_arr)
@@ -483,13 +486,13 @@ void save_diss_excit_rates(const string& output_path, double grb_distance, doubl
 	string fname;
 	ofstream output;
 
-	fname = output_path + "h2grb_diss_excit_rates.txt";
+	fname = output_path + "h2grb_excit_rates.txt";
 	output.open(fname.c_str());
 
 	output << scientific;
 	output.precision(6);
 
-	output << left << "!Dissociation / excitation rates," << endl
+	output << left << "!Excitation rates," << endl
 		<< "!h2_exc_el- H2 electronic excitation rate, in [cm-3 s-1]," << endl
 		<< "!h2_exc_v - H2 vibrational excitation rate, vi = 0 -> vf > 0 (within the ground electronic state), in [cm-3 s-1]," << endl
 		<< "!h2_exc_r - H2 pure rotational excitation within v = 0, ji = 0,1 -> jf > 1, in [cm-3 s-1]," << endl;
@@ -513,51 +516,34 @@ void save_diss_excit_rates(const string& output_path, double grb_distance, doubl
 }
 
 
-void save_diss_excit(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, 
-	const vector<double>& time_moments,
-	const vector<double>& h2_solomon_diss_arr, 
-	const vector<double>& h2_diss_exc_singlet_arr, 
-	const vector<double>& h2_diss_exc_triplet_arr,
-	const vector<double>& hei_exc_arr,
-	const vector<double>& h2_excit_electr_arr,
-	const vector<double>& h2_excit_electr_bs_arr,
-	const vector<double>& h2_excit_electr_cp_arr,
-	const vector<double>& h2_excit_vibr_arr,
-	const vector<double>& h2_excit_vibr_1_arr,
-	const vector<double>& h2_excit_vibr_2_arr)
+void save_diss(const std::string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const std::vector<double>& time_moments, 
+	const std::vector<double>& h2_solomon_diss_arr, 
+	const std::vector<double>& h2_diss_exc_singlet_arr, 
+	const std::vector<double>& h2_diss_exc_triplet_arr)
 {
 	int i;
 	double tot_int;
 	string fname;
 	ofstream output;
 
-	fname = output_path + "h2grb_diss_excit_int.txt";
+	fname = output_path + "h2grb_diss_int.txt";
 	output.open(fname.c_str());
 
 	output << scientific;
 	output.precision(6);
 
-	output << left << "!Number of dissociations/excitations up to a given time [cm-3]," << endl
+	output << left << "!Number of dissociations up to a given time [cm-3]," << endl
 		<< "!tot_int(H2) - integrated amount of H2 dissociated [cm-3]," << endl
-		<< "!sol_int  - dissociation following excitation to the singlet states (Solomon) [cm-3], " << endl
+		<< "!sol_int  - dissociation following excitation to the singlet states (analogous to Solomon) [cm-3], " << endl
 		<< "!de_s_int - dissociative excitation of H2 (via singlet states)," << endl
-		<< "!de_t_int - dissociative excitation of H2 (via triplet states)," << endl
-		<< "!hei_int  - HeI excitation [cm-3];" << endl
-		<< "!el_int   - excitation to all H2 electronic states (that are taken into account in the model);" << endl
-		<< "!el_bs_int- excitation to B1S+u H2 electronic state;" << endl
-		<< "!el_cp_int- excitation to C1Pu H2 electronic state;" << endl
-		<< "!vibr_int - excitation to vibrational states within the ground electronic state, vi = 0 -> vf > 0;" << endl
-		<< "!v1_int   - excitation vi = 0 -> vf = 1 within the ground electronic state;" << endl
-		<< "!v2_int   - excitation vi = 0,1 -> vf = 2 within the ground electronic state;" << endl;
+		<< "!de_t_int - dissociative excitation of H2 (via triplet states)," << endl;
 
 	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
-		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
+		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot
 		<< setw(7) << (int)h2_solomon_diss_arr.size() << endl;
 
 	output << left << setw(13) << "!time(s)" << setw(12) << "tot_int(H2)"
-		<< setw(12) << "sol_int" << setw(12) << "de_s_int" << setw(12) << "de_t_int" << setw(12) << "hei_int"
-		<< setw(12) << "el_int" << setw(12) << "el_bs_int" << setw(12) << "el_cp_int" 
-		<< setw(12) << "vibr_int" << setw(12) << "v1_int" << setw(12) << "v2_int" << endl;
+		<< setw(12) << "sol_int" << setw(12) << "de_s_int" << setw(12) << "de_t_int" << endl;
 
 	for (i = 0; i < (int)h2_solomon_diss_arr.size(); i++) {
 		tot_int = h2_solomon_diss_arr[i] + h2_diss_exc_singlet_arr[i] + h2_diss_exc_triplet_arr[i];
@@ -569,14 +555,72 @@ void save_diss_excit(const string& output_path, double grb_distance, double hcol
 		output << left << setw(12) << tot_int
 			<< setw(12) << h2_solomon_diss_arr[i]
 			<< setw(12) << h2_diss_exc_singlet_arr[i]
-			<< setw(12) << h2_diss_exc_triplet_arr[i]
-			<< setw(12) << hei_exc_arr[i] 
+			<< setw(12) << h2_diss_exc_triplet_arr[i] << endl;
+	}
+	output.close();
+}
+
+
+void save_excit(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const vector<double>& time_moments,
+	const vector<double>& h2_excit_electr_arr,
+	const vector<double>& h2_excit_vibr_arr,
+	const vector<double>& h2_excit_rot_arr,
+	const vector<double>& h2_excit_electr_bs_arr,
+	const vector<double>& h2_excit_electr_cp_arr,
+	const vector<double>& h2_excit_vibr_v1_arr,
+	const vector<double>& h2_excit_vibr_v2_arr, 
+	const vector<double>& h2_excit_vibr_v3_arr,
+	const vector<double>& h2_excit_el_vstate_arr,
+	const vector<double>& hei_exc_arr)
+{
+	int i;
+	string fname;
+	ofstream output;
+
+	fname = output_path + "h2grb_excit_int.txt";
+	output.open(fname.c_str());
+
+	output << scientific;
+	output.precision(6);
+
+	output << left << "!Number of dissociations/excitations up to a given time [cm-3]," << endl
+		<< "!el_int   - excitation to all H2 electronic states (that are taken into account in the model);" << endl
+		<< "!vibr_int - excitation to vibrational states within the ground electronic state, vi = 0 -> vf > 0;" << endl
+		<< "!rot_int  - pure rotational excitations from v = 0, j = 0 and j = 1 to level with j > 1;" << endl
+		<< "!el_bs_int- excitation to B1S+u H2 electronic state;" << endl
+		<< "!el_cp_int- excitation to C1Pu H2 electronic state;" << endl
+		<< "!v1_int   - excitation vi = 0 -> vf = 1 within the ground electronic state;" << endl
+		<< "!v2_int   - excitation vi = 0,1 -> vf = 2 within the ground electronic state;" << endl
+		<< "!v3_int   - excitation vi = 0,1,2 -> vf = 3 within the ground electronic state;" << endl
+		<< "!v_int    - electronic excitation of v state of the ground electronic state, v = " << CALC_EL_PUMPING_VSTATE_NB << endl
+		<< "!hei_int  - HeI excitation [cm-3];" << endl;
+
+	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
+		<< setw(7) << (int)h2_excit_electr_arr.size() << endl;
+
+	output << left << setw(13) << "!time(s)" 
+		<< setw(12) << "el_int" << setw(12) << "vibr_int" << setw(12) << "rot_int" 
+		<< setw(12) << "el_bs_int" << setw(12) << "el_cp_int" << setw(12) << "v1_int" << setw(12) << "v2_int" << setw(12) << "v3_int" 
+		<< setw(12) << "v_int"  << setw(12) << "hei_int"<< endl;
+
+	for (i = 0; i < (int)h2_excit_electr_arr.size(); i++) {
+		
+		output.precision(3);
+		output << left << setw(13) << time_moments[i];
+
+		output.precision(2);
+		output << left  
 			<< setw(12) << h2_excit_electr_arr[i]
+			<< setw(12) << h2_excit_vibr_arr[i] 
+			<< setw(12) << h2_excit_rot_arr[i]
 			<< setw(12) << h2_excit_electr_bs_arr[i]
 			<< setw(12) << h2_excit_electr_cp_arr[i] 
-			<< setw(12) << h2_excit_vibr_arr[i] 
-			<< setw(12) << h2_excit_vibr_1_arr[i] 
-			<< setw(12) << h2_excit_vibr_2_arr[i] << endl;
+			<< setw(12) << h2_excit_vibr_v1_arr[i] 
+			<< setw(12) << h2_excit_vibr_v2_arr[i] 
+			<< setw(12) << h2_excit_vibr_v3_arr[i]
+			<< setw(12) << h2_excit_el_vstate_arr[i]
+			<< setw(12) << hei_exc_arr[i]<< endl;
 	}
 	output.close();
 }

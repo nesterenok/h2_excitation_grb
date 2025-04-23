@@ -1,9 +1,9 @@
 # Nb of processors used by OpenMP,
-4
+6
 # path to the directory with data tables (spectroscopic data, collision rates and etc.),
 C:/Users/Александр/Documents/input_data/
 # path to the directory with the simulation data (GRB propagation)
-C:/Users/Александр/Documents/Данные и графики/paper Fitting of the xray spectra of GRBs/2025_02_1e4_dist100/
+C:/Users/Александр/Documents/Данные и графики/paper Fitting of the xray spectra of GRBs/2025_03_2e4_dist10000/
 # path to the directory for the output,
 C:/Users/Александр/Documents/Visual Studio 2019/h2_excitation_grb/h2_excitation_grb/output/
 # H column density in [cm-2] from the cloud boundary to the cloud layer centre,
@@ -12,11 +12,10 @@ C:/Users/Александр/Documents/Visual Studio 2019/h2_excitation_grb/h2_excitation_
 # 1 - initialization of H2 population densities from file,  0 - H2 molecules are in lowest energy levels, J = 0 and 1,
 0
 # ortho-to-para-H2 ratio, this parameter is used if H2 population densities are not read from file (and in test simulations),
-3.
-#
-# Below all parameters are for test simulations,
+0.1
 # Test simulations - electrons have fixed energy, 0 - no, 1 - yes. 
-1
+0
+# Below all parameters are for test simulations,
 # Electron concentration in test simulations in [cm-3],
 0.1
 # Electron energy in test simulations in [eV],

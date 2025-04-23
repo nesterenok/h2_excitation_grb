@@ -5,7 +5,8 @@
 #include "dynamic_array.h"
 
 // Saving cross section table
-void save_cross_section_table(const std::string& output_path, const std::string& data_path);
+void save_cross_section_table(const std::string& output_path, const std::string& data_path,
+	double ionization_fraction, double thermal_electron_temp);
 
 // Calculation of lifetimes of HeI states,
 void calc_helium_lifetimes(const std::string& output_path, const std::string& data_path);
@@ -68,6 +69,29 @@ public:
 	// path to the data folder, and file name with the path within the data folder must be given:
 	cross_section_table_vs1(const std::string& data_path, const std::string& name);
 	~cross_section_table_vs1() { ; }
+};
+
+
+// H2 electron impact ionization, total ionization cross sections, production H2+ and H+
+// Straub et al., Physical Review A 54, 2146 (1996);
+class h2_ioniz_cs_table_straub1996 : public cross_section_table
+{
+public:
+	// path to the data folder, and file name with the path within the data folder must be given:
+	h2_ioniz_cs_table_straub1996(const std::string& data_path, const std::string& name);
+	~h2_ioniz_cs_table_straub1996() { ; }
+};
+
+
+// H2 electron impact ionization, dissociative ionization cross sections (production H+)
+// Straub et al., Physical Review A 54, 2146 (1996);
+// these cross section data is important in accurate calculations of H+ concentration,
+class h2_dissioniz_cs_table_straub1996 : public cross_section_table
+{
+public:
+	// path to the data folder, and file name with the path within the data folder must be given:
+	h2_dissioniz_cs_table_straub1996(const std::string& data_path, const std::string& name);
+	~h2_dissioniz_cs_table_straub1996() { ; }
 };
 
 

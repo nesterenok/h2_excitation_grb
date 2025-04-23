@@ -105,6 +105,87 @@ cross_section_table_vs1::cross_section_table_vs1(const std::string& data_path, c
 }
 
 
+h2_ioniz_cs_table_straub1996::h2_ioniz_cs_table_straub1996(const std::string& data_path, const std::string& name)
+{
+	char text_line[MAX_TEXT_LINE_WIDTH];
+	int i;
+	double en, cs1, cs2;
+
+	string file_name;
+	ifstream input;
+
+	file_name = data_path + name;
+	input.open(file_name.c_str(), ios_base::in);
+
+	if (!input) {
+		cout << "Error in " << SOURCE_NAME << ": can't open file with cross section data " << file_name << endl;
+		exit(1);
+	}
+	// comment lines are read (line length must be < MAX_TEXT_LINE_WIDTH):
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+	
+	input >> nb_cs;
+
+	en_arr = new double[nb_cs];
+	cs_arr = new double[nb_cs];
+
+	for (i = 0; i < nb_cs; i++) {
+		input >> en >> cs1 >> cs2;   // reading data on two channels,
+		// the energy data in the file have dimension eV,
+		en_arr[i] = en;
+		// the cross section data have dimension 1.e-17 cm2 for H2+ channel and 1.e-18 cm2 for H+ channel
+		cs_arr[i] = cs1 * 1.e-17 + cs2 * 1.e-18;
+	}
+	input.close();
+	en_thr = en_arr[0];
+	
+	// used in extrapolation:
+	gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 4]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 4]);
+}
+
+
+h2_dissioniz_cs_table_straub1996::h2_dissioniz_cs_table_straub1996(const std::string& data_path, const std::string& name)
+{
+	char text_line[MAX_TEXT_LINE_WIDTH];
+	int i;
+	double en, cs1, cs2;
+
+	string file_name;
+	ifstream input;
+
+	file_name = data_path + name;
+	input.open(file_name.c_str(), ios_base::in);
+
+	if (!input) {
+		cout << "Error in " << SOURCE_NAME << ": can't open file with cross section data " << file_name << endl;
+		exit(1);
+	}
+	// comment lines are read (line length must be < MAX_TEXT_LINE_WIDTH):
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+	input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+
+	input >> nb_cs;
+
+	en_arr = new double[nb_cs];
+	cs_arr = new double[nb_cs];
+
+	for (i = 0; i < nb_cs; i++) {
+		input >> en >> cs1 >> cs2;   // reading data on two channels,
+		// the energy data in the file have dimension eV,
+		en_arr[i] = en;
+		// the cross section data have dimension 1.e-17 cm2 for H2+ channel and 1.e-18 cm2 for H+ channel
+		// only dissociative ionization is considered here,
+		cs_arr[i] = cs2 * 1.e-18;
+	}
+	input.close();
+	en_thr = en_arr[0];
+
+	// used in extrapolation:
+	gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 4]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 4]);
+}
+
+
 //
 // Electron impact ionization classes
 oscillator_strength::oscillator_strength() : af(0.), bf(0.), cf(0.), df(0.), ef(0.), ff(0.)
@@ -759,11 +840,8 @@ double hei_electron_excitation_spin_forbidden::operator()(double en) const
 }
 
 // 
-void save_cross_section_table(const string& output_path, const string& data_path)
+void save_cross_section_table(const string& output_path, const string& data_path, double ionization_fraction, double thermal_electron_temp)
 {
-	const double ionization_fraction = 1.e-6;
-	const double thermal_electron_temp = 1.e-3;  // eV
-
 	const double energy_min = 0.01;  // eV
 	const double energy_max = 1.e+7;
 	const int nb_of_bins_per_order = 30;
@@ -1207,7 +1285,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 		output << left << setw(12) << enloss_diss_triplet_h2;
 
-		// energy loss in [eV cm2], per H2,
+		// energy loss in [eV cm2], per H2, number density of electrons ne = 2. * ionization_fraction
 		enloss_coulomb = 2. * calc_coulomb_losses_thermal_electrons(electron_energies[i], ionization_fraction, thermal_electron_temp) 
 			/ electron_velocities[i];
 

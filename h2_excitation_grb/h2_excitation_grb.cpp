@@ -222,7 +222,7 @@ int main()
 	}
 
 	output_path = "C:/Users/Александр/Documents/Данные и графики/paper GRB in molecular cloud/python_scripts_ism/";
-	//save_cross_section_table(output_path, data_path);
+	//save_cross_section_table(output_path, data_path, IONIZATION_FRACTION_THERMAL_EL, THERMAL_EL_TEMPERATURE);
 	//calc_helium_lifetimes(output_path, data_path);
 }
 
@@ -243,9 +243,10 @@ void init_electron_energy_grid(vector<double>& electron_energies_grid, vector<do
 
 	// equal energy intervals in energy range [0, E_fixed],
 	y = ELECTRON_ENERGY_FIXED / nb_bins;
-	for (i = 0; i <= nb_bins; i++) {
+	for (i = 0; i < nb_bins; i++) {
 		electron_energies_grid.push_back(i * y);
 	}
+	electron_energies_grid.push_back(ELECTRON_ENERGY_FIXED);
 
 	k = (int)(NB_OF_BINS_PER_ORDER_EL * log10((double)MAX_ELECTRON_ENERGY / ELECTRON_ENERGY_FIXED));
 	for (i = 0; i < k; i++) {
@@ -291,13 +292,16 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 
 	double enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos,
 		enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, diss_decay_heating_rate,
-		neutral_coll_heating_rate, enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_h2_singlet, enloss_h2_triplet, enloss_ioniz, enloss_hei,
+		neutral_coll_heating_rate; 
+	
+	double enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_h2_singlet, enloss_h2_triplet, enloss_ioniz, enloss_hei,
 		enloss_coulomb_el, diss_decay_heating, neutral_coll_heating;
 		
-	double h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate, h2_excit_electr_bs_rate, 
-		h2_excit_electr_cp_rate, h2_excit_electr_rate, h2_excit_vibr_1_rate, h2_excit_vibr_2_rate, h2_excit_vibr_rate,  h2_excit_rot_rate,
-		h2_solomon_diss, h2_diss_exc_singlet, h2_diss_exc_triplet, hei_exc, h2_excit_electr_bs, h2_excit_electr_cp, h2_excit_electr, 
-		h2_excit_vibr_1, h2_excit_vibr_2, h2_excit_vibr;
+	double h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate, h2_excit_electr_rate, h2_excit_vibr_rate, h2_excit_rot_rate, 
+		h2_excit_electr_bs_rate, h2_excit_electr_cp_rate,  h2_excit_vibr_v1_rate, h2_excit_vibr_v2_rate, h2_excit_vibr_v3_rate, h2_el_excit_vstate_rate;
+		
+	double h2_solomon_diss, h2_diss_exc_singlet, h2_diss_exc_triplet, hei_exc, h2_excit_electr, h2_excit_vibr, h2_excit_rot, 
+		h2_excit_electr_bs, h2_excit_electr_cp, h2_excit_vibr_v1, h2_excit_vibr_v2, h2_excit_vibr_v3, h2_el_excit_vstate;
 
 	time_t timer;
 	char* ctime_str;
@@ -315,19 +319,20 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 		enloss_rate_h2_singlet_arr, enloss_rate_h2_triplet_arr, enloss_rate_ioniz_arr, enloss_rate_hei_arr, 
 		enloss_rate_coulomb_el_arr, diss_decay_heating_rate_arr, neutral_coll_heating_rate_arr;
 
-	// Excitation rates in [cm-3 s-1], as a function of time
-	vector<double> h2_excit_electr_rate_arr, h2_excit_vibr_rate_arr, h2_excit_rot_rate_arr;
-
 	// Energy loss in [eV cm-3] during the time interval [0, t] as a function of time t,
 	vector<double> enloss_mt_arr, enloss_h2_rot_arr, enloss_h2_vibr_arr, enloss_h2_singlet_arr, enloss_h2_triplet_arr, enloss_ioniz_arr, 
 		enloss_hei_arr, enloss_coulomb_el_arr, diss_decay_heating_arr, neutral_coll_heating_arr;
 
+	// Excitation rates in [cm-3 s-1], as a function of time
+	vector<double> h2_excit_electr_rate_arr, h2_excit_vibr_rate_arr, h2_excit_rot_rate_arr;
+
 	// Number of excitations in [cm-3] up to a given time, as a function of time
-	vector<double> h2_excit_electr_arr, h2_excit_electr_bs_arr, h2_excit_electr_cp_arr, 
-		h2_excit_vibr_arr, h2_excit_vibr_1_arr, h2_excit_vibr_2_arr;
+	vector<double> h2_excit_electr_arr, h2_excit_vibr_arr, h2_excit_rot_arr, 
+		h2_excit_electr_bs_arr, h2_excit_electr_cp_arr, h2_excit_vibr_v1_arr, h2_excit_vibr_v2_arr, h2_excit_vibr_v3_arr, h2_excit_el_vstate_arr, 
+		hei_exc_arr;
 
 	// Dissociated concentration of H2 in [cm-3] up to a given time, as a function of time
-	vector<double> h2_solomon_diss_arr, h2_diss_exc_singlet_arr, h2_diss_exc_triplet_arr, hei_exc_arr;
+	vector<double> h2_solomon_diss_arr, h2_diss_exc_singlet_arr, h2_diss_exc_triplet_arr;
 
 	// Physical parameters as a function of time,
 	vector<double> neutral_temp_arr, ion_temp_arr, dust_charge_arr;
@@ -583,13 +588,15 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	enloss_mt = enloss_h2_rot = enloss_h2_vibr = enloss_h2_singlet = enloss_h2_triplet = enloss_ioniz = enloss_hei 
 		= enloss_coulomb_el = diss_decay_heating = neutral_coll_heating  = 0.;
 
-	h2_solomon_diss_rate = h2_diss_exc_singlet_rate = h2_diss_exc_triplet_rate = hei_exc_rate = 0.;
-	h2_solomon_diss = h2_diss_exc_singlet = h2_diss_exc_triplet = hei_exc  = 0.;
+	h2_solomon_diss_rate = h2_diss_exc_singlet_rate = h2_diss_exc_triplet_rate = 0.;
+	h2_solomon_diss = h2_diss_exc_singlet = h2_diss_exc_triplet = 0.;
 
-	h2_excit_electr_bs_rate = h2_excit_electr_cp_rate = h2_excit_electr_rate 
-		= h2_excit_vibr_rate = h2_excit_vibr_1_rate = h2_excit_vibr_2_rate = h2_excit_rot_rate = 0.;
+	h2_excit_electr_rate = h2_excit_vibr_rate = h2_excit_rot_rate 
+		= h2_excit_electr_bs_rate = h2_excit_electr_cp_rate = h2_excit_vibr_v1_rate = h2_excit_vibr_v2_rate = h2_excit_vibr_v3_rate 
+		= h2_el_excit_vstate_rate = hei_exc_rate = 0.;
 	
-	h2_excit_electr_bs = h2_excit_electr_cp = h2_excit_electr = h2_excit_vibr = h2_excit_vibr_1 = h2_excit_vibr_2 = 0.;
+	h2_excit_electr = h2_excit_vibr = h2_excit_rot 
+		= h2_excit_electr_bs = h2_excit_electr_cp = h2_excit_vibr_v1 = h2_excit_vibr_v2 = h2_excit_vibr_v3 = h2_el_excit_vstate = hei_exc = 0.;
 
 	// for initial time moment:
 	for (i = 0; i < nb_of_el_energies; i++) {
@@ -649,25 +656,31 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	diss_decay_heating_arr.push_back(diss_decay_heating);
 	neutral_coll_heating_arr.push_back(neutral_coll_heating);
 	
-	// Dissociation/excitation rates,
+	// Excitation rates,
 	h2_excit_electr_rate_arr.push_back(h2_excit_electr_rate);
 	h2_excit_vibr_rate_arr.push_back(h2_excit_vibr_rate);
 	h2_excit_rot_rate_arr.push_back(h2_excit_rot_rate);
 
-	// Dissociation/excitation, time-integrated
-	h2_solomon_diss_arr.push_back(h2_solomon_diss);
-	h2_diss_exc_singlet_arr.push_back(h2_diss_exc_singlet);
-	h2_diss_exc_triplet_arr.push_back(h2_diss_exc_triplet);
-	hei_exc_arr.push_back(hei_exc);
+	// Excitation, time-integrated
+	h2_excit_electr_arr.push_back(h2_excit_electr);
+	h2_excit_vibr_arr.push_back(h2_excit_vibr);
+	h2_excit_rot_arr.push_back(h2_excit_rot);
 
 	h2_excit_electr_bs_arr.push_back(h2_excit_electr_bs);
 	h2_excit_electr_cp_arr.push_back(h2_excit_electr_cp);
-	h2_excit_electr_arr.push_back(h2_excit_electr);
+	
+	h2_excit_vibr_v1_arr.push_back(h2_excit_vibr_v1);
+	h2_excit_vibr_v2_arr.push_back(h2_excit_vibr_v2);
+	h2_excit_vibr_v3_arr.push_back(h2_excit_vibr_v3);
+	h2_excit_el_vstate_arr.push_back(h2_el_excit_vstate_rate);
 
-	h2_excit_vibr_arr.push_back(h2_excit_vibr);
-	h2_excit_vibr_1_arr.push_back(h2_excit_vibr_1);
-	h2_excit_vibr_2_arr.push_back(h2_excit_vibr_2);
+	hei_exc_arr.push_back(hei_exc);
 
+	// Dissociation, time-integrated
+	h2_solomon_diss_arr.push_back(h2_solomon_diss);
+	h2_diss_exc_singlet_arr.push_back(h2_diss_exc_singlet);
+	h2_diss_exc_triplet_arr.push_back(h2_diss_exc_triplet);
+	
 	neutral_temp_arr.push_back(NV_Ith_S(y, physeq_nb));
 	ion_temp_arr.push_back(NV_Ith_S(y, physeq_nb + 1));
 	dust_charge_arr.push_back(NV_Ith_S(y, physeq_nb + 2) * grain_nb_density);  // dust charge per cm3
@@ -760,37 +773,50 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 			diss_decay_heating += (x9 + diss_decay_heating_rate) * dt;
 			neutral_coll_heating += (x10 + neutral_coll_heating_rate) * dt;
 			
-			// Excitation and other rates
+			// Dissociation rates
 			x1 = h2_solomon_diss_rate;
 			x2 = h2_diss_exc_singlet_rate;
 			x3 = h2_diss_exc_triplet_rate;
-			x4 = hei_exc_rate;
 
-			x5 = h2_excit_electr_rate;
-			x6 = h2_excit_electr_bs_rate;
-			x7 = h2_excit_electr_cp_rate;
+			user_data.get_h2_diss_rates(h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate);
 
-			x8 = h2_excit_vibr_rate;
-			x9 = h2_excit_vibr_1_rate;
-			x10 = h2_excit_vibr_2_rate;
-
-			user_data.get_h2_process_rates(h2_excit_electr_rate, h2_excit_electr_bs_rate, h2_excit_electr_cp_rate, 
-				h2_excit_vibr_rate, h2_excit_vibr_1_rate, h2_excit_vibr_2_rate, h2_excit_rot_rate, 
-				h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate);
-			
 			h2_solomon_diss += (x1 + h2_solomon_diss_rate) * dt;
 			h2_diss_exc_singlet += (x2 + h2_diss_exc_singlet_rate) * dt;
 			h2_diss_exc_triplet += (x3 + h2_diss_exc_triplet_rate) * dt;
-			hei_exc += (x4 + hei_exc_rate) * dt;
 
-			h2_excit_electr += (x5 + h2_excit_electr_rate) * dt;
-			h2_excit_electr_bs += (x6 + h2_excit_electr_bs_rate) * dt;
-			h2_excit_electr_cp += (x7 + h2_excit_electr_cp_rate) * dt;
+			// Excitation rates,
+			x1 = h2_excit_electr_rate;
+			x2 = h2_excit_vibr_rate;
+			x3 = h2_excit_rot_rate;
 			
-			h2_excit_vibr += (x8 + h2_excit_vibr_rate) * dt;
-			h2_excit_vibr_1 += (x9 + h2_excit_vibr_1_rate) * dt;
-			h2_excit_vibr_2 += (x10 + h2_excit_vibr_2_rate) * dt;
+			x4 = h2_excit_electr_bs_rate;
+			x5 = h2_excit_electr_cp_rate;
+
+			x6 = h2_excit_vibr_v1_rate;
+			x7 = h2_excit_vibr_v2_rate;
+			x8 = h2_excit_vibr_v3_rate;
+			x9 = h2_el_excit_vstate_rate;
 			
+			x10 = hei_exc_rate;
+
+			user_data.get_h2_process_rates(h2_excit_electr_rate, h2_excit_vibr_rate, h2_excit_rot_rate, 
+				h2_excit_electr_bs_rate, h2_excit_electr_cp_rate, h2_excit_vibr_v1_rate, h2_excit_vibr_v2_rate, h2_excit_vibr_v3_rate, 
+				h2_el_excit_vstate_rate, hei_exc_rate);
+			
+			h2_excit_electr += (x1 + h2_excit_electr_rate) * dt;
+			h2_excit_vibr += (x2 + h2_excit_vibr_rate) * dt;
+			h2_excit_rot += (x3 + h2_excit_rot_rate) * dt;
+
+			h2_excit_electr_bs += (x4 + h2_excit_electr_bs_rate) * dt;
+			h2_excit_electr_cp += (x5 + h2_excit_electr_cp_rate) * dt;
+			
+			h2_excit_vibr_v1 += (x6 + h2_excit_vibr_v1_rate) * dt;
+			h2_excit_vibr_v2 += (x7 + h2_excit_vibr_v2_rate) * dt;
+			h2_excit_vibr_v3 += (x8 + h2_excit_vibr_v3_rate) * dt;
+			h2_el_excit_vstate += (x9 + h2_el_excit_vstate_rate) * dt;
+			
+			hei_exc += (x10 + hei_exc_rate) * dt;
+
 			flag = CVodeGetNumSteps(cvode_mem, &nb_steps_tot);
 
 			if (verbosity) {
@@ -858,24 +884,30 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 				diss_decay_heating_arr.push_back(diss_decay_heating);
 				neutral_coll_heating_arr.push_back(neutral_coll_heating);
 				
-				// Excitations / dissociations, rates
+				// Excitations, rates
 				h2_excit_electr_rate_arr.push_back(h2_excit_electr_rate);
 				h2_excit_vibr_rate_arr.push_back(h2_excit_vibr_rate);
 				h2_excit_rot_rate_arr.push_back(h2_excit_rot_rate);
 
-				// Excitations / dissociations, time-integrated,
-				h2_solomon_diss_arr.push_back(h2_solomon_diss);
-				h2_diss_exc_singlet_arr.push_back(h2_diss_exc_singlet);
-				h2_diss_exc_triplet_arr.push_back(h2_diss_exc_triplet);
-				hei_exc_arr.push_back(hei_exc);
-				
+				// Excitations, time-integrated,
 				h2_excit_electr_arr.push_back(h2_excit_electr);
+				h2_excit_vibr_arr.push_back(h2_excit_vibr);
+				h2_excit_rot_arr.push_back(h2_excit_rot);
+				
 				h2_excit_electr_bs_arr.push_back(h2_excit_electr_bs);
 				h2_excit_electr_cp_arr.push_back(h2_excit_electr_cp);
 
-				h2_excit_vibr_arr.push_back(h2_excit_vibr);
-				h2_excit_vibr_1_arr.push_back(h2_excit_vibr_1);
-				h2_excit_vibr_2_arr.push_back(h2_excit_vibr_2);
+				h2_excit_vibr_v1_arr.push_back(h2_excit_vibr_v1);
+				h2_excit_vibr_v2_arr.push_back(h2_excit_vibr_v2);
+				h2_excit_vibr_v3_arr.push_back(h2_excit_vibr_v3);
+				h2_excit_el_vstate_arr.push_back(h2_el_excit_vstate);
+				
+				hei_exc_arr.push_back(hei_exc);
+				
+				// Dissociations, time-integrated,
+				h2_solomon_diss_arr.push_back(h2_solomon_diss);
+				h2_diss_exc_singlet_arr.push_back(h2_diss_exc_singlet);
+				h2_diss_exc_triplet_arr.push_back(h2_diss_exc_triplet);
 
 				neutral_temp_arr.push_back(NV_Ith_S(y, physeq_nb));
 				ion_temp_arr.push_back(NV_Ith_S(y, physeq_nb + 1));
@@ -917,20 +949,25 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 					diss_decay_heating_arr, 
 					neutral_coll_heating_arr);
 
-				save_diss_excit_rates(output_path, grb_distance, hcolumn_density, conc_h_tot, time_cloud_arr, 
+				save_excit_rates(output_path, grb_distance, hcolumn_density, conc_h_tot, time_cloud_arr, 
 					h2_excit_electr_rate_arr, h2_excit_vibr_rate_arr, h2_excit_rot_rate_arr);
 
-				save_diss_excit(output_path, grb_distance, hcolumn_density, conc_h_tot, time_cloud_arr,
-					h2_solomon_diss_arr, 
-					h2_diss_exc_singlet_arr, 
-					h2_diss_exc_triplet_arr, 
-					hei_exc_arr, 
+				save_excit(output_path, grb_distance, hcolumn_density, conc_h_tot, time_cloud_arr, 
 					h2_excit_electr_arr, 
-					h2_excit_electr_bs_arr,
-					h2_excit_electr_cp_arr, 
 					h2_excit_vibr_arr, 
-					h2_excit_vibr_1_arr, 
-					h2_excit_vibr_2_arr);
+					h2_excit_rot_arr,
+					h2_excit_electr_bs_arr,
+					h2_excit_electr_cp_arr,
+					h2_excit_vibr_v1_arr, 
+					h2_excit_vibr_v2_arr, 
+					h2_excit_vibr_v3_arr,
+					h2_excit_el_vstate_arr,
+					hei_exc_arr);
+
+				save_diss(output_path, grb_distance, hcolumn_density, conc_h_tot, time_cloud_arr,
+					h2_solomon_diss_arr,
+					h2_diss_exc_singlet_arr,
+					h2_diss_exc_triplet_arr);
 
 				save_phys_parameters(output_path, time_cloud_arr, neutral_temp_arr, ion_temp_arr, dust_charge_arr, specimen_conc_evol, 
 					grb_distance, hcolumn_density, conc_h_tot);
@@ -940,7 +977,6 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 			cout << "Some unexpected error has been occurred: " << flag << endl;
 			break;
 		}
-
 	}
 	cout << left << "Total calculation time (s): " << setw(12) << (int)(time(NULL) - timer) << endl;
 	
@@ -979,14 +1015,16 @@ void simulate_h2_excitation(const string& data_path, const string& sim_path, con
 	x4 = h2_diss_exc_singlet_arr.back() + h2_diss_exc_triplet_arr.back() + h2_solomon_diss_arr.back();
 
 	output << left
-		<< setw(38) << "H2 dissociations [cm-3]: "           << x4 << endl
-		<< setw(38) << "H2 dissociations, per ion pair: "    << x4 / (x2 - x1) << endl
+		<< setw(38) << "H2 dissociations [cm-3]: " << x4 << endl
+		<< setw(38) << "H2 dissociations, per ion pair: " << x4 / (x2 - x1) << endl
 		<< setw(38) << "Electronic excitation, per ion pair" << h2_excit_electr_arr.back() / (x2 - x1) << endl
 		<< setw(38) << "Excitation to B1S+u, per ion pair: " << h2_excit_electr_bs_arr.back() / (x2 - x1) << endl
-		<< setw(38) << "Excitation to C1Pu, per ion pair: "  << h2_excit_electr_cp_arr.back() / (x2 - x1) << endl
-		<< setw(38) << "Vibrational excitation [cm-3]: "     << h2_excit_vibr_arr.back() << endl
-		<< setw(38) << "Excitation to v=1 [cm-3]: "          << h2_excit_vibr_1_arr.back() << endl
-		<< setw(38) << "Ratio of excitations v=2/v=1: "      << h2_excit_vibr_2_arr.back() / h2_excit_vibr_1_arr.back() << endl;
+		<< setw(38) << "Excitation to C1Pu, per ion pair: " << h2_excit_electr_cp_arr.back() / (x2 - x1) << endl
+		<< setw(38) << "Vibr. excitation [cm-3]: " << h2_excit_vibr_arr.back() << endl
+		<< setw(38) << "Vibr. excitation to v=1 [cm-3]: " << h2_excit_vibr_v1_arr.back() << endl
+		<< setw(38) << "Ratio of excitations v=2/v=1: " << h2_excit_vibr_v2_arr.back() / h2_excit_vibr_v1_arr.back() << endl
+		<< setw(38) << "Ratio of excitations v=3/v=1: " << h2_excit_vibr_v3_arr.back() / h2_excit_vibr_v1_arr.back() << endl
+		<< setw(34) << "Electronic excitation [cm-3], v = " << CALC_EL_PUMPING_VSTATE_NB << " : " << h2_excit_el_vstate_arr.back() << endl;
 	
 	output.close();
 
@@ -1063,7 +1101,7 @@ void init_electron_spectra_test(const string& output_path, dynamic_array & init_
 	double de;
 
 	for (i = 0; i < (int)en_grid.size(); i++) {
-		if (en_grid[i] > test_electron_energy) {
+		if (en_grid[i] * (1. - 1.e-9) > test_electron_energy) {
 			i--;
 			break;
 		}
@@ -1295,6 +1333,7 @@ void init_specimen_conc(const string& path, double& conc_h_tot, vector<double>& 
 	input.close();
 }
 
+
 // In the file, the levels are denoted by the number,
 // Note, there is no check yet about the consistency of energy levels used in this code and those used in the simulations before, 
 void init_h2_population_density(const string& path, vector<dynamic_array>& d, vector<int>& qnb_v_arr, vector<int>& qnb_j_arr)
@@ -1362,6 +1401,9 @@ void init_h2_population_density(const string& path, vector<dynamic_array>& d, ve
 	}
 	input.close();
 }
+
+
+
 
 
 // calculation of data tables for electron Coulomb scattering

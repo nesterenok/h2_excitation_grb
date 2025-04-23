@@ -59,24 +59,30 @@ void save_electron_energy_losses(const std::string& output_path, double grb_dist
 
 
 // Dissociation or excition rate of species, [cm-3 s-1], as a function of time,
-void save_diss_excit_rates(const std::string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const std::vector<double>& time_moments,
+void save_excit_rates(const std::string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const std::vector<double>& time_moments,
     const std::vector<double>& h2_excit_electr_rate_arr, 
     const std::vector<double>& h2_excit_vibr_rate_arr, 
     const std::vector<double>& h2_excit_rot_rate_arr);
 
 
+void save_diss(const std::string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const std::vector<double>& time_moments,
+    const std::vector<double>& h2_solomon_diss_arr,
+    const std::vector<double>& h2_diss_exc_singlet_arr,
+    const std::vector<double>& h2_diss_exc_triplet_arr);
+
+
 // Dissociated or excited number of species up to a given time, [cm-3], as a function of time,
-void save_diss_excit(const std::string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const std::vector<double>& time_moments,
-    const std::vector<double>& h2_solomon_diss_arr, 
-    const std::vector<double>& h2_diss_exc_singlet_arr, 
-    const std::vector<double>& h2_diss_exc_triplet_arr,
-    const std::vector<double>& hei_exc_arr,
+void save_excit(const std::string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const std::vector<double>& time_moments,
     const std::vector<double>& h2_excit_electr_arr,
+    const std::vector<double>& h2_excit_vibr_arr,
+    const std::vector<double>& h2_excit_rot_arr,
     const std::vector<double>& h2_excit_electr_bs_arr,
     const std::vector<double>& h2_excit_electr_cp_arr,
-    const std::vector<double>& h2_excit_vibr_arr,
-    const std::vector<double>& h2_excit_vibr_1_arr,
-    const std::vector<double>& h2_excit_vibr_2_arr);
+    const std::vector<double>& h2_excit_vibr_v1_arr,
+    const std::vector<double>& h2_excit_vibr_v2_arr, 
+    const std::vector<double>& h2_excit_vibr_v3_arr, 
+    const std::vector<double>& h2_excit_el_vstate_arr,
+    const std::vector<double>& hei_exc_arr);
 
 //
 void save_phys_parameters(const std::string& output_path, const std::vector<double>& time_moments,
