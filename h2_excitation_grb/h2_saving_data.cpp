@@ -1,6 +1,7 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
+#include <omp.h>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -15,8 +16,8 @@
 using namespace std;
 
 
-void save_model_parameters(const std::string& output_path, double grb_cloud_distance, double grb_distance, double hcolumn_dens, double conc_h_tot, 
-	double op_ratio_h2, double dust_gas_mass_ratio, double grain_radius, double grain_nb_density, int layer_nb)
+void save_model_parameters(const std::string& output_path,  double conc_h_tot, double op_ratio_h2, double ioniz_fract, double dust_gas_mass_ratio, double grain_radius,
+	double grain_nb_density, double grb_cloud_distance, double grb_distance, double hcolumn_dens, int layer_nb)
 {
 	time_t timer;
 	char* ctime_str;
@@ -33,24 +34,27 @@ void save_model_parameters(const std::string& output_path, double grb_cloud_dist
 	timer = time(NULL);
 	ctime_str = ctime(&timer);
 
-	output << "!H2-GRB model parameters, date " << ctime_str;
-	output << left << "!Molecular cloud parameters:" << endl
-		<< "!Cloud layer number:" << endl << layer_nb << endl
-		<< "!Distance from the GRB source to the cloud boundary [pc]:" << endl << grb_cloud_distance / PARSEC << endl
-		<< "!Distance from the GRB source to the centre of the cloud layer [pc]:" << endl << grb_distance / PARSEC << endl
-		<< "!H column density passed by the GRB, from the cloud boundary to the cloud layer centre [cm-2]:" << endl << hcolumn_dens << endl
+	output << "!H2-electron propagation parameters, date " << ctime_str;
+	if (layer_nb >= 0) {
+		output << left << "!Molecular cloud parameters:" << endl
+			<< "!Cloud layer number:" << endl << layer_nb << endl
+			<< "!Distance from the GRB source to the cloud boundary [pc]:" << endl << grb_cloud_distance / PARSEC << endl
+			<< "!Distance from the GRB source to the centre of the cloud layer [pc]:" << endl << grb_distance / PARSEC << endl
+			<< "!H column density passed by the GRB, from the cloud boundary to the cloud layer centre [cm-2]:" << endl << hcolumn_dens << endl;
+	}
+	output << left << "!Gas parameters:" << endl
 		<< "!H nuclei concentration [cm-3]:" << endl << conc_h_tot << endl
 		<< "!Initial H2 concentration [cm-3]:" << endl << 0.5 * conc_h_tot << endl
 		<< "!Initial H2 OPR:" << endl << op_ratio_h2 << endl;
 	
 	output << left << "!Coulomb losses (0/1):" << endl << CALC_EL_LOSSES_THERMAL_EL << endl
-		<< "!Ionization fraction of thermal electrons:" << endl << IONIZATION_FRACTION_THERMAL_EL << endl
+		<< "!Ionization fraction of thermal electrons:" << endl << ioniz_fract << endl
 		<< "!Thermal electron temperature [K]:" << endl << THERMAL_EL_TEMPERATURE << endl;
 	
 	output << left << "!Collisions of H2 with H2, He included (0/1):" << endl << H2_COLLISIONS_WITH_H2_HE << endl
 		<< "!Temperature of the neutral gas in the cloud [K]:" << endl << THERMAL_NEUTRAL_TEMPERATURE << endl;
 
-	output << left << "!Nb of H2 vibrational states taking into account in electron-impact excitation:" << endl << NB_OF_H2_VSTATES_X1SU << endl;
+	output << left << "!Nb of H2 vibrational states taking into account in electron-impact excitation:" << endl << USED_NB_OF_H2_VSTATES_X1SG << endl;
 	
 	output << left << "!Dust parameters:" << endl
 		<< "!Dust-gas mass ratio:" << endl << dust_gas_mass_ratio << endl
@@ -59,11 +63,19 @@ void save_model_parameters(const std::string& output_path, double grb_cloud_dist
 
 	output << left << "!Nb of bins per order in the electron energy grid (default 100):" << endl
 		<< NB_OF_BINS_PER_ORDER_EL << endl;
+
+#ifdef _OPENMP
+	output << left << "!Nb of processors in OpenMP:" << endl 
+		<< omp_get_num_threads() << endl;
+#else
+	output << left << "!No OpenMP" << endl << "1" << endl;
+#endif
+
 	output.close();
 }
 
 void save_electron_spectrum_evolution(const string& output_path, const vector<double>& electron_energies_grid, const vector<double>& electron_energy_bin_size,
-	const vector<double>& time_moments, const vector<dynamic_array>& spectrum_data, double grb_distance, double hcolumn_dens, double conc_h_tot)
+	const vector<double>& time_moments, const vector<dynamic_array>& spectrum_data, double conc_h_tot)
 {
 	int i, l, nb_of_times, nb_of_el_energies;
 	double en, d_en, tot_en, tot_n;
@@ -78,15 +90,15 @@ void save_electron_spectrum_evolution(const string& output_path, const vector<do
 	output.open(fname.c_str());
 
 	output << "!Electron spectrum evolution," << endl
-		<< "!first row: distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of rows (= nb of el. energies) and nb of times," << endl
+		// << "!first row: distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2] <<
+		<< "!first row: H nuclei concentration [cm-3], nb of rows (= nb of el. energies) and nb of times," << endl
 		<< "!second row: time (s)," << endl
 		<< "!data: col.1 - centre of the energy bin [eV], col.2 - bin semi-length [eV], col.3 - spectrum N(E) [cm-3 eV-1]," << endl;
 
 	output << scientific;
 	output.precision(6);
-
-	output << left << "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
-		<< setw(7) << nb_of_el_energies << setw(7) << nb_of_times << endl;
+	//output << left << "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens;
+	output << left << "! " << setw(15) << conc_h_tot << setw(7) << nb_of_el_energies << setw(7) << nb_of_times << endl;
 
 	output.precision(4);
 	output << left << setw(28) << "!" << setw(13) << time_moments[0];
@@ -117,14 +129,12 @@ void save_electron_spectrum_evolution(const string& output_path, const vector<do
 	output.open(fname.c_str());
 
 	output << "!Kinetic energy of electrons," << endl
-		<< "!first row: distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of rows (= nb of times)," << endl
+		<< "!first row: H nuclei concentration [cm-3], nb of rows (= nb of times)," << endl
 		<< "!data: time (s), conc of electrons (from spectrum) [cm-3], total energy [eV cm-3], median energy [eV]," << endl;
 
 	output << scientific;
 	output.precision(6);
-
-	output << left << "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
-		<< setw(7) << nb_of_times << endl;
+	output << left << "! " << setw(15) << conc_h_tot << setw(7) << nb_of_times << endl;
 
 	output.precision(4);
 	for (l = 0; l < nb_of_times; l++) {
@@ -145,8 +155,8 @@ void save_electron_spectrum_evolution(const string& output_path, const vector<do
 }
 
 
-void save_specimen_conc_evolution(const string& output_path, const vector<double>& time_moments,
-	const vector<dynamic_array>& conc_data, double grb_distance, double hcolumn_dens, double conc_h_tot)
+void save_specimen_conc_evolution(const string& output_path, const vector<double>& time_moments, const vector<dynamic_array>& conc_data, 
+	double conc_h_tot)
 {
 	int i, l;
 	double w;
@@ -157,14 +167,12 @@ void save_specimen_conc_evolution(const string& output_path, const vector<double
 	output.open(fname.c_str());
 
 	output << left << "!Evolution of concentrations of chemical species," << endl
-		<< "!first row - distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times, number of species," << endl
-		<< "!second row - specimen list," << endl;
+		<< "!first row: H nuclei concentration [cm-3], nb of times, number of species," << endl
+		<< "!second row: specimen list," << endl;
 
 	output << scientific;
 	output.precision(6);
-
-	output << left << "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
-		<< setw(7) << (int)conc_data.size() << setw(7) << NB_OF_CHEM_SPECIES << endl;
+	output << left << "! " << setw(15) << conc_h_tot << setw(7) << (int)conc_data.size() << setw(7) << NB_OF_CHEM_SPECIES << endl;
 	
 	output << left << setw(13) << "!time(s)";
 	for (i = 0; i < NB_OF_CHEM_SPECIES; i++) {
@@ -191,8 +199,7 @@ void save_specimen_conc_evolution(const string& output_path, const vector<double
 
 
 void save_h2_populations_evolution(const string& output_path, const vector<double>& time_moments,
-	const vector<dynamic_array>& h2_popdens_data, const vector<dynamic_array>& h2_popdens_v_data, double grb_distance, double hcolumn_dens, 
-	double conc_h_tot, int nb_lev_h2)
+	const vector<dynamic_array>& h2_popdens_data, const vector<dynamic_array>& h2_popdens_v_data, double conc_h_tot, int nb_lev_h2)
 {
 	int i, l, v;
 	double w;
@@ -206,11 +213,10 @@ void save_h2_populations_evolution(const string& output_path, const vector<doubl
 	output.precision(6);
 
 	output << left << "!Evolution of population densities [cm-3] of H2 energy levels," << endl
-		<< "!first row - distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times, number of levels," << endl
-		<< "!second row - level nb," << endl;
+		<< "!first row: H nuclei concentration [cm-3], nb of times, number of levels," << endl
+		<< "!second row: level nb," << endl;
 
-	output << left << "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
-		<< setw(7) << (int)h2_popdens_data.size() << setw(7) << nb_lev_h2 << endl;
+	output << left << "! " << setw(15) << conc_h_tot << setw(7) << (int)h2_popdens_data.size() << setw(7) << nb_lev_h2 << endl;
 	
 	output << left << setw(13) << "!time(s)";
 	for (i = 1; i <= nb_lev_h2; i++) {
@@ -241,14 +247,13 @@ void save_h2_populations_evolution(const string& output_path, const vector<doubl
 	output.precision(6);
 
 	output << left << "!Evolution of population densities [cm-3] of vibrational states of H2," << endl
-		<< "!first row - distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times, number of vibr states," << endl
-		<< "!second row - summed value, v state nb," << endl;
+		<< "!first row: H nuclei concentration [cm-3], nb of times, number of vibr states," << endl
+		<< "!second row: summed value, v state nb," << endl;
 
-	output << left << "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
-		<< setw(7) << (int)h2_popdens_v_data.size() << setw(7) << MAX_H2_VSTATES_X1SU << endl;
+	output << left << "! " << setw(15) << conc_h_tot << setw(7) << (int)h2_popdens_v_data.size() << setw(7) << MAX_NB_H2_VSTATES_X1SG << endl;
 
 	output << left << setw(13) << "!time(s)" << setw(13) << "sum";
-	for (v = 0; v < MAX_H2_VSTATES_X1SU; v++) {
+	for (v = 0; v < MAX_NB_H2_VSTATES_X1SG; v++) {
 		output << left << setw(12) << v;
 	}
 	output << endl;
@@ -259,13 +264,13 @@ void save_h2_populations_evolution(const string& output_path, const vector<doubl
 
 		// summed over the all vibrational states, is equal to H2 concentration,
 		w = 0.;
-		for (v = 0; v < MAX_H2_VSTATES_X1SU; v++) {
+		for (v = 0; v < MAX_NB_H2_VSTATES_X1SG; v++) {
 			w += h2_popdens_v_data[l].arr[v];
 		}
 		output.precision(3);
 		output << left << setw(13) << w;
 
-		for (v = 0; v < MAX_H2_VSTATES_X1SU; v++)
+		for (v = 0; v < MAX_NB_H2_VSTATES_X1SG; v++)
 		{
 			w = h2_popdens_v_data[l].arr[v];
 			if (w < MINIMAL_ABUNDANCE)
@@ -279,7 +284,7 @@ void save_h2_populations_evolution(const string& output_path, const vector<doubl
 
 
 void save_hei_populations_evolution(const string& output_path, const vector<double>& time_moments,
-	const vector<dynamic_array>& hei_popdens_data, double grb_distance, double hcolumn_dens, double conc_h_tot, int nb_lev_hei)
+	const vector<dynamic_array>& hei_popdens_data, double conc_h_tot, int nb_lev_hei)
 {
 	int i, l;
 	double w;
@@ -293,11 +298,10 @@ void save_hei_populations_evolution(const string& output_path, const vector<doub
 	output.precision(6);
 
 	output << left << "!Evolution of population densities [cm-3] of HeI energy levels," << endl
-		<< "!first row - distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times, number of HeI levels," << endl
-		<< "!second row - level nb," << endl;
+		<< "!first row: H nuclei concentration [cm-3], nb of times, number of HeI levels," << endl
+		<< "!second row: level nb," << endl;
 
-	output << left << "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
-		<< setw(7) << (int)hei_popdens_data.size() << setw(7) << nb_lev_hei << endl;
+	output << left << "! " << setw(15) << conc_h_tot << setw(7) << (int)hei_popdens_data.size() << setw(7) << nb_lev_hei << endl;
 
 	output << left << setw(13) << "!time(s)";
 	for (i = 1; i <= nb_lev_hei; i++) {
@@ -323,7 +327,7 @@ void save_hei_populations_evolution(const string& output_path, const vector<doub
 }
 
 
-void save_electron_energy_loss_rates(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const vector<double>& time_moments,
+void save_electron_energy_loss_rates(const string& output_path, double conc_h_tot, const vector<double>& time_moments,
 	const vector<double>& enloss_rates_mt,
 	const vector<double>& enloss_rates_h2_rot, 
 	const vector<double>& enloss_rates_h2_rot_pos,
@@ -363,9 +367,8 @@ void save_electron_energy_loss_rates(const string& output_path, double grb_dista
 		<< "!ndiss - neutral heating rate due to H2 dissociation, > 0" << endl
 		<< "!ncoll - neutral heating rate due to collisions H2-H2, H2-He," << endl;
 
-	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
-		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
-		<< setw(7) << (int)enloss_rates_mt.size() << endl;
+	output << left << "!H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)enloss_rates_mt.size() << endl;
 	
 	output << left << setw(13) << "!time(s)"
 		<< setw(11) << "tot" << setw(11) << "mt" << setw(11) << "rot" << setw(11) << "rot_pos" << setw(11) << "vibr" << setw(11) << "vibr_pos" 
@@ -399,7 +402,7 @@ void save_electron_energy_loss_rates(const string& output_path, double grb_dista
 }
 
 
-void save_electron_energy_losses(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const vector<double>& time_moments,
+void save_electron_energy_losses(const string& output_path, double conc_h_tot, const vector<double>& time_moments,
 	const vector<double>& enloss_mt,
 	const vector<double>& enloss_h2_rot,
 	const vector<double>& enloss_h2_vibr,
@@ -427,17 +430,16 @@ void save_electron_energy_losses(const string& output_path, double grb_distance,
 		<< "!mt_int - momentum transfer, " << endl
 		<< "!rot_int - H2 rotational excitation," << endl
 		<< "!vibr_int - H2 ro-vibrational excitation (within the ground electronic state, including pure rotational transitions)," << endl
-		<< "!elec_s_int - H2 electronic states excitation (singlet)," << endl
-		<< "!elec_t_int - H2 electronic states excitation (triplet)," << endl
+		<< "!elec_s_int - due to H2 electronic states excitation (singlet), including dissociative excitation" << endl
+		<< "!elec_t_int - due to H2 electronic states excitation (triplet), including dissociative excitation" << endl
 		<< "!ion_int - molecule/atom ionization," << endl
 		<< "!hei_int - HeI excitation by electron impact" << endl
 		<< "!ecoul_int - Coulomb loses on electrons," << endl
 		<< "!ndiss_int - neutral heating rate due to H2 dissociation, > 0" << endl
 		<< "!ncoll_int - neutral heating rate due to collisions H2-H2, H2-He," << endl;
 
-	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
-		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
-		<< setw(7) << (int)enloss_mt.size() << endl;
+	output << left << "! H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)enloss_mt.size() << endl;
 
 	output << left << setw(13) << "!time(s)" 
 		<< setw(11) << "tot_int"
@@ -477,7 +479,7 @@ void save_electron_energy_losses(const string& output_path, double grb_distance,
 }
 
 
-void save_excit_rates(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const vector<double>& time_moments,
+void save_excit_rates(const string& output_path, double conc_h_tot, const vector<double>& time_moments,
 	const vector<double>& h2_excit_electr_rate_arr, 
 	const vector<double>& h2_excit_vibr_rate_arr, 
 	const vector<double>& h2_excit_rot_rate_arr)
@@ -497,9 +499,8 @@ void save_excit_rates(const string& output_path, double grb_distance, double hco
 		<< "!h2_exc_v - H2 vibrational excitation rate, vi = 0 -> vf > 0 (within the ground electronic state), in [cm-3 s-1]," << endl
 		<< "!h2_exc_r - H2 pure rotational excitation within v = 0, ji = 0,1 -> jf > 1, in [cm-3 s-1]," << endl;
 
-	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
-		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot
-		<< setw(7) << (int)h2_excit_electr_rate_arr.size() << endl;
+	output << left << "!H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)h2_excit_electr_rate_arr.size() << endl;
 
 	output << left << setw(13) << "!time(s)" << setw(12) << "h2_exc_el" << setw(12) << "h2_exc_v" << setw(12) << "h2_exc_r" << endl;
 
@@ -516,10 +517,11 @@ void save_excit_rates(const string& output_path, double grb_distance, double hco
 }
 
 
-void save_diss(const std::string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const std::vector<double>& time_moments, 
+void save_diss(const std::string& output_path, double conc_h_tot, const std::vector<double>& time_moments, 
 	const std::vector<double>& h2_solomon_diss_arr, 
 	const std::vector<double>& h2_diss_exc_singlet_arr, 
-	const std::vector<double>& h2_diss_exc_triplet_arr)
+	const std::vector<double>& h2_diss_excit_electr_triplet_arr, 
+	const std::vector<double>& h2_excit_electr_triplet_arr)
 {
 	int i;
 	double tot_int;
@@ -535,18 +537,18 @@ void save_diss(const std::string& output_path, double grb_distance, double hcolu
 	output << left << "!Number of dissociations up to a given time [cm-3]," << endl
 		<< "!tot_int(H2) - integrated amount of H2 dissociated [cm-3]," << endl
 		<< "!sol_int  - dissociation following excitation to the singlet states (analogous to Solomon) [cm-3], " << endl
-		<< "!de_s_int - dissociative excitation of H2 (via singlet states)," << endl
-		<< "!de_t_int - dissociative excitation of H2 (via triplet states)," << endl;
+		<< "!de_s_int - dissociative excitation of H2 via singlet states," << endl
+		<< "!de_t_int - total excitation of H2 to triplet states (including b3su)," << endl
+		<< "!eexc_t_int - excitation to triplet H2 electronic states a3sg, c3Pu, d3Pu;" << endl;
 
-	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
-		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot
-		<< setw(7) << (int)h2_solomon_diss_arr.size() << endl;
+	output << left << "!H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)h2_solomon_diss_arr.size() << endl;
 
 	output << left << setw(13) << "!time(s)" << setw(12) << "tot_int(H2)"
-		<< setw(12) << "sol_int" << setw(12) << "de_s_int" << setw(12) << "de_t_int" << endl;
+		<< setw(12) << "sol_int" << setw(12) << "de_s_int" << setw(12) << "de_t_int" << setw(12) << "exc_t_int" << endl;
 
 	for (i = 0; i < (int)h2_solomon_diss_arr.size(); i++) {
-		tot_int = h2_solomon_diss_arr[i] + h2_diss_exc_singlet_arr[i] + h2_diss_exc_triplet_arr[i];
+		tot_int = h2_solomon_diss_arr[i] + h2_diss_exc_singlet_arr[i] + h2_diss_excit_electr_triplet_arr[i];
 
 		output.precision(3);
 		output << left << setw(13) << time_moments[i];
@@ -555,18 +557,21 @@ void save_diss(const std::string& output_path, double grb_distance, double hcolu
 		output << left << setw(12) << tot_int
 			<< setw(12) << h2_solomon_diss_arr[i]
 			<< setw(12) << h2_diss_exc_singlet_arr[i]
-			<< setw(12) << h2_diss_exc_triplet_arr[i] << endl;
+			<< setw(12) << h2_diss_excit_electr_triplet_arr[i] 
+			<< setw(12) << h2_excit_electr_triplet_arr[i] << endl;
 	}
 	output.close();
 }
 
 
-void save_excit(const string& output_path, double grb_distance, double hcolumn_dens, double conc_h_tot, const vector<double>& time_moments,
+void save_excit(const string& output_path, double conc_h_tot, const vector<double>& time_moments,
 	const vector<double>& h2_excit_electr_arr,
 	const vector<double>& h2_excit_vibr_arr,
 	const vector<double>& h2_excit_rot_arr,
 	const vector<double>& h2_excit_electr_bs_arr,
+	const vector<double>& h2_excit_electr_bps_arr,
 	const vector<double>& h2_excit_electr_cp_arr,
+	const vector<double>& h2_excit_electr_dp_arr,
 	const vector<double>& h2_excit_vibr_v1_arr,
 	const vector<double>& h2_excit_vibr_v2_arr, 
 	const vector<double>& h2_excit_vibr_v3_arr,
@@ -584,25 +589,26 @@ void save_excit(const string& output_path, double grb_distance, double hcolumn_d
 	output.precision(6);
 
 	output << left << "!Number of dissociations/excitations up to a given time [cm-3]," << endl
-		<< "!el_int   - excitation to all H2 electronic states (that are taken into account in the model);" << endl
-		<< "!vibr_int - excitation to vibrational states within the ground electronic state, vi = 0 -> vf > 0;" << endl
-		<< "!rot_int  - pure rotational excitations from v = 0, j = 0 and j = 1 to level with j > 1;" << endl
-		<< "!el_bs_int- excitation to B1S+u H2 electronic state;" << endl
-		<< "!el_cp_int- excitation to C1Pu H2 electronic state;" << endl
-		<< "!v1_int   - excitation vi = 0 -> vf = 1 within the ground electronic state;" << endl
-		<< "!v2_int   - excitation vi = 0,1 -> vf = 2 within the ground electronic state;" << endl
-		<< "!v3_int   - excitation vi = 0,1,2 -> vf = 3 within the ground electronic state;" << endl
-		<< "!v_int    - electronic excitation of v state of the ground electronic state, v = " << CALC_EL_PUMPING_VSTATE_NB << endl
-		<< "!hei_int  - HeI excitation [cm-3];" << endl;
+		<< "!el_int    - excitation to all H2 electronic states (without excitations to dissociation continuum, without triplet states);" << endl
+		<< "!vibr_int  - excitation to vibrational states within the ground electronic state, vi = 0 -> vf > 0;" << endl
+		<< "!rot_int   - pure rotational excitations from v = 0, j = 0 and j = 1 to level with j > 1;" << endl
+		<< "!el_bs_int - excitation to B 1S+u H2 electronic state;" << endl
+		<< "!el_bps_int- excitation to B-primed 1S+u H2 electronic state;" << endl
+		<< "!el_cp_int - excitation to C 1Pu H2 electronic state;" << endl
+		<< "!el_dp_int - excitation to D 1Pu H2 electronic state;" << endl
+		<< "!v1_int    - excitation vi = 0 -> vf = 1 within the ground electronic state;" << endl
+		<< "!v2_int    - excitation vi = 0,1 -> vf = 2 within the ground electronic state;" << endl
+		<< "!v3_int    - excitation vi = 0,1,2 -> vf = 3 within the ground electronic state;" << endl
+		<< "!v_int     - electronic excitation of v state of the ground electronic state, v = " << CALC_EL_PUMPING_VSTATE_NB << endl
+		<< "!hei_int   - HeI excitation [cm-3];" << endl;
 
-	output << left << "!distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
-		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
-		<< setw(7) << (int)h2_excit_electr_arr.size() << endl;
+	output << left << "!H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)h2_excit_electr_arr.size() << endl;
 
 	output << left << setw(13) << "!time(s)" 
-		<< setw(12) << "el_int" << setw(12) << "vibr_int" << setw(12) << "rot_int" 
-		<< setw(12) << "el_bs_int" << setw(12) << "el_cp_int" << setw(12) << "v1_int" << setw(12) << "v2_int" << setw(12) << "v3_int" 
-		<< setw(12) << "v_int"  << setw(12) << "hei_int"<< endl;
+		<< setw(12) << "el_int" << setw(12) << "vibr_int" << setw(12) << "rot_int" << setw(12) << "el_bs_int" << setw(12) << "el_bps_int" 
+		<< setw(12) << "el_cp_int" << setw(12) << "el_dp_int"
+		<< setw(12) << "v1_int" << setw(12) << "v2_int" << setw(12) << "v3_int" << setw(12) << "v_int"  << setw(12) << "hei_int"<< endl;
 
 	for (i = 0; i < (int)h2_excit_electr_arr.size(); i++) {
 		
@@ -615,7 +621,9 @@ void save_excit(const string& output_path, double grb_distance, double hcolumn_d
 			<< setw(12) << h2_excit_vibr_arr[i] 
 			<< setw(12) << h2_excit_rot_arr[i]
 			<< setw(12) << h2_excit_electr_bs_arr[i]
-			<< setw(12) << h2_excit_electr_cp_arr[i] 
+			<< setw(12) << h2_excit_electr_bps_arr[i]
+			<< setw(12) << h2_excit_electr_cp_arr[i]
+			<< setw(12) << h2_excit_electr_dp_arr[i]
 			<< setw(12) << h2_excit_vibr_v1_arr[i] 
 			<< setw(12) << h2_excit_vibr_v2_arr[i] 
 			<< setw(12) << h2_excit_vibr_v3_arr[i]
@@ -628,7 +636,7 @@ void save_excit(const string& output_path, double grb_distance, double hcolumn_d
 
 void save_phys_parameters(const string& output_path, const vector<double>& time_moments,
 	const vector<double>& neut_temp_arr, const vector<double>& ion_temp_arr, const vector<double>& dust_charge_arr,
-	const vector<dynamic_array>& conc_data, double grb_distance, double hcolumn_dens, double conc_h_tot)
+	const vector<dynamic_array>& conc_data, double conc_h_tot)
 {
 	int i;
 	string fname;
@@ -646,9 +654,8 @@ void save_phys_parameters(const string& output_path, const vector<double>& time_
 		<< "!dcharge - charge of dust grains [cm-3]," << endl
 		<< "!conc_e - concentration of electrons [cm-3]" << endl;
 
-	output << left << "!distance from the GRB source cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2], H nuclei concentration [cm-3], nb of times," << endl
-		<< "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens << setw(15) << conc_h_tot 
-		<< setw(7) << (int)neut_temp_arr.size() << endl;
+	output << left << "!H nuclei concentration [cm-3], nb of times," << endl
+		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)neut_temp_arr.size() << endl;
 
 	output << left << setw(13) << "!time(s)" << setw(12) << "temp_n(K)"
 		<< setw(12) << "temp_i(K)" << setw(12) << "dcharge" << setw(12) << "conc_e" << endl;

@@ -29,7 +29,7 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 // Numerical parameters
 //-------------------------------------------------
 
-#define REL_ERROR_SOLVER 1.e-6
+#define REL_ERROR_SOLVER 1.e-7
 #define ABS_CONCENTRATION_ERROR_SOLVER 1.e-14  // specimen concentration (cm-3)
 #define ABS_POPULATION_ERROR_SOLVER 1.e-14     // specimen level population density (cm-3)
 #define ABS_ELSPECTRA_ERROR_SOLVER 1.e-14
@@ -54,10 +54,11 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 #define MAX_MODEL_TIME 1.e+8   // maximal model time in s (the simulations are done up to this time),
 
 // the number of vibrational states of the ground electronic state of H2 taken into account in electron-impact excitation,
-// must be less or equal than maximal, MAX_H2_VSTATES_X1SU,
-// v qnb = 0, 1,.., NB_OF_H2_VSTATES_X1SU-1
-// very small difference between nb = 5 and 15;
-#define NB_OF_H2_VSTATES_X1SU 10
+// must be less or equal than maximal, MAX_NB_H2_VSTATES_X1SG,
+// v qnb = 0, 1,.., NB_OF_H2_VSTATES_X1SG-1
+// small difference between nb = 5 and 15;
+// Note: the deexcitation of electronically excited levels is not treated correctly if v qnb < 14
+#define USED_NB_OF_H2_VSTATES_X1SG 15
 
 // Calculation of the electronic pumping rate of the particular vibrational state of the ground electronic state
 #define CALC_EL_PUMPING_VSTATE_NB 3

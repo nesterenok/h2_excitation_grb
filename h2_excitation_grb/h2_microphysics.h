@@ -288,7 +288,7 @@ public:
 
 
 //
-// Vibrationally-resolved electronic excitation of H2 ground state S1g+(X), 
+// Electronic excitation of H2 ground state S1g+(X), 
 // Scarlett et al., Atomic Data and Nuclear Data Tables 137, 101361 (2021), 
 // Scarlett et al., Physical Review A 104, L040801 (2021);
 // molecular convergent close-coupling method (MCCC), 
@@ -305,7 +305,7 @@ public:
 	double operator() (double energy) const;
 
 	// path to the data folder, and file name with the path within the data folder must be given:
-	cross_section_table_mccc(const std::string& data_path, const std::string& name, bool is_extrapolation_on);
+	cross_section_table_mccc(const std::string& data_path, const std::string& name, bool is_extrapolation_on, int verbosity);
 	~cross_section_table_mccc() { ; }
 };
 

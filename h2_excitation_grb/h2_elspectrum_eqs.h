@@ -13,14 +13,10 @@
 
 //
 // Electronic H2 states, taken into account: 
-//      ground state   - S1g+(X), 
-//      singlet states - S1u+(B,Bp), P1u(C+-,D+-)
-//      triplet states - 
+//      ground state   - 1Sg+ (X), 
+//      singlet states - 1Su+ (B, Bp, Bpp), 1Pu (C+-, D+-, Dp+-), 1Sg+ (EF)
+//      triplet states - 3Sg+ (a), 3Pu (c,d)
 //      triplet states (dissociative) - S3u+(b)
-// Transitions:
-//      S1g+(X) -> S1u(B,Bp),    singlet transition, dLambda = 0, Lambda = S = 0 
-//      S1g+(X) -> P1u(C+-,D+-), singlet transition, dLambda = 1, Lambda = P = 1 
-//
 
 // Contribution of triplet states to the dissociation (cross section at maximum):
 // S3u+(b) - 1.64*a0^2, S3u+(e) - 0.024*a0^2, S3u+(h) - 0.045*a0^2,
@@ -41,27 +37,34 @@ struct spectra_data {
     spectra_data() : i0(0), w1(0), w2(0) { ; }
 };
 
+// auxiliary class for saving parameters of the electronic excitation
+struct electronic_excitation_data_unit {
+    double excit_rate, direct_diss_rate, twostep_diss_rate;  // two step dissociation is known as Solomon process
+};
+
+
 class elspectra_evolution_data
 {
 protected:
     bool dust_is_presented;
     int el_nb, h_nb, hp_nb, h2_nb, h2p_nb, he_nb, hep_nb, hepp_nb, 
-        nb_lev_h2, nb_lev_h2_b, nb_lev_h2_cplus, nb_lev_h2_cminus, nb_lev_h2_bp, nb_lev_h2_dplus, nb_lev_h2_dminus, nb_lev_hei,
-        h2_ioniz_min_nb, he_ioniz_min_nb, h_ioniz_min_nb, h2p_ioniz_min_nb, hep_ioniz_min_nb, 
-        h2_b1su_min_nb, h2_c1pu_min_nb, h2_bp1su_min_nb, h2_d1pu_min_nb, 
-        h2_b1su_diss_min_nb, h2_c1pu_diss_min_nb, h2_bp1su_diss_min_nb, h2_d1pu_diss_min_nb, h2_b3su_diss_min_nb,
+        nb_lev_h2, nb_lev_h2_b, nb_lev_h2_cplus, nb_lev_h2_cminus, nb_lev_h2_bp, nb_lev_h2_dplus, nb_lev_h2_dminus, nb_lev_h2_bpp,
+        nb_lev_h2_dprimed_minus, nb_lev_h2_dprimed_plus, nb_lev_h2_ef, nb_lev_h2_a3, nb_lev_h2_c3, nb_lev_h2_d3,
+        nb_lev_hei, h2_ioniz_min_nb, he_ioniz_min_nb, h_ioniz_min_nb, h2p_ioniz_min_nb, hep_ioniz_min_nb,
+        h2_b1su_min_nb, h2_c1pu_min_nb, h2_bp1su_min_nb, h2_d1pu_min_nb, h2_ef1sg_min_nb, h2_b1su_diss_min_nb, h2_c1pu_diss_min_nb, h2_bp1su_diss_min_nb, 
+        h2_d1pu_diss_min_nb, h2_b3su_diss_min_nb, h2_a3sg_min_nb, h2_c3pu_min_nb, h2_d3pu_min_nb, 
         hei_min_nb, nb_coll_trans_hei, nb_of_el_energies, nb_of_equat, h2eq_nb, heieq_nb, physeq_nb, min_grain_charge;
     int* indices;
 
     double conc_h_tot, ioniz_fract, grain_cs, grain_nb_density,
         enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos,
-        enloss_rate_h2_singlet, enloss_diss_h2_singlet, enloss_diss_h2_triplet, enloss_rate_ioniz,
+        enloss_rate_h2_exc_singlet, enloss_rate_h2_exc_triplet, enloss_diss_h2_singlet, enloss_diss_h2_b, enloss_rate_ioniz,
         enloss_rate_hei, enloss_rate_coulomb_el, conc_n, conc_i, energy_gain_n, energy_gain_e, nb_gain_n, nb_gain_i, 
         diss_decay_heating_rate, neutral_coll_heating_rate;
 
-    double h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_triplet_rate, hei_exc_rate, h2_excit_electr_rate, 
-        h2_excit_electr_bs_rate, h2_excit_electr_cp_rate, h2_excit_vibr_rate, h2_excit_vibr_v1_rate, h2_excit_vibr_v2_rate, h2_excit_vibr_v3_rate, 
-        h2_excit_rot_rate, h2_vstate_el_exc_rate;
+    double h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_exc_b_rate, hei_exc_rate, h2_excit_electr_rate, 
+        h2_excit_electr_bs_rate, h2_excit_electr_bps_rate, h2_excit_electr_cp_rate, h2_excit_electr_dp_rate, h2_excit_electr_efs_rate, 
+        h2_excit_triplet_rate, h2_excit_vibr_rate, h2_excit_vibr_v1_rate, h2_excit_vibr_v2_rate, h2_excit_vibr_v3_rate, h2_excit_rot_rate, h2_vstate_el_exc_rate;
 
     // in eV, in electron_energies - the centre of energy interval is provided,
     double* electron_energies_grid, * electron_energy_bin_size, *electron_energies, *electron_velocities;      
@@ -70,25 +73,31 @@ protected:
     double* h2_ioniz_rates_tot, * he_ioniz_rates_tot, * h_ioniz_rates_tot, * h2p_ioniz_rates_tot, * hep_ioniz_rates_tot;
     double** h2_ioniz_rates, ** he_ioniz_rates, ** h_ioniz_rates, ** h2p_ioniz_rates, ** hep_ioniz_rates;
 
-    double** h2_bstate_rates, ** h2_cstate_rates, ** h2_bpstate_rates, ** h2_dstate_rates;
+    double** h2_bstate_rates, ** h2_cstate_rates, ** h2_bpstate_rates, ** h2_dstate_rates, ** h2_efstate_rates,
+        ** h2_3astate_rates, ** h2_3cstate_rates, ** h2_3dstate_rates;
     double** h2_bstate_diss_rates, ** h2_cstate_diss_rates, ** h2_bpstate_diss_rates, ** h2_dstate_diss_rates, ** h2_3bstate_diss_rates;
     double** h2_rot_rates, ** h2_rovibr_rates;
     double** hei_rates;
     double*  coll_partn_conc;
 
-    const energy_diagram* hei_di, *h2_di, *h2_di_b, * h2_di_cminus, * h2_di_cplus, *h2_di_bp, * h2_di_dminus, * h2_di_dplus;
+    const energy_diagram* hei_di, *h2_di, *h2_di_b, * h2_di_cminus, * h2_di_cplus, *h2_di_bp, * h2_di_dminus, * h2_di_dplus, 
+        *h2_di_a3, *h2_di_c3, *h2_di_d3, * h2_di_bpp, * h2_di_dprimed_minus, * h2_di_dprimed_plus, * h2_di_ef;
     const einstein_coeff* h2_einst, *hei_einst;
-    
     const h2_collisions*  h2_coll;
 
-    std::vector<transition> lyman_band_h2, werner_plus_band_h2, werner_minus_band_h2, bp_band_h2, dplus_band_h2, dminus_band_h2;
+    std::vector<transition> lyman_band_h2, werner_plus_band_h2, werner_minus_band_h2, bp_band_h2, dplus_band_h2, dminus_band_h2, 
+        bpp_band_h2, dprimed_plus_band_h2, dprimed_minus_band_h2, ef_band_h2;
+    
     std::vector<h2_energy_level_param> h2_b_state_data, h2_cplus_state_data, h2_cminus_state_data, 
-        h2_bp_state_data, h2_dplus_state_data, h2_dminus_state_data;
+        h2_bp_state_data, h2_dplus_state_data, h2_dminus_state_data, h2_bpp_state_data, h2_dprimed_plus_state_data, h2_dprimed_minus_state_data, 
+        h2_ef_state_data;
 
     const cross_section_table_vs1 *elastic_h2_el_cs, * elastic_he_el_cs;
    
-    cross_section_table_mccc** h2_bstate_cs, ** h2_cstate_cs, ** h2_bpstate_cs, ** h2_dstate_cs;
-    cross_section_table_mccc** h2_bstate_diss_cs, ** h2_cstate_diss_cs, ** h2_bpstate_diss_cs, ** h2_dstate_diss_cs, ** h2_3bstate_diss_cs;
+    cross_section_table_mccc** h2_bstate_cs, ** h2_cstate_cs, ** h2_bpstate_cs, ** h2_dstate_cs, **h2_efstate_cs,
+        ** h2_3astate_cs, **h2_3cstate_cs, ** h2_3dstate_cs;
+    cross_section_table_mccc** h2_bstate_diss_cs, ** h2_cstate_diss_cs, ** h2_bpstate_diss_cs, ** h2_dstate_diss_cs, 
+        ** h2_3bstate_diss_cs;
     cross_section_table_mccc** h2_rot_cs, **h2_rovibr_cs;
 
     h2_ioniz_cs_table_straub1996 * h2_ioniz_cs_straub;
@@ -97,10 +106,7 @@ protected:
     electron_impact_ionization* h2_ioniz_cs, * he_ioniz_cs, * h_ioniz_cs, * h2p_ioniz_cs, * hep_ioniz_cs;
     
     spectra_data** h2_ioniz_indexes, ** he_ioniz_indexes, ** h_ioniz_indexes, ** h2p_ioniz_indexes, ** hep_ioniz_indexes;
-
-    honl_london_singlet_dl0 hl_singlet_dl0;
-    honl_london_singlet_dl1 hl_singlet_dl1;
-    err_func error_function;
+    electronic_excitation_data_unit el_excit_data[NB_EXC_ELECTRONIC_STATES];
 
     // Helium
     // the arrays of the initial and final level nb, which are included in the array of cross sections,
@@ -113,39 +119,58 @@ protected:
         int &el_ion_min_nb, int verbosity = 1);
     
     // Note: parameter 'rate' stores the rate of the current reaction, while energy losses are summed
-    void derivatives_ionization(const realtype* y_data, realtype* ydot_data, const electron_impact_ionization*, 
-        double** rates, const double* rates_tot, spectra_data** indexes, int el_ion_min_nb, int target_nb, double& rate, double& enloss_rate);
+    void derivatives_ionization(const realtype* y_data, realtype* ydot_data, double** rates, const double* rates_tot, 
+        spectra_data** indexes, double binding_energy, int el_ion_min_nb, int target_nb, double& rate, double& enloss_rate);
 
     // H2 electronic excitation,
-    void init_tables_h2_electronic_exc(cross_section_table_mccc**, double**& rates, int vibr_qnb_final_max, int verbosity = 1);
-
+    void init_tables_h2_exc_sg_su_state(cross_section_table_mccc**, double**& rates, int vibr_qnb_final_max, int verbosity = 1);
+    void init_tables_h2_exc_sg_pu_state(cross_section_table_mccc**, double**& rates, int vibr_qnb_final_max, int verbosity = 1);
+    void init_tables_h2_exc_sg_sg_state(cross_section_table_mccc**, double**& rates, int vibr_qnb_final_max, int verbosity = 1);
+    
     // calculation the nb of electron energy interval that corresponds to the collisional transition with the minimal energy, 
     int calc_min_energy_of_transition(const energy_diagram* h2_di_elexc, int vibr_qnb_final_max);
  
     // all parameters with & are summed
     // thermal_energy - kinetic energy released in the dissociation, in erg cm-3 s-1,
-    // S1g(X) -> S1u(B), S1u(Bp), dL = 0, dJ = +/-1,
-    void derivatives_h2_electronic_exc_dl0(const realtype* y_data, realtype* ydot_data, const energy_diagram* h2_di_exc, 
-        const std::vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb, 
-        double& enloss_rate, double& diss_rate, double & excit_rate, double& th_energy_deriv, double& vstate_exc_rate);
+    // 1Sg(X) -> 1Su(B), 1Su(Bp), 1Su(Bpp), dL = 0, sigma gerade - sigma ungerade transitions
+    // dj = +-1, +-3, +-5 for X->B
+    void derivatives_h2_electronic_sg_su(const realtype* y_data, realtype* ydot_data, const energy_diagram* h2_di_exc,
+        const std::vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb,
+        double& enloss_rate, double& diss_rate, double& excit_rate, double& th_energy_deriv, double& vstate_exc_rate, double scaling_factor);
 
-    // S1g(X) -> P1u(C), P1u(D), dJ = -1, 0, 1
-    void derivatives_h2_electronic_exc_dl1(const realtype* y_data, realtype* ydot_data, 
+    // 1Sg(X) -> 1Pu(C), 1Pu(D), dL = 1, sigma gerade - pi ungerade transitions
+    // dj = 0, +-2, +-4 for X->C-; dj = +-1, +-3, +-5 for X->C+
+    void derivatives_h2_electronic_sg_pu(const realtype* y_data, realtype* ydot_data, 
         const energy_diagram* h2_di_plus, const energy_diagram* h2_di_minus,
         const std::vector<h2_energy_level_param> h2_state_plus_data, const std::vector<h2_energy_level_param> h2_state_minus_data, double** rates, 
-        int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double& diss_rate, double& excit_rate, double& th_energy_deriv, double& vstate_exc_rate);
+        int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double& diss_rate, double& excit_rate, double& th_energy_deriv, double& vstate_exc_rate, 
+        double scaling_factor);
+
+    // 1Sg(X) -> 1Sg(EF), sigma gerade - sigma gerade,
+    // dj = 0, +-2, +-4 for X->EF
+    void derivatives_h2_electronic_sg_sg(const realtype* y_data, realtype* ydot_data, const energy_diagram* h2_di_exc,
+        const std::vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb,
+        double& enloss_rate, double& diss_rate, double& excit_rate, double& th_energy_deriv, double& vstate_exc_rate, double scaling_factor);
+
+    // for triplet state 3Sg+(a),
+    void derivatives_h2_electronic_sg_sg_triplet(const realtype* y_data, realtype* ydot_data, const energy_diagram * h2_di_exc,
+        double** rates, int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double& diss_rate);
+
+    // for triplet states 3Pu(c), 3Pu(d)
+    void derivatives_h2_electronic_sg_pu_triplet(const realtype* y_data, realtype* ydot_data, const energy_diagram* h2_di_exc,
+        double** rates, int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double& diss_rate);
 
     // H2 dissociation 
-    // through electronic excitation (direct),
-    // the energy lost by the electron is equal to the threshold value given in the cross section data file 
-    // (minus the energy of the initial state of H2 with given J),
+    // through electronic excitation (direct or through triplet states),
+    // the energy lost by the electron is equal to:
+    // = the threshold value given in the cross section data file - the energy of the initial state of H2 with given J,
     void init_tables_h2_electronic_diss(cross_section_table_mccc**, double**& rates, int& el_min_nb, int verbosity = 1);
 
     // all parameters with & (energy loss and dissociation rate) are summed,
     void derivatives_h2_electronic_diss(const realtype* y_data, realtype* ydot_data, cross_section_table_mccc** cs, double** rates, int el_min_nb,
         double& enloss_rate, double& diss_rate);
 
-    // pure H2 rotational excitation,
+    // pure H2 rotational excitation, vibration nb initial = final,
     void init_tables_h2_rotational_exc(cross_section_table_mccc**, double**& rates, int verbosity = 1);
 
     void derivatives_h2_rotational_exc(const realtype* y_data, realtype* ydot_data, double**& rates, double& enloss_rate, double& enloss_rate_pos, 
@@ -189,14 +214,14 @@ public:
         double & h2_electr_sin, double & h2_electr_tri, double & ion, double & hei, double& el_coul, 
         double & diss_decay_heat, double & neut_heat_coll) const;
     
-    // dissociation rates [cm-3 s-1],
+    // dissociation rates or excitations leading to dissociation [cm-3 s-1],
     // through excitation of singlet states of H2 (diss_exc) and triplet (diss_exc_tr),
-    void get_h2_diss_rates(double& sol_diss, double& diss_excit_sin, double& diss_excit_tri);
+    void get_h2_diss_rates(double& sol_diss, double& diss_excit_sin, double& diss_excit_tri, double& excit_electr_triplet_rate);
 
     // excitation rates [cm-3 s-1],
     void get_h2_process_rates(double & excit_electr_rate, double & excit_vibr_rate, double & excit_rot_rate, 
-        double & excit_electr_bs_rate, double & excit_electr_cp_rate, double & excit_vibr_v1_rate, double & excit_vibr_v2_rate, 
-        double& excit_vibr_v3_rate, double & el_excit_vstate_rate, double & hei_excit);
+        double & excit_electr_bs_rate, double& excit_electr_bps_rate, double & excit_electr_cp_rate, double& excit_electr_dp_rate,
+        double & excit_vibr_v1_rate, double & excit_vibr_v2_rate, double& excit_vibr_v3_rate, double & el_excit_vstate_rate, double & hei_excit);
 
     double get_electron_energy(int i) const;      // returns the centre of the interval [i, i+1], energy in eV
     double get_electron_energy_bin(int i) const;  // returns the energy bin size, in eV,

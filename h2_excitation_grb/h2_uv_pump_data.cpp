@@ -37,30 +37,53 @@ void h2_band_transitions(const std::string& path, std::vector<transition>& einst
 
 	if (h2_excited_di->electronic_state == 1) {
 		name = "B";
+		fname = path + "h2_cloudy_data/transprob_B.dat";
 	}
 	else if (h2_excited_di->electronic_state == 2) {
 		name = "C_plus";
+		fname = path + "h2_cloudy_data/transprob_C_plus.dat";
 	}
 	else if (h2_excited_di->electronic_state == 3) {
 		name = "C_minus";
+		fname = path + "h2_cloudy_data/transprob_C_minus.dat";
 	}
 	else if (h2_excited_di->electronic_state == 4) {
 		name = "B_primed";
+		fname = path + "h2_cloudy_data/transprob_B_primed.dat";
 	}
 	else if (h2_excited_di->electronic_state == 5) {
 		name = "D_plus";
+		fname = path + "h2_cloudy_data/transprob_D_plus.dat";
 	}
 	else if (h2_excited_di->electronic_state == 6) {
 		name = "D_minus";
+		fname = path + "h2_cloudy_data/transprob_D_minus.dat";
+	}
+	// M. Glass-Maujean, private communication (2025),
+	else if (h2_excited_di->electronic_state == 7) {
+		name = "B_primed_primed";
+		fname = path + "h2_additional_data/transprob_glass_maujean_4ps.txt";
+	}
+	else if (h2_excited_di->electronic_state == 8) {
+		name = "D_primed_plus";
+		fname = path + "h2_additional_data/transprob_glass_maujean_4ppi_plus.txt";
+	}
+	else if (h2_excited_di->electronic_state == 9) {
+		name = "D_primed_minus";
+		fname = path + "h2_additional_data/transprob_glass_maujean_4ppi_minus.txt";
+	}
+	// transitions EF -> B
+	// Glass-Maujean, Quadrelli & Dressler, Atomic Data and Nuclear Data Tables 30, 273 (1984) - vibrationally resolved Einstein coefficients,
+	// Honl-London factors are used to calculated ro-vibrationally resolved Einstein coefficients,
+	else if (h2_excited_di->electronic_state == 10) {
+		name = "EF-B";
+		fname = path + "h2_additional_data/transprob_glass_maujean_ef_b.txt";
 	}
 	else {
 		cout << "Error in " << SOURCE_NAME << ": the unknown excited electronic state of H2 molecule" << endl;
 		exit(1);
 	}
 	
-	fname = path + "h2_cloudy_data/transprob_";
-	fname += name + ".dat";
-
 	input.open(fname.c_str(), ios_base::in);
 	if (!input) {
 		cout << "Error in " << SOURCE_NAME << ": can't open " << fname << endl;
@@ -164,6 +187,21 @@ void print_statistics(string output_path, string name, const std::vector<transit
 }
 
 
+//
+//
+//
+dissociation_data_unit::dissociation_data_unit()
+	: v(0), j(0), prob(0.), kin_energy(0.)
+{;}
+
+dissociation_data_unit::dissociation_data_unit(const dissociation_data_unit& obj) {
+	v = obj.v;
+	j = obj.j;
+	prob = obj.prob;
+	kin_energy = obj.kin_energy;
+}
+
+
 h2_energy_level_param::h2_energy_level_param(int i, int nbd, double dp, double td, double ke)
 	: nb(i), diss_prob(dp), tot_decay(td), kin_energy(ke), nb_of_decays(nbd)
 {
@@ -220,11 +258,11 @@ h2_energy_level_param& h2_energy_level_param::operator=(const h2_energy_level_pa
 
 
 void h2_excited_state_data(const std::string& data_path, std::vector<h2_energy_level_param> & level_data, 
-	const energy_diagram* h2_excited_di, const std::vector<transition> & h2_band, int verbosity)
+	const energy_diagram* h2_excited_di, const std::vector<transition> & h2_band, int diss_data_exists, int verbosity)
 {
 	char text_line[MAX_TEXT_LINE_WIDTH];
-	int i, v, j, nb;
-	double diss_prob, tot_decay, kin_energy;
+	int i, k, v, j;
+	double prob, tot_decay_rate, kin_energy;
 
 	string fname;
 	stringstream ss;
@@ -234,92 +272,198 @@ void h2_excited_state_data(const std::string& data_path, std::vector<h2_energy_l
 	decay_channel dec_ch;
 	vector<decay_channel> decay_list;
 
+	dissociation_data_unit diss_fdata;
+	vector<dissociation_data_unit> diss_fdata_arr;
+
+	level_data.clear();
+	diss_fdata_arr.clear();
+
 	if (verbosity) {
 		cout << "H2 molecule dissociation probabilities are being initializing..." << endl;
 	}
 
-	if (h2_excited_di->electronic_state == 1) { // B state,
-		fname = "h2_cloudy_data/dissprob_B.dat";
-	}
-	else if (h2_excited_di->electronic_state == 2) { // C+ state
-		fname = "h2_cloudy_data/dissprob_C_plus.dat";
-	}
-	else if (h2_excited_di->electronic_state == 3) { // C- state
-		fname = "h2_cloudy_data/dissprob_C_minus.dat";
-	}
-	else if (h2_excited_di->electronic_state == 4) { // Bp state,
-		fname = "h2_cloudy_data/dissprob_B_primed.dat";
-	}
-	else if (h2_excited_di->electronic_state == 5) { // D+ state
-		fname = "h2_cloudy_data/dissprob_D_plus.dat";
-	}
-	else if (h2_excited_di->electronic_state == 6) { // D- state
-		fname = "h2_cloudy_data/dissprob_D_minus.dat";
-	}
-	else {
-		cout << "Error in " << SOURCE_NAME << ": the unknown excited electronic state of H2 molecule" << endl;
-		exit(1);
-	}
-
-	fname = data_path + fname;
-	input.open(fname.c_str(), ios_base::in);
-
-	if (!input.is_open()) {
-		cout << "Error in " << SOURCE_NAME << ": can't open " << fname << endl;
-		exit(1);
-	}
-
-	level_data.clear();
-	while (!input.eof()) {
-		// comment lines are read (all lines must be commented, no empty lines at the file end)
-		do
-			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
-		while (text_line[0] == '#');
-
-		if (text_line[0] == '\0')
-			break;
-
-		ss.clear();
-		ss.str(text_line);
-
-		ss >> v >> j >> diss_prob >> kin_energy;  // dissociation probability here in s-1, energy in eV
-		kin_energy *= EV_TO_ERGS;  // conversion to erg;
-		
-		nb = h2_excited_di->get_nb(v, j);
-		tot_decay = diss_prob;
-		decay_list.clear();
-
-		if (nb >= 0) {
-			for (i = 0; i < (int)(h2_band.size()); i++) {
-				if (h2_band[i].up_lev.nb == nb) {
-					tot_decay += h2_band[i].einst_coeff;
-					dec_ch.nb = h2_band[i].low_lev.nb;
-					dec_ch.rate = h2_band[i].einst_coeff;
-					decay_list.push_back(dec_ch);
-				}
-			}
-			parameters = new h2_energy_level_param(nb, (int)decay_list.size(), diss_prob / tot_decay, tot_decay, kin_energy);
-
-			for (i = 0; i < parameters->nb_of_decays; i++) {
-				parameters->decay_level_nbs[i] = decay_list[i].nb;
-				parameters->decay_probs[i] = decay_list[i].rate / tot_decay;
-			}
-
-			level_data.push_back(*parameters);
-			delete parameters;
+	if (diss_data_exists)
+	{
+		if (h2_excited_di->electronic_state == 1) { // B state,
+			fname = "h2_cloudy_data/dissprob_B.dat";
+		}
+		else if (h2_excited_di->electronic_state == 2) { // C+ state
+			fname = "h2_cloudy_data/dissprob_C_plus.dat";
+		}
+		else if (h2_excited_di->electronic_state == 3) { // C- state
+			fname = "h2_cloudy_data/dissprob_C_minus.dat";
+		}
+		else if (h2_excited_di->electronic_state == 4) { // Bp state,
+			fname = "h2_cloudy_data/dissprob_B_primed.dat";
+		}
+		else if (h2_excited_di->electronic_state == 5) { // D+ state
+			fname = "h2_cloudy_data/dissprob_D_plus.dat";
+		}
+		else if (h2_excited_di->electronic_state == 6) { // D- state
+			fname = "h2_cloudy_data/dissprob_D_minus.dat";
 		}
 		else {
-			if (verbosity)
-				cout << "	unknown level v=" << v << ", j=" << j << " in " << fname << endl;
+			cout << "Error in " << SOURCE_NAME << ": there is no data for the excited electronic state..." << endl;
+			exit(1);
+		}
+
+		fname = data_path + fname;
+		input.open(fname.c_str(), ios_base::in);
+
+		if (!input.is_open()) {
+			cout << "Error in " << SOURCE_NAME << ": can't open " << fname << endl;
+			exit(1);
+		}
+		else {
+			if (verbosity) {
+				cout << "	reading data from file: " << fname << endl;
+			}
+		}
+
+		while (!input.eof()) {
+			// comment lines are read (all lines must be commented, no empty lines at the file end)
+			do
+				input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+			while (text_line[0] == '#');
+
+			if (text_line[0] == '\0')
+				break;
+
+			ss.clear();
+			ss.str(text_line);
+
+			ss >> v >> j >> prob >> kin_energy;  // dissociation probability here in s-1, energy in eV
+
+			diss_fdata.v = v;
+			diss_fdata.j = j;
+			diss_fdata.prob = prob;
+			diss_fdata.kin_energy = kin_energy * EV_TO_ERGS;  // conversion to erg;
+
+			diss_fdata_arr.push_back(diss_fdata);
+		}
+		input.close();
+
+		if (verbosity) {
+			cout << "  data have been read from file " << fname << endl;
 		}
 	}
-	input.close();
-	sort(level_data.begin(), level_data.end());
-	
-	if (verbosity) {
-		cout << "  data have been read from file " << fname << endl;
+
+	for (i = 0; i < h2_excited_di->nb_lev; i++) {
+		prob = tot_decay_rate = kin_energy = 0.;
+		
+		for (k = 0; k < (int)diss_fdata_arr.size(); k++) {
+			if (diss_fdata_arr[k].v == h2_excited_di->lev_array[i].v && diss_fdata_arr[k].j == h2_excited_di->lev_array[i].j) 
+			{
+				prob = diss_fdata_arr[k].prob;
+				tot_decay_rate += prob;
+				kin_energy = diss_fdata_arr[k].kin_energy;
+				break;
+			}
+		}
+		
+		decay_list.clear();
+		for (k = 0; k < (int)(h2_band.size()); k++) {
+			if (h2_band[k].up_lev.j == h2_excited_di->lev_array[i].j && h2_band[k].up_lev.v == h2_excited_di->lev_array[i].v) 
+			{
+				tot_decay_rate += h2_band[k].einst_coeff;
+				dec_ch.nb = h2_band[k].low_lev.nb;
+				dec_ch.rate = h2_band[k].einst_coeff;
+				decay_list.push_back(dec_ch);
+			}
+		}
+		prob /= tot_decay_rate;  // making dimensionless
+
+		parameters = new h2_energy_level_param(i, (int)decay_list.size(), prob, tot_decay_rate, kin_energy);
+
+		for (k = 0; k < parameters->nb_of_decays; k++) {
+			parameters->decay_level_nbs[k] = decay_list[k].nb;
+			parameters->decay_probs[k] = decay_list[k].rate / tot_decay_rate;
+		}
+
+		level_data.push_back(*parameters);
+		delete parameters;
 	}
+	sort(level_data.begin(), level_data.end());
 }
+
+// A -> B -> X
+void h2_excited_state_data(const string& path, vector<h2_energy_level_param>& level_data_up, vector<h2_energy_level_param> level_data_low,
+	const energy_diagram* h2_excited_di_up, const energy_diagram* h2_excited_di_low, const vector<transition>& h2_band_up, const vector<transition>& h2_band_low, 
+	int verbosity)
+{
+	int i, k, l, n, m;
+	double x, prob, tot_decay_rate, kin_energy;
+
+	h2_energy_level_param* parameters;
+	decay_channel dec_ch;
+	vector<decay_channel> decay_list;
+
+	for (i = 0; i < h2_excited_di_up->nb_lev; i++) {
+		decay_list.clear();
+		prob = tot_decay_rate = kin_energy = 0.;
+
+		// Calculation of the total decay rate of the levels of the upper electronic state A
+		for (k = 0; k < (int)(h2_band_up.size()); k++) {
+			if (h2_band_up[k].up_lev.j == h2_excited_di_up->lev_array[i].j && h2_band_up[k].up_lev.v == h2_excited_di_up->lev_array[i].v)
+			{
+				tot_decay_rate += h2_band_up[k].einst_coeff;  // s-1
+			}
+		}
+
+		for (k = 0; k < (int)(h2_band_up.size()); k++) {
+			if (h2_band_up[k].up_lev.j == h2_excited_di_up->lev_array[i].j && h2_band_up[k].up_lev.v == h2_excited_di_up->lev_array[i].v)
+			{
+				// finding the level of the electronic state B, and using the data on B -> X transitions
+				l = h2_excited_di_low->get_nb(h2_band_up[k].low_lev.v, h2_band_up[k].low_lev.j);
+				
+				for (n = 0; n < level_data_low[l].nb_of_decays; n++) {
+					for (m = 0; m < (int)decay_list.size(); m++) {
+						if (decay_list[m].nb == level_data_low[l].decay_level_nbs[n]) {
+							break;
+						}
+					}
+
+					if (m < (int)decay_list.size()) {
+						decay_list[m].rate += level_data_low[l].decay_probs[n] * h2_band_up[k].einst_coeff;	
+					}
+					else 
+					{
+						dec_ch.nb = level_data_low[l].decay_level_nbs[n];
+						dec_ch.rate = level_data_low[l].decay_probs[n] * h2_band_up[k].einst_coeff;
+						decay_list.push_back(dec_ch);
+					}	
+				}
+				// dissociation probability in level data is dimensionless,
+				prob += level_data_low[l].diss_prob * h2_band_up[k].einst_coeff;
+				kin_energy += level_data_low[l].kin_energy * h2_band_up[k].einst_coeff;
+			}
+		}
+		prob /= tot_decay_rate;
+		kin_energy /= tot_decay_rate;
+
+		parameters = new h2_energy_level_param(i, (int)decay_list.size(), prob, tot_decay_rate, kin_energy);
+
+		x = 0.;
+		for (k = 0; k < parameters->nb_of_decays; k++) {
+			parameters->decay_level_nbs[k] = decay_list[k].nb;
+			parameters->decay_probs[k] = decay_list[k].rate / tot_decay_rate;
+			x += parameters->decay_probs[k];
+		}
+
+		x += parameters->diss_prob;
+		if (x < 1. - 10. * numeric_limits<double>::epsilon()) {
+			if (verbosity) {
+				cout << "v = " << h2_excited_di_up->lev_array[i].v << "  j = " << h2_excited_di_up->lev_array[i].j << "  total probability " << x << endl;
+			}
+		}
+
+		level_data_up.push_back(*parameters);
+		delete parameters;
+	}
+	sort(level_data_up.begin(), level_data_up.end());
+}
+
+
 
 void print_statistics(std::string output_path, std::string name, const energy_diagram* h2_excited_di, 
 	const std::vector<h2_energy_level_param>& level_param_vector)

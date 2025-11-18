@@ -1,0 +1,20 @@
+# Nb of processors used by OpenMP,
+6
+# path to the directory with data tables (spectroscopic data, collision rates and etc.),
+C:/Users/Александр/Documents/input_data/
+# path to the directory for the output,
+C:/Users/Александр/Documents/Visual Studio 2019/h2_excitation_grb/h2_excitation_grb/output/
+# Electron concentration in test simulations in [cm-3],
+0.1
+# Electron energy in test simulations in [eV],
+1000.
+# Helium abundance in test simulations (only H2 and He are taken into account), He abundance must be > 0.
+1.e-9
+# H nuclei total concentration for test simulations, [cm-3]
+2.e+4
+# Ionization fraction x_e, number density of electrons n_e = n_{H,tot} * x_e,
+# this parameter defines the energy losses on thermal electrons, 
+# the number of thermal electrons does not change during the simulations,
+0.
+# ortho-to-para-H2 ratio,
+3.

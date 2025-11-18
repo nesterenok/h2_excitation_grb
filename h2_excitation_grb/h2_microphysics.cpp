@@ -324,6 +324,7 @@ h2p_electron_ionization_data::h2p_electron_ionization_data()
 }
 
 electron_impact_ionization::electron_impact_ionization(const electron_ionization_data & data, int verbosity)
+	: err(1.e-6)
 {
 	double af, bf, cf, df, ef, ff;
 
@@ -358,8 +359,7 @@ electron_impact_ionization::electron_impact_ionization(const electron_ionization
 			<< "    from table in Kim & Rudd (1994): " << data.ni << endl;
 	}
 
-	c1 = 2. - ni / ne;	
-	err = 1.e-6;
+	c1 = 2. - ni / ne;
 	proj_en = 0.;
 }
 
@@ -674,8 +674,8 @@ double cross_section_integral_weight::get(double xx1, double xx2, double yy1, do
 
 
 //
-// Vibrationally-resolved electronic excitation of H2 ground state S1g+(X), 
-cross_section_table_mccc::cross_section_table_mccc(const std::string& data_path, const std::string& name, bool is_extr_on)
+// Electronic excitation of H2 ground state S1g+(X), 
+cross_section_table_mccc::cross_section_table_mccc(const std::string& data_path, const std::string& name, bool is_extr_on, int verbosity)
 	:cross_section_table(), is_extrapolation_on(is_extr_on)
 {
 	char text_line[MAX_TEXT_LINE_WIDTH];
@@ -737,9 +737,11 @@ cross_section_table_mccc::cross_section_table_mccc(const std::string& data_path,
 		}
 		else {
 			gamma = -10.;
-			cout << "Warning: the cross section does not decrease with increasing energy, file " << endl
-				<< "	" << name << endl
-				<< "	gamma is set equal to -10;" << endl;
+			if (verbosity) {
+				cout << "Warning: the cross section does not decrease with increasing energy, file " << endl
+					<< "	" << name << endl
+					<< "	gamma is set equal to -10;" << endl;
+			}
 		}
 	}
 }
@@ -839,6 +841,8 @@ double hei_electron_excitation_spin_forbidden::operator()(double en) const
 	return answ;
 }
 
+//
+//
 // 
 void save_cross_section_table(const string& output_path, const string& data_path, double ionization_fraction, double thermal_electron_temp)
 {
@@ -849,8 +853,8 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	bool is_extrapolation_on;
 	int i, nb_of_energies, vi, vf, ji, verbosity = 1;
 	double t, enloss_mt_h2, enloss_ion_h2, enloss_ion_h2_rel, enloss_rot_h2, enloss_vibr_h2_01, enloss_vibr_h2_02,
-		enloss_singlet_h2, enloss_diss_singlet_h2, enloss_diss_triplet_h2, enloss_mt_he, enloss_ion_he, enloss_ion_he_rel, enloss_coulomb,
-		cs_vibr_h2_01, cs_vibr_h2_02, cs_vibr_h2_03, cs_singlet_h2, cs_diss_singlet_h2, cs_diss_triplet_h2;
+		enloss_singlet_h2, enloss_diss_singlet_h2, enloss_diss_triplet_h2_b, enloss_diss_triplet_h2_ca, enloss_mt_he, enloss_ion_he, enloss_ion_he_rel, enloss_coulomb,
+		cs_vibr_h2_01, cs_vibr_h2_02, cs_vibr_h2_03, cs_singlet_h2, cs_diss_singlet_h2, cs_diss_triplet_h2_b, cs_diss_triplet_h2_ca;
 	double *electron_energies, *electron_velocities;
 
 	string path, fname;
@@ -893,7 +897,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	fname = path + "MCCC-el-H2-X1Sg_vf=0_Jf=2.X1Sg_vi=0_Ji=0.txt";
 	
 	cross_section_table_mccc * h2_rot_cs02 
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false, verbosity);
 	
 	// H2 vibrational excitation, 
 	// the sum of (v, J) = (0, ji) -> (1, ji) and (0, ji) -> (1, ji + 2)
@@ -912,7 +916,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc* h2_vibr_rot_cs1_0
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false, verbosity);
 
 	ss.clear();
 	ss.str("");
@@ -927,7 +931,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	fname = ss.str();
 
 	cross_section_table_mccc* h2_vibr_rot_cs1_2
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false, verbosity);
 
 	// v = 0 -> 2,
 	ss.clear();
@@ -943,7 +947,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc* h2_vibr_rot_cs2_0
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false, verbosity);
 
 	ss.clear();
 	ss.str("");
@@ -958,7 +962,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc* h2_vibr_rot_cs2_2
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false, verbosity);
 
 	// v = 0 -> 3,
 	ss.clear();
@@ -974,7 +978,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc* h2_vibr_rot_cs3_0
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false, verbosity);
 
 	ss.clear();
 	ss.str("");
@@ -989,7 +993,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc* h2_vibr_rot_cs3_2
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false, verbosity);
 
 	// v = 0 -> 4,
 	ss.clear();
@@ -1005,7 +1009,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc* h2_vibr_rot_cs4_0
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false, verbosity);
 
 	ss.clear();
 	ss.str("");
@@ -1020,16 +1024,16 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc* h2_vibr_rot_cs4_2
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false, verbosity);
 
 	// H2 electronic excitation (singlet)
 	vi = 0;
 
 	// S1g+(X) -> S1u+(B), 
 	cross_section_table_mccc **h2_bstate_cs 
-		= new cross_section_table_mccc * [MAX_H2_VSTATES_B1SU];
+		= new cross_section_table_mccc * [MAX_NB_H2_VSTATES_B1SU];
 	
-	for (vf = 0; vf < MAX_H2_VSTATES_B1SU; vf++) {
+	for (vf = 0; vf < MAX_NB_H2_VSTATES_B1SU; vf++) {
 		ss.clear();
 		ss.str("");
 
@@ -1043,14 +1047,14 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 		// check for the existence of the file?..,
 		fname = ss.str();
-		h2_bstate_cs[vf] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+		h2_bstate_cs[vf] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 	}
 
 	// S1g+(X) -> P1u(C-/+)
 	cross_section_table_mccc** h2_cstate_cs 
-		= new cross_section_table_mccc * [MAX_H2_VSTATES_C1PU];
+		= new cross_section_table_mccc * [MAX_NB_H2_VSTATES_C1PU];
 	
-	for (vf = 0; vf < MAX_H2_VSTATES_C1PU; vf++) {
+	for (vf = 0; vf < MAX_NB_H2_VSTATES_C1PU; vf++) {
 		ss.clear();
 		ss.str("");
 
@@ -1063,14 +1067,14 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		ss << ".txt";
 
 		fname = ss.str();
-		h2_cstate_cs[vf] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+		h2_cstate_cs[vf] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 	}
 	
 	// S1g+(X) -> S1u+(Bp)
 	cross_section_table_mccc ** h2_bpstate_cs 
-		= new cross_section_table_mccc * [MAX_H2_VSTATES_BP1SU];
+		= new cross_section_table_mccc * [MAX_NB_H2_VSTATES_BP1SU];
 	
-	for (vf = 0; vf < MAX_H2_VSTATES_BP1SU; vf++) {
+	for (vf = 0; vf < MAX_NB_H2_VSTATES_BP1SU; vf++) {
 		ss.clear();
 		ss.str("");
 
@@ -1083,14 +1087,14 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		ss << ".txt";
 
 		fname = ss.str();
-		h2_bpstate_cs[vf] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+		h2_bpstate_cs[vf] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 	}
 
 	// S1g+(X) -> P1u(D-/+)
 	cross_section_table_mccc ** h2_dstate_cs 
-		= new cross_section_table_mccc * [MAX_H2_VSTATES_D1PU];
+		= new cross_section_table_mccc * [MAX_NB_H2_VSTATES_D1PU];
 	
-	for (vf = 0; vf < MAX_H2_VSTATES_D1PU; vf++) {
+	for (vf = 0; vf < MAX_NB_H2_VSTATES_D1PU; vf++) {
 		ss.clear();
 		ss.str("");
 		
@@ -1103,7 +1107,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		ss << ".txt";
 
 		fname = ss.str();
-		h2_dstate_cs[vf] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+		h2_dstate_cs[vf] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 	}
 	
 	// Electronic dissociative excitation of H2
@@ -1119,7 +1123,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc *h2_bstate_diss_cs 
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 	
 	// S1g+(X) -> P1u(C),
 	ss.clear();
@@ -1133,7 +1137,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc *h2_cstate_diss_cs 
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 	
 	// S1g+(X) -> S1u+(Bp),	
 	ss.clear();
@@ -1147,7 +1151,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc *h2_bpstate_diss_cs 
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 	
 	// S1g+(X) -> P1u(D),
 	ss.clear();
@@ -1161,7 +1165,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc * h2_dstate_diss_cs 
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 	
 	// dissociative excitation to triplet states,
 	// S1g(X) -> S3u+(b) (dissociative state),
@@ -1176,35 +1180,63 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 	fname = ss.str();
 	cross_section_table_mccc * h2_3bstate_diss_cs 
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 	
-	// S1g(X) -> S3u+(h) (bound state),
+	// S1g(X) -> P3u (c) 
 	ss.clear();
 	ss.str("");
 
 	ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
 	ss << vi;
-	ss << "/MCCC-el-H2-h3Sg_DE.X1Sg_vi=";
+	ss << "/MCCC-el-H2-c3Pu_total.X1Sg_vi=";
 	ss << vi;
 	ss << ".txt";
 
 	fname = ss.str();
-	cross_section_table_mccc* h2_3hstate_diss_cs
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+	cross_section_table_mccc* h2_3cstate_cs
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 
-	// S1g(X) -> S3u+(e) (bound state),
+	// S1g(X) -> S3g+ (a)
 	ss.clear();
 	ss.str("");
 
 	ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
 	ss << vi;
-	ss << "/MCCC-el-H2-e3Su_DE.X1Sg_vi=";
+	ss << "/MCCC-el-H2-a3Sg_total.X1Sg_vi=";
 	ss << vi;
 	ss << ".txt";
 
 	fname = ss.str();
-	cross_section_table_mccc* h2_3estate_diss_cs
-		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true);
+	cross_section_table_mccc* h2_3astate_cs
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+
+	// S1g(X) -> S3u+(h),
+	ss.clear();
+	ss.str("");
+
+	ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+	ss << vi;
+	ss << "/MCCC-el-H2-h3Sg_total.X1Sg_vi=";
+	ss << vi;
+	ss << ".txt";
+
+	fname = ss.str();
+	cross_section_table_mccc* h2_3hstate_cs
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+
+	// S1g(X) -> S3u+(e),
+	ss.clear();
+	ss.str("");
+
+	ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+	ss << vi;
+	ss << "/MCCC-el-H2-e3Su_total.X1Sg_vi=";
+	ss << vi;
+	ss << ".txt";
+
+	fname = ss.str();
+	cross_section_table_mccc* h2_3estate_cs
+		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
 
 	// Saving energy losses:
 	fname = output_path + "energy_loss_electron_h2.txt";
@@ -1225,6 +1257,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		<< setw(12) << "el-singlet " 
 		<< setw(12) << "diss-singlet " 
 		<< setw(12) << "diss-triplet " 
+		<< setw(12) << "triplet "
 		<< setw(12) << "coulomb" << endl;
 
 	for (i = 0; i < nb_of_energies; i++) 
@@ -1255,19 +1288,19 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		output << left << setw(12) << enloss_vibr_h2_02;
 
 		enloss_singlet_h2 = 0.;
-		for (vf = 0; vf < MAX_H2_VSTATES_B1SU; vf++) {
+		for (vf = 0; vf < MAX_NB_H2_VSTATES_B1SU; vf++) {
 			enloss_singlet_h2 += (*h2_bstate_cs[vf])(electron_energies[i]) * h2_bstate_cs[vf]->get_threshold_energy();
 		}
 
-		for (vf = 0; vf < MAX_H2_VSTATES_C1PU; vf++) {
+		for (vf = 0; vf < MAX_NB_H2_VSTATES_C1PU; vf++) {
 			enloss_singlet_h2 += (*h2_cstate_cs[vf])(electron_energies[i]) * h2_cstate_cs[vf]->get_threshold_energy();
 		}
 
-		for (vf = 0; vf < MAX_H2_VSTATES_BP1SU; vf++) {
+		for (vf = 0; vf < MAX_NB_H2_VSTATES_BP1SU; vf++) {
 			enloss_singlet_h2 += (*h2_bpstate_cs[vf])(electron_energies[i]) * h2_bpstate_cs[vf]->get_threshold_energy();
 		}
 
-		for (vf = 0; vf < MAX_H2_VSTATES_D1PU; vf++) {
+		for (vf = 0; vf < MAX_NB_H2_VSTATES_D1PU; vf++) {
 			enloss_singlet_h2 += (*h2_dstate_cs[vf])(electron_energies[i]) * h2_dstate_cs[vf]->get_threshold_energy();
 		}
 		output << left << setw(12) << enloss_singlet_h2;
@@ -1279,11 +1312,14 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 		output << left << setw(12) << enloss_diss_singlet_h2;
 
-		enloss_diss_triplet_h2 = (*h2_3bstate_diss_cs)(electron_energies[i]) * h2_3bstate_diss_cs->get_threshold_energy();
-		//enloss_diss_triplet_h2 += (*h2_3hstate_diss_cs)(electron_energies[i]) * h2_3hstate_diss_cs->get_threshold_energy();
-		//enloss_diss_triplet_h2 += (*h2_3estate_diss_cs)(electron_energies[i]) * h2_3estate_diss_cs->get_threshold_energy();
+		enloss_diss_triplet_h2_b = (*h2_3bstate_diss_cs)(electron_energies[i]) * h2_3bstate_diss_cs->get_threshold_energy();
+		
+		enloss_diss_triplet_h2_ca = (*h2_3cstate_cs)(electron_energies[i]) * h2_3cstate_cs->get_threshold_energy();
+		enloss_diss_triplet_h2_ca += (*h2_3astate_cs)(electron_energies[i]) * h2_3astate_cs->get_threshold_energy();
+		//enloss_diss_triplet_h2_ca += (*h2_3hstate_cs)(electron_energies[i]) * h2_3hstate_cs->get_threshold_energy();
+		//enloss_diss_triplet_h2_ca += (*h2_3estate_cs)(electron_energies[i]) * h2_3estate_cs->get_threshold_energy();
 
-		output << left << setw(12) << enloss_diss_triplet_h2;
+		output << left << setw(12) << enloss_diss_triplet_h2_b << setw(12) << enloss_diss_triplet_h2_ca;
 
 		// energy loss in [eV cm2], per H2, number density of electrons ne = 2. * ionization_fraction
 		enloss_coulomb = 2. * calc_coulomb_losses_thermal_electrons(electron_energies[i], ionization_fraction, thermal_electron_temp) 
@@ -1310,7 +1346,8 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		<< setw(12) << "v=0-3"
 		<< setw(12) << "el-singlet " 
 		<< setw(12) << "diss-singlet "
-		<< setw(12) << "diss-triplet " << endl;
+		<< setw(12) << "diss-triplet " 
+		<< setw(12) << "triplet " << endl;
 
 	for (i = 0; i < nb_of_energies; i++)
 	{
@@ -1339,23 +1376,22 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		output << left << setw(12) << cs_vibr_h2_03;
 
 		cs_singlet_h2 = 0.;
-		for (vf = 0; vf < MAX_H2_VSTATES_B1SU; vf++) {
+		for (vf = 0; vf < MAX_NB_H2_VSTATES_B1SU; vf++) {
 			cs_singlet_h2 += (*h2_bstate_cs[vf])(electron_energies[i]);
 		}
 
-		for (vf = 0; vf < MAX_H2_VSTATES_C1PU; vf++) {
+		for (vf = 0; vf < MAX_NB_H2_VSTATES_C1PU; vf++) {
 			cs_singlet_h2 += (*h2_cstate_cs[vf])(electron_energies[i]);
 		}
 
-		for (vf = 0; vf < MAX_H2_VSTATES_BP1SU; vf++) {
+		for (vf = 0; vf < MAX_NB_H2_VSTATES_BP1SU; vf++) {
 			cs_singlet_h2 += (*h2_bpstate_cs[vf])(electron_energies[i]);
 		}
 
-		for (vf = 0; vf < MAX_H2_VSTATES_D1PU; vf++) {
+		for (vf = 0; vf < MAX_NB_H2_VSTATES_D1PU; vf++) {
 			cs_singlet_h2 += (*h2_dstate_cs[vf])(electron_energies[i]);
 		}
 		output << left << setw(12) << cs_singlet_h2;
-
 
 		cs_diss_singlet_h2 = (*h2_bstate_diss_cs)(electron_energies[i]);
 		cs_diss_singlet_h2 += (*h2_cstate_diss_cs)(electron_energies[i]);
@@ -1364,11 +1400,14 @@ void save_cross_section_table(const string& output_path, const string& data_path
 
 		output << left << setw(12) << cs_diss_singlet_h2;
 
-		cs_diss_triplet_h2 = (*h2_3bstate_diss_cs)(electron_energies[i]);
-		//cs_diss_triplet_h2 += (*h2_3hstate_diss_cs)(electron_energies[i]);
-		//cs_diss_triplet_h2 += (*h2_3estate_diss_cs)(electron_energies[i]);
+		cs_diss_triplet_h2_b = (*h2_3bstate_diss_cs)(electron_energies[i]);
+		
+		cs_diss_triplet_h2_ca = (*h2_3cstate_cs)(electron_energies[i]);
+		cs_diss_triplet_h2_ca += (*h2_3astate_cs)(electron_energies[i]);
+		//cs_diss_triplet_h2_ca += (*h2_3hstate_cs)(electron_energies[i]);
+		//cs_diss_triplet_h2_ca += (*h2_3estate_cs)(electron_energies[i]);
 
-		output << left << setw(12) << cs_diss_triplet_h2;
+		output << left << setw(12) << cs_diss_triplet_h2_b << setw(12) << cs_diss_triplet_h2_ca;
 		output << endl;
 	}
 	output.close();
