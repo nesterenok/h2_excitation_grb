@@ -16,8 +16,8 @@
 using namespace std;
 
 
-void save_model_parameters(const std::string& output_path,  double conc_h_tot, double op_ratio_h2, double ioniz_fract, double dust_gas_mass_ratio, double grain_radius,
-	double grain_nb_density, double grb_cloud_distance, double grb_distance, double hcolumn_dens, int layer_nb)
+void save_model_parameters(const std::string& output_path,  double conc_h_tot, double op_ratio_h2, double ioniz_fract, double dust_gas_mass_ratio, 
+	double grain_radius, double grain_nb_density, double grb_cloud_distance, double grb_distance, double hcolumn_dens, int layer_nb)
 {
 	time_t timer;
 	char* ctime_str;
@@ -539,7 +539,7 @@ void save_diss(const std::string& output_path, double conc_h_tot, const std::vec
 		<< "!sol_int  - dissociation following excitation to the singlet states (analogous to Solomon) [cm-3], " << endl
 		<< "!de_s_int - dissociative excitation of H2 via singlet states," << endl
 		<< "!de_t_int - total excitation of H2 to triplet states (including b3su)," << endl
-		<< "!eexc_t_int - excitation to triplet H2 electronic states a3sg, c3Pu, d3Pu;" << endl;
+		<< "!exc_t_int - excitation to triplet H2 electronic states a3sg, c3Pu, d3Pu;" << endl;
 
 	output << left << "!H nuclei concentration [cm-3], nb of times," << endl
 		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)h2_solomon_diss_arr.size() << endl;

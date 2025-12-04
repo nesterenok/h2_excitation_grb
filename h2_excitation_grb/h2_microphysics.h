@@ -288,9 +288,10 @@ public:
 
 
 //
-// Electronic excitation of H2 ground state S1g+(X), 
+// Electronic excitation of H2 ground state 1Sg+(X), 
 // Scarlett et al., Atomic Data and Nuclear Data Tables 137, 101361 (2021), 
 // Scarlett et al., Physical Review A 104, L040801 (2021);
+// Scarlett et al., private communication (2023), cross sections for transitions (X,v'',J'') -> (A, v',J')
 // molecular convergent close-coupling method (MCCC), 
 // cross section values in the data file are in a0^2 (Bohr radius squared), a0 = 0.529e-8 cm
 // at high energies, the cross sections are equal to 0.,

@@ -29,7 +29,7 @@ const double log_coulomb_constant = log(1.5 * pow(BOLTZMANN_CONSTANT, 1.5)
 
 
 elspectra_evolution_data::elspectra_evolution_data(const string& data_path, const string& output_path, double cht, double iof, const vector<double>& en_grid, int verb)
-	: conc_h_tot(cht), ioniz_fract(iof), dust_is_presented(false), grain_cs(0.), grain_nb_density(0.),
+	: verbosity(verb), conc_h_tot(cht), ioniz_fract(iof), dust_is_presented(false), grain_cs(0.), grain_nb_density(0.),
 	enloss_rate_mt(0.), enloss_rate_h2_rot(0.), enloss_rate_h2_vibr(0.), enloss_rate_h2_exc_singlet(0.), enloss_rate_h2_exc_triplet(0.), enloss_diss_h2_b(0.),
 	enloss_rate_ioniz(0.), enloss_rate_hei(0.), conc_n(0.), conc_i(0.), energy_gain_n(0.), energy_gain_e(0.), nb_gain_n(0.), nb_gain_i(0.), 
 	h2_solomon_diss_rate(0.), h2_diss_exc_singlet_rate(0.), h2_diss_exc_b_rate(0.), hei_exc_rate(0.), 
@@ -39,7 +39,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	h2_vstate_el_exc_rate(0.), neutral_coll_heating_rate(0.), indices(0), coll_partn_conc(0), h2_coll(0)
 {
 	bool is_extrapolation_on;
-	int i, j, dj, k, li, lf, vi, vf, isotope, electronic_state, diss_data_exists, verbosity = 1;
+	int i, j, dj, k, li, lf, vi, vf, isotope, electronic_state, diss_data_exists;
 	double en, den, vel;
 	
 	string fname, name;
@@ -160,7 +160,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	//h2_di = new h2_diagram(data_path, h2_mol, nb_lev_h2, verbosity);
 	//h2_einst = new h2_einstein_coeff(data_path, h2_di, verbosity);
 
-	// new H2 molecule data (Roueff et al. 2019), max number of levels 302,
+	// new H2 molecule data (Roueff et al. A&A 630, A58, 2019), max number of levels 302,
 	nb_lev_h2 = 302;
 	molecule h2_mol("H2", isotope = 1, 2. * ATOMIC_MASS_UNIT);
 
@@ -233,7 +233,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	h2_excited_state_data(data_path, h2_dprimed_plus_state_data, h2_di_dprimed_plus, dprimed_plus_band_h2, diss_data_exists, verbosity);
 	h2_excited_state_data(data_path, h2_dprimed_minus_state_data, h2_di_dprimed_minus, dprimed_minus_band_h2, diss_data_exists, verbosity);
 
-	// EF -> B -> X
+	// EF -> B -> X, data for B already exist
 	h2_excited_state_data(data_path, h2_ef_state_data, h2_b_state_data, h2_di_ef, h2_di_b, ef_band_h2, lyman_band_h2, verbosity);
 
 	// Triplet states
@@ -329,9 +329,9 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 					for (dj = -2; dj <= 2; dj += 2)
 					{
 						i = 3 * (vi * (USED_NB_OF_H2_VSTATES_X1SG - 1) * MAX_NB_J_H2 + vf * MAX_NB_J_H2 + j) + (dj + 2) / 2;
-						if (vf > vi)
+						if (vf > vi) {
 							i -= 3 * MAX_NB_J_H2;
-
+						}
 						h2_rovibr_cs[i] = 0;
 
 						li = h2_di->get_nb(vi, j);
@@ -380,7 +380,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	init_tables_h2_rovibr_exc(h2_rovibr_cs, h2_rovibr_rates, verbosity);
 
 	// Excitation of electronically excited states of H2,
-	// S1g+(X) -> S1u+(B),  
+	// 1Sg+(X) -> 1Su+(B),  
 	// Note, 0 =< vi < USED_NB_OF_H2_VSTATES_X1SG, 0 <= j < MAX_NB_J_H2,
 	h2_bstate_cs = new cross_section_table_mccc * [6 * USED_NB_OF_H2_VSTATES_X1SG * MAX_NB_H2_VSTATES_B1SU * MAX_NB_J_H2];
 	
@@ -436,7 +436,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	init_tables_h2_exc_sg_su_state(h2_bstate_cs, h2_bstate_rates, MAX_NB_H2_VSTATES_B1SU, verbosity);
 	h2_b1su_min_nb = calc_min_energy_of_transition(h2_di_b, MAX_NB_H2_VSTATES_B1SU);
 
-	// S1g+(X) -> S1u+(Bp)
+	// 1Sg+(X) -> 1Su+(Bp)
 	h2_bpstate_cs = new cross_section_table_mccc * [6 * USED_NB_OF_H2_VSTATES_X1SG * MAX_NB_H2_VSTATES_BP1SU * MAX_NB_J_H2];
 	for (k = 0, vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
 		for (j = 0; j < MAX_NB_J_H2; j++)
@@ -490,7 +490,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	init_tables_h2_exc_sg_su_state(h2_bpstate_cs, h2_bpstate_rates, MAX_NB_H2_VSTATES_BP1SU, verbosity);
 	h2_bp1su_min_nb = calc_min_energy_of_transition(h2_di_bp, MAX_NB_H2_VSTATES_BP1SU);
 
-	// S1g+(X) -> P1u(C-/+)
+	// 1Sg+(X) -> 1Pu(C-/+)
 	h2_cstate_cs = new cross_section_table_mccc * [11 * USED_NB_OF_H2_VSTATES_X1SG * MAX_NB_H2_VSTATES_C1PU * MAX_NB_J_H2];
 	for (k = 0, vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
 		for (j = 0; j < MAX_NB_J_H2; j++)
@@ -546,7 +546,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	// the level energy difference of C- and C+ is neglected, C- state have higher number of levels,
 	h2_c1pu_min_nb = calc_min_energy_of_transition(h2_di_cminus, MAX_NB_H2_VSTATES_C1PU);
 
-	// S1g+(X) -> P1u(D-/+)
+	// 1Sg+(X) -> 1Pu(D-/+)
 	h2_dstate_cs = new cross_section_table_mccc * [11 * USED_NB_OF_H2_VSTATES_X1SG * MAX_NB_H2_VSTATES_D1PU * MAX_NB_J_H2];
 	for (k = 0, vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
 		for (j = 0; j < MAX_NB_J_H2; j++)
@@ -602,7 +602,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	// the level energy difference of D- and D+ is neglected, D- state have much higher number of levels,
 	h2_d1pu_min_nb = calc_min_energy_of_transition(h2_di_dminus, MAX_NB_H2_VSTATES_D1PU);
 
-	// S1g+(X) -> 1Sg(EF)
+	// 1Sg+(X) -> 1Sg(EF)
 	h2_efstate_cs = new cross_section_table_mccc * [5 * USED_NB_OF_H2_VSTATES_X1SG * MAX_NB_H2_VSTATES_EF1SG * MAX_NB_J_H2];
 	for (k = 0, vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
 		for (j = 0; j < MAX_NB_J_H2; j++)
@@ -658,8 +658,8 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	h2_ef1sg_min_nb = calc_min_energy_of_transition(h2_di_ef, MAX_NB_H2_VSTATES_EF1SG);
 
 	//
-	// Electronic dissociative excitation of H2
-	// S1g+(X) -> S1u+(B),
+	// Electronic (direct) dissociative excitation of H2
+	// 1Sg+(X) -> 1Su+(B),
 	// vi -> dissociation, 0 =< vi < USED_NB_OF_H2_VSTATES_X1SG,
 	h2_bstate_diss_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
 	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
@@ -677,7 +677,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	}
 	init_tables_h2_electronic_diss(h2_bstate_diss_cs, h2_bstate_diss_rates, h2_b1su_diss_min_nb, verbosity);
 
-	// S1g+(X) -> P1u(C),
+	// 1Sg+(X) -> 1Pu(C),
 	h2_cstate_diss_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
 	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
 		ss.clear();
@@ -694,7 +694,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	}
 	init_tables_h2_electronic_diss(h2_cstate_diss_cs, h2_cstate_diss_rates, h2_c1pu_diss_min_nb, verbosity);
 
-	// S1g+(X) -> S1u+(Bp),
+	// 1Sg+(X) -> 1Su+(Bp),
 	h2_bpstate_diss_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
 	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
 		ss.clear();
@@ -711,7 +711,7 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	}
 	init_tables_h2_electronic_diss(h2_bpstate_diss_cs, h2_bpstate_diss_rates, h2_bp1su_diss_min_nb, verbosity);
 
-	// S1g+(X) -> P1u(D),
+	// 1Sg+(X) -> 1Pu(D),
 	h2_dstate_diss_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
 	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
 		ss.clear();
@@ -728,10 +728,29 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	}
 	init_tables_h2_electronic_diss(h2_dstate_diss_cs, h2_dstate_diss_rates, h2_d1pu_diss_min_nb, verbosity);
 
+	// 1Sg+(X) -> 1Sg+(EF)
+	h2_efstate_diss_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
+	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
+		ss.clear();
+		ss.str("");
+
+		ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+		ss << vi;
+		ss << "/MCCC-el-H2-EF1Sg_DE.X1Sg_vi=";
+		ss << vi;
+		ss << ".txt";
+
+		fname = ss.str();
+		h2_efstate_diss_cs[vi] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+	}
+	init_tables_h2_electronic_diss(h2_efstate_diss_cs, h2_efstate_diss_rates, h2_ef1sg_diss_min_nb, verbosity);
+
+	//
+	// Triplet states
 	// Excitation to the quasi-bound levels of the triplet states eventually leads to the dissociation of the molecule,
 	// Liu et al. Apj 716, 701 (2010);
 
-	// S1g(X) -> S3u+ (b) (dissociative state),
+	// 1Sg(X) -> 3Su+ (b) (dissociative state),
 	// An important impact of these cross sections in the 7-12 eV energy interval (Padovani et al., A&A 658, A 189, 2022, sections 2.1,2.2),
 	h2_3bstate_diss_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
 	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
@@ -749,8 +768,8 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	}
 	init_tables_h2_electronic_diss(h2_3bstate_diss_cs, h2_3bstate_diss_rates, h2_b3su_diss_min_nb, verbosity);
 
-	// S1g(X) -> S3g+(a)
-	// Excitation to bound state, without excitation to dissiociation continuum that is 0.1 per cent,
+	// 1Sg(X) -> 3Sg+(a)
+	// Excitation to bound state, without excitation to dissociation continuum that is 0.1 per cent,
 	h2_3astate_cs = new cross_section_table_mccc * [5 * USED_NB_OF_H2_VSTATES_X1SG * MAX_H2_VSTATES_a3Sg * MAX_NB_J_H2];
 
 	for (k = 0, vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
@@ -805,8 +824,8 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	init_tables_h2_exc_sg_sg_state(h2_3astate_cs, h2_3astate_rates, MAX_H2_VSTATES_a3Sg, verbosity);
 	h2_a3sg_min_nb = calc_min_energy_of_transition(h2_di_a3, MAX_H2_VSTATES_a3Sg);
 
-	// S1g(X) -> P3u (c)
-	// Excitation to bound state, without excitation to dissiociation continuum,
+	// 1Sg(X) -> 3Pu (c)
+	// Excitation to bound state, without excitation to dissiociation continuum, that is less than 0.5 per cent
 	h2_3cstate_cs = new cross_section_table_mccc * [11 * USED_NB_OF_H2_VSTATES_X1SG * MAX_H2_VSTATES_c3Pu * MAX_NB_J_H2];
 
 	for (k = 0, vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
@@ -861,8 +880,8 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	init_tables_h2_exc_sg_pu_state(h2_3cstate_cs, h2_3cstate_rates, MAX_H2_VSTATES_c3Pu, verbosity);
 	h2_c3pu_min_nb = calc_min_energy_of_transition(h2_di_c3, MAX_H2_VSTATES_c3Pu);
 
-	// S1g(X) -> P3u (d)
-	// Excitation to bound state, without excitation to dissiociation continuum,
+	// 1Sg(X) -> 3Pu (d)
+	// Excitation to bound state, without excitation to dissiociation continuum, that is about 1 per cent
 	h2_3dstate_cs = new cross_section_table_mccc * [11 * USED_NB_OF_H2_VSTATES_X1SG * MAX_H2_VSTATES_d3Pu * MAX_NB_J_H2];
 
 	for (k = 0, vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
@@ -917,6 +936,9 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	init_tables_h2_exc_sg_pu_state(h2_3dstate_cs, h2_3dstate_rates, MAX_H2_VSTATES_d3Pu, verbosity);
 	h2_d3pu_min_nb = calc_min_energy_of_transition(h2_di_d3, MAX_H2_VSTATES_d3Pu);
 
+	// States below are not dissociative, but are treated as dissociative in order to estimate their effect,
+	// 1Sg(X) -> 3Su+ (e),
+	//...
 
 	// Initialization of HeI excitation cross sections,
 	// only excitation from the ground state 1s2 1S is implemented yet,
@@ -967,6 +989,7 @@ elspectra_evolution_data::~elspectra_evolution_data()
 	delete[] h2_cstate_diss_cs;
 	delete[] h2_bpstate_diss_cs;
 	delete[] h2_dstate_diss_cs;
+	delete[] h2_efstate_diss_cs;
 	delete[] h2_3bstate_diss_cs;
 
 	delete[] h2_rot_cs;
@@ -1035,6 +1058,7 @@ elspectra_evolution_data::~elspectra_evolution_data()
 	free_2d_array(h2_cstate_diss_rates);
 	free_2d_array(h2_bpstate_diss_rates);
 	free_2d_array(h2_dstate_diss_rates);
+	free_2d_array(h2_efstate_diss_rates);
 	free_2d_array(h2_3bstate_diss_rates);
 
 	free_2d_array(h2_rot_rates);
@@ -1125,7 +1149,7 @@ int elspectra_evolution_data::calc_min_energy_of_transition(const energy_diagram
 	int i, j, l, vf, dj, el_min_nb;
 	double en, en_min;
 
-	// the energy of the highest ro-vibrational level of the ground state X1SU is v=12, j=10, E=36104.6 cm-1 = 4.48 eV
+	// the energy of the highest ro-vibrational level of the ground state 1Sg(X) is v=12, j=10, E=36104.6 cm-1 = 4.48 eV
 	// eV, ionization energy of H2
 	en_min = 15.43;
 
@@ -1159,7 +1183,6 @@ void elspectra_evolution_data::init_tables_h2_exc_sg_su_state(cross_section_tabl
 	rates = alloc_2d_array<double>(6 * USED_NB_OF_H2_VSTATES_X1SG * vibr_qnb_final_max * MAX_NB_J_H2, nb_of_el_energies);
 	memset(*rates, 0, 6 * USED_NB_OF_H2_VSTATES_X1SG * vibr_qnb_final_max * MAX_NB_J_H2 * nb_of_el_energies * sizeof(rates[0][0]));
 
-	// pumping by electron impact is taken into account for H2 vibrational quanta of the ground electronic state vi < USED_NB_OF_H2_VSTATES_X1SG
 	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
 		for (j = 0; j < MAX_NB_J_H2; j++) 
 		{
@@ -1190,7 +1213,6 @@ void elspectra_evolution_data::init_tables_h2_exc_sg_pu_state(cross_section_tabl
 	rates = alloc_2d_array<double>(11 * USED_NB_OF_H2_VSTATES_X1SG * vibr_qnb_final_max * MAX_NB_J_H2, nb_of_el_energies);
 	memset(*rates, 0, 11 * USED_NB_OF_H2_VSTATES_X1SG * vibr_qnb_final_max * MAX_NB_J_H2 * nb_of_el_energies * sizeof(rates[0][0]));
 
-	// pumping by electron impact is taken into account for H2 vibrational quanta of the ground electronic state vi < USED_NB_OF_H2_VSTATES_X1SG
 	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
 		for (j = 0; j < MAX_NB_J_H2; j++)
 		{
@@ -1220,7 +1242,6 @@ void elspectra_evolution_data::init_tables_h2_exc_sg_sg_state(cross_section_tabl
 	rates = alloc_2d_array<double>(5 * USED_NB_OF_H2_VSTATES_X1SG * vibr_qnb_final_max * MAX_NB_J_H2, nb_of_el_energies);
 	memset(*rates, 0, 5 * USED_NB_OF_H2_VSTATES_X1SG * vibr_qnb_final_max * MAX_NB_J_H2 * nb_of_el_energies * sizeof(rates[0][0]));
 
-	// pumping by electron impact is taken into account for H2 vibrational quanta of the ground electronic state vi < USED_NB_OF_H2_VSTATES_X1SG
 	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
 		for (j = 0; j < MAX_NB_J_H2; j++)
 		{
@@ -1262,8 +1283,8 @@ void elspectra_evolution_data::init_tables_h2_electronic_diss(cross_section_tabl
 				rates[vi][i] = (*cs[vi])(electron_energies[i]) * electron_velocities[i];  // [cm2 *cm/s]
 		}
 		
-		// is subtracted energy of the highest level, v = 12, j = 10	
-		en = cs[vi]->get_threshold_energy() - 36104.6 * CM_INVERSE_TO_EV;
+		// is subtracted energy of the highest level, v = 14, j = 4	(Roueff et al. 2019)
+		en = cs[vi]->get_threshold_energy() - 36118.04 * CM_INVERSE_TO_EV;
 		if (en < en_min)
 			en_min = en;
 	}
@@ -1272,7 +1293,7 @@ void elspectra_evolution_data::init_tables_h2_electronic_diss(cross_section_tabl
 
 void elspectra_evolution_data::init_tables_h2_rotational_exc(cross_section_table_mccc** cs, double**& rates, int verbosity)
 {
-	int i, j, dj, n, vi, li, lf;
+	int i, j, dj, n, vi;
 
 	// (vi, ji) -> (vi, jf), 
 	// jf = ji-2, ji + 2
@@ -1285,10 +1306,7 @@ void elspectra_evolution_data::init_tables_h2_rotational_exc(cross_section_table
 			for (dj = -2; dj <= 2; dj += 4) 
 			{
 				n = 2 * (vi * MAX_NB_J_H2 + j) + (dj + 2)/4;
-				li = h2_di->get_nb(vi, j);
-				lf = h2_di->get_nb(vi, j + dj);
-
-				if (li >= 0 && lf >= 0 && cs[n] != 0) {
+				if (cs[n] != 0) {
 					for (i = 0; i < nb_of_el_energies; i++)
 					{
 						// entire electron energy bin must be higher than the threshold energy,
@@ -1304,7 +1322,7 @@ void elspectra_evolution_data::init_tables_h2_rotational_exc(cross_section_table
 
 void elspectra_evolution_data::init_tables_h2_rovibr_exc(cross_section_table_mccc **cs, double**& rates, int verbosity)
 {
-	int i, j, dj, n, vi, vf, li, lf;
+	int i, j, dj, n, vi, vf;
 
 	// (vi, ji) -> (vf, jf), 
 	// vi != vf, jf = ji-2, ji, ji + 2
@@ -1320,13 +1338,10 @@ void elspectra_evolution_data::init_tables_h2_rovibr_exc(cross_section_table_mcc
 					for (dj = -2; dj <= 2; dj += 2)
 					{
 						n = 3 * (vi * (USED_NB_OF_H2_VSTATES_X1SG - 1) * MAX_NB_J_H2 + vf * MAX_NB_J_H2 + j) + (dj + 2) / 2;
-						if (vf > vi)
+						if (vf > vi) {
 							n -= 3 * MAX_NB_J_H2;
-						
-						li = h2_di->get_nb(vi, j);
-						lf = h2_di->get_nb(vf, j + dj);
-
-						if (li >= 0 && lf >= 0 && cs[n] != 0) {
+						}
+						if (cs[n] != 0) {
 							for (i = 0; i < nb_of_el_energies; i++)
 							{
 								// entire electron energy bin must be higher than the threshold energy,
@@ -1534,19 +1549,20 @@ void elspectra_evolution_data::get_el_energy_losses(double& mt, double& h2_rot, 
 	double & diss_decay_heat, double& neut_heat_coll) const
 {
 	// [eV cm-3 s-1]
-	mt = enloss_rate_mt;
 	h2_rot = enloss_rate_h2_rot;
 	h2_rot_p = enloss_rate_h2_rot_pos;
 	h2_vibr = enloss_rate_h2_vibr;
 	h2_vibr_p = enloss_rate_h2_vibr_pos;
-	h2_electr_sin = enloss_rate_h2_exc_singlet + enloss_diss_h2_singlet;  // via excitation of singlet H2 states (including dissociation)
+	h2_electr_sin = enloss_rate_h2_exc_singlet + enloss_diss_h2_singlet;  // via excitation of singlet H2 states (including direct dissociation)
 	h2_electr_tri = enloss_rate_h2_exc_triplet + enloss_diss_h2_b;        // triplet H2 states, a3,c3,d3 excitation, and dissociation through b3 
 	ion = enloss_rate_ioniz;
 	hei = enloss_rate_hei;
 
+	// contributes to gas heating:
+	mt = enloss_rate_mt;
 	el_coul = enloss_rate_coulomb_el;                        // Coulomb losses (collisions with thermal electrons), fast electrons lose energy
 	neut_heat_coll = neutral_coll_heating_rate;              // collisions of excited H2 with H2 and He,
-	diss_decay_heat = diss_decay_heating_rate / EV_TO_ERGS;  // in eV, heating due to dissociative excitation of H2
+	diss_decay_heat = diss_decay_heating_rate / EV_TO_ERGS;  // in eV, heating due to dissociative excitation of H2 (B, Bp, C, D, EF), and triplet states
 }
 
 
@@ -1557,12 +1573,12 @@ void elspectra_evolution_data::get_h2_diss_rates(double& sol_diss, double& diss_
 	diss_excit_sin = h2_diss_exc_singlet_rate; 
 	// all excitations to triplet states eventually lead to dissociation
 	diss_excit_tri = h2_diss_exc_b_rate + h2_excit_triplet_rate; 		
-	excit_tri = h2_excit_triplet_rate;    // triplet state a3sg (without dissociation to continuum)
+	excit_tri = h2_excit_triplet_rate;    // triplet state a3Sg, c3Pu, d3Pu (without dissociation to continuum)
 
 }
 
 void elspectra_evolution_data::get_h2_process_rates(double& excit_electr_rate, double& excit_vibr_rate, double& excit_rot_rate, 
-	double& excit_electr_bps_rate,  double& excit_electr_bs_rate, double& excit_electr_cp_rate, double& excit_electr_dp_rate,
+	double& excit_electr_bs_rate,  double& excit_electr_bps_rate, double& excit_electr_cp_rate, double& excit_electr_dp_rate,
 	double& excit_vibr_v1_rate, double& excit_vibr_v2_rate, double& excit_vibr_v3_rate, double& el_excit_vstate_rate, double & hei_excit)
 {
 	// [cm-3 s-1]
@@ -1571,7 +1587,7 @@ void elspectra_evolution_data::get_h2_process_rates(double& excit_electr_rate, d
 	excit_rot_rate = h2_excit_rot_rate;        // pure rotational excitation rate from v= 0, j = 0 or j = 1, to level with j > 1[cm-3 s-1]
 
 	// dissociation must be included??
-	excit_electr_bs_rate = h2_excit_electr_bs_rate;   // singlet state S1u+(B), direct excitation to continuum is not included
+	excit_electr_bs_rate = h2_excit_electr_bs_rate;   // singlet state S1u+(B), including S1g+(EF), direct excitation to continuum is not included
 	excit_electr_bps_rate = h2_excit_electr_bps_rate; // singlet state S1u+(B primed),
 
 	excit_electr_cp_rate = h2_excit_electr_cp_rate;  // P1u(C)
@@ -1721,7 +1737,7 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 
 	// [cm-3 s-1], only pure excitations, without dissociative excitations
 	h2_excit_electr_rate = h2_excit_electr_bs_rate = h2_excit_electr_bps_rate = h2_excit_electr_cp_rate = h2_excit_electr_dp_rate 
-		= h2_excit_triplet_rate = 0.;
+		= h2_excit_electr_efs_rate = h2_excit_triplet_rate = 0.;
 
 	// Electronic excitation of the particular vibrational state of the ground electronic state, [cm-3 s-1],
 	// vibrational quantum number = CALC_EL_PUMPING_VSTATE_NB, 
@@ -1733,6 +1749,9 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 		enloss_rate_h2_exc_singlet, h2_solomon_diss_rate, h2_excit_electr_bs_rate, diss_decay_heating_rate, h2_vstate_el_exc_rate, scaling_factor);
 
 	h2_excit_electr_rate += h2_excit_electr_bs_rate;
+	h2_state_data[0].excit = h2_excit_electr_bs_rate;
+	h2_state_data[0].twostep_diss = h2_solomon_diss_rate;
+	h2_state_data[0].diss_heat_input = diss_decay_heating_rate;
 
 	// 1Su(X) -> 1Su+(Bp)
 	derivatives_h2_electronic_sg_su(y_data, ydot_data, h2_di_bp, h2_bp_state_data, h2_bpstate_rates, MAX_NB_H2_VSTATES_BP1SU, h2_bp1su_min_nb, 
@@ -1758,10 +1777,11 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	derivatives_h2_electronic_sg_sg(y_data, ydot_data, h2_di_ef, h2_ef_state_data, h2_efstate_rates, MAX_NB_H2_VSTATES_EF1SG, h2_ef1sg_min_nb,
 		enloss_rate_h2_exc_singlet, h2_solomon_diss_rate, h2_excit_electr_efs_rate, diss_decay_heating_rate, h2_vstate_el_exc_rate, scaling_factor);
 
+	h2_excit_electr_bs_rate += h2_excit_electr_efs_rate;
 	h2_excit_electr_rate += h2_excit_electr_efs_rate;
 
 	// additional electronic states
-	// S1u(X) -> S1u+(Bpp), 
+	// 1Su(X) -> 1Su+(Bpp), 
 	// the same cross sections as for the B' (3ps) state, scaling factor is 0.35,
 	// Note, the maximal vibrational number for B' must be used (for which the collisional data exist),
 	// Padovani et al. A&A, 682, A131 (2024); Zammit et al. Phys. Rev. A 95, 022708 (2017b)
@@ -1777,20 +1797,24 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 
 	// dissociative excitation,
 	// This process must be accompanied by the heating of the gas - is not taken into account yet,
-	// S1u+(B)
+	// 1Su+(B)
 	derivatives_h2_electronic_diss(y_data, ydot_data, h2_bstate_diss_cs, h2_bstate_diss_rates, h2_b1su_diss_min_nb, 
 		enloss_diss_h2_singlet, h2_diss_exc_singlet_rate);
 
-	// S1u+(Bp)
+	// 1Su+(Bp)
 	derivatives_h2_electronic_diss(y_data, ydot_data, h2_bpstate_diss_cs, h2_bpstate_diss_rates, h2_bp1su_diss_min_nb,
 		enloss_diss_h2_singlet, h2_diss_exc_singlet_rate);
 
-	// P1u(C)
+	// 1Pu(C)
 	derivatives_h2_electronic_diss(y_data, ydot_data, h2_cstate_diss_cs, h2_cstate_diss_rates, h2_c1pu_diss_min_nb,
 		enloss_diss_h2_singlet, h2_diss_exc_singlet_rate);
 
-	// P1u(D)
+	// 1Pu(D)
 	derivatives_h2_electronic_diss(y_data, ydot_data, h2_dstate_diss_cs, h2_dstate_diss_rates, h2_d1pu_diss_min_nb,
+		enloss_diss_h2_singlet, h2_diss_exc_singlet_rate);
+
+	// 1Sg+(EF)
+	derivatives_h2_electronic_diss(y_data, ydot_data, h2_efstate_diss_cs, h2_efstate_diss_rates, h2_ef1sg_diss_min_nb,
 		enloss_diss_h2_singlet, h2_diss_exc_singlet_rate);
 
 	//
@@ -1810,6 +1834,11 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	// S1g(X) -> P3u(d)
 	derivatives_h2_electronic_sg_pu_triplet(y_data, ydot_data, h2_di_d3, h2_3dstate_rates, MAX_H2_VSTATES_d3Pu, h2_d3pu_min_nb,
 		enloss_rate_h2_exc_triplet, h2_excit_triplet_rate);
+
+	// all the excitation to triplet states eventually lead to the dissociation,
+	// the energy distribution of H atoms is uncertain but cannot be much different from a mean of 5.4 eV 
+	// Dalgarno et al. ApJ Suppl. Ser. 125, p.237 (1999)
+	diss_decay_heating_rate += 5.4 * EV_TO_ERGS * (h2_diss_exc_b_rate + h2_excit_triplet_rate);
 
 	// the decrease of population densities of H2 is taken into account in the functions above,
 	// all excitations to triplet states lead eventually to dissociation, 
@@ -1977,7 +2006,7 @@ void elspectra_evolution_data::derivatives_ionization(const realtype* y_data, re
 }
 
 void elspectra_evolution_data::derivatives_h2_electronic_sg_su(const realtype* y_data, realtype* ydot_data, 
-	const energy_diagram* h2_di_exc, const std::vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb, 
+	const energy_diagram* h2_di_exc, const vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb, 
 	double& enloss_rate, double& diss_rate, double& excit_rate, double& th_energy_deriv, double& vstate_exc_rate, double scaling_factor)
 {
 	int i, k, j, n, dj, vi, vf, low, up;
@@ -1987,7 +2016,7 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_su(const realtype* y
 #pragma omp parallel reduction(+: dissr, excr, v_excr, enl, th_en) private(i, k, n, dj, j, vi, vf, low, up)
 	{
 		int i0;
-		double en, x, y, f, w1, w2;
+		double en, x, y, f, w1, w2, delta_en;
 
 		double* arr_h2 = new double[nb_lev_h2];
 		memset(arr_h2, 0, nb_lev_h2 * sizeof(double));
@@ -2015,43 +2044,46 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_su(const realtype* y
 							y = 0.;
 							f = scaling_factor * y_data[h2eq_nb + low];
 							n = 6 * (vi * vibr_qnb_final_max * MAX_NB_J_H2 + vf * MAX_NB_J_H2 + j) + (dj + 5) / 2;
-							
-							for (i = el_min_nb; i < nb_of_el_energies; i++)
-							{
-								en = electron_energies[i] - (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
-								if (en < 0.)
-									en = 0.;
+							delta_en = (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
 
-								k = get_nb_electron_energy_array(en);
+							for (i = el_min_nb; i < nb_of_el_energies; i++) {
+								if (electron_energies_grid[i] > delta_en) 
+								{ // is it necessary such strict condition? Check the sensitivity
+									en = electron_energies[i] - delta_en;
+									if (en < 0.)
+										en = 0.;
 
-								if (k == 0 && en < electron_energies[k]) {
-									i0 = 0;
-									w1 = 1.;
-								}
-								else {
-									if (en < electron_energies[k])
-										k--;
+									k = get_nb_electron_energy_array(en);
 
-									i0 = k;
-									w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
-									if (w1 > 1.)
+									if (k == 0 && en < electron_energies[k]) {
+										i0 = 0;
 										w1 = 1.;
+									}
+									else {
+										if (en < electron_energies[k])
+											k--;
+
+										i0 = k;
+										w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
+										if (w1 > 1.)
+											w1 = 1.;
+									}
+									w2 = 1. - w1;
+
+									// excitation rate,
+									// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
+									x = f * y_data[i] * rates[n][i];
+
+									arr_el[i0] += x * w1;
+									arr_el[i0 + 1] += x * w2;
+
+									// must be equal to x * delta_E
+									enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
+										- electron_energies[i]) * x;  // [cm-3 s-1 eV],
+
+									arr_el[i] -= x;
+									y += x;
 								}
-								w2 = 1. - w1;
-
-								// excitation rate,
-								// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
-								x = f * y_data[i] * rates[n][i];
-
-								arr_el[i0] += x * w1;
-								arr_el[i0 + 1] += x * w2;
-
-								// must be equal to x * delta_E
-								enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
-									- electron_energies[i]) * x;  // [cm-3 s-1 eV],
-
-								arr_el[i] -= x;
-								y += x;
 							}
 							arr_h2[low] -= y;
 
@@ -2102,7 +2134,7 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_su(const realtype* y
 }
 
 void elspectra_evolution_data::derivatives_h2_electronic_sg_sg(const realtype* y_data, realtype* ydot_data, 
-	const energy_diagram* h2_di_exc, const std::vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb, 
+	const energy_diagram* h2_di_exc, const vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb, 
 	double& enloss_rate, double& diss_rate, double& excit_rate, double& th_energy_deriv, double& vstate_exc_rate, double scaling_factor)
 {
 	int i, k, j, n, dj, vi, vf, low, up;
@@ -2112,7 +2144,7 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_sg(const realtype* y
 #pragma omp parallel reduction(+: dissr, excr, v_excr, enl, th_en) private(i, k, n, dj, j, vi, vf, low, up)
 	{
 		int i0;
-		double en, x, y, f, w1, w2;
+		double en, x, y, f, w1, w2, delta_en;
 
 		double* arr_h2 = new double[nb_lev_h2];
 		memset(arr_h2, 0, nb_lev_h2 * sizeof(double));
@@ -2140,43 +2172,46 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_sg(const realtype* y
 							y = 0.;
 							f = scaling_factor * y_data[h2eq_nb + low];
 							n = 5 * (vi * vibr_qnb_final_max * MAX_NB_J_H2 + vf * MAX_NB_J_H2 + j) + (dj + 4) / 2;
+							delta_en = (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
 
-							for (i = el_min_nb; i < nb_of_el_energies; i++)
-							{
-								en = electron_energies[i] - (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
-								if (en < 0.)
-									en = 0.;
+							for (i = el_min_nb; i < nb_of_el_energies; i++) {
+								if (electron_energies_grid[i] > delta_en)
+								{ // is it necessary such strict condition? Check the sensitivity
+									en = electron_energies[i] - delta_en;
+									if (en < 0.)
+										en = 0.;
 
-								k = get_nb_electron_energy_array(en);
+									k = get_nb_electron_energy_array(en);
 
-								if (k == 0 && en < electron_energies[k]) {
-									i0 = 0;
-									w1 = 1.;
-								}
-								else {
-									if (en < electron_energies[k])
-										k--;
-
-									i0 = k;
-									w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
-									if (w1 > 1.)
+									if (k == 0 && en < electron_energies[k]) {
+										i0 = 0;
 										w1 = 1.;
+									}
+									else {
+										if (en < electron_energies[k])
+											k--;
+
+										i0 = k;
+										w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
+										if (w1 > 1.)
+											w1 = 1.;
+									}
+									w2 = 1. - w1;
+
+									// excitation rate,
+									// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
+									x = f * y_data[i] * rates[n][i];
+
+									arr_el[i0] += x * w1;
+									arr_el[i0 + 1] += x * w2;
+
+									// must be equal to x * delta_E
+									enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
+										- electron_energies[i]) * x;  // [cm-3 s-1 eV],
+
+									arr_el[i] -= x;
+									y += x;
 								}
-								w2 = 1. - w1;
-
-								// excitation rate,
-								// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
-								x = f * y_data[i] * rates[n][i];
-
-								arr_el[i0] += x * w1;
-								arr_el[i0 + 1] += x * w2;
-
-								// must be equal to x * delta_E
-								enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
-									- electron_energies[i]) * x;  // [cm-3 s-1 eV],
-
-								arr_el[i] -= x;
-								y += x;
 							}
 							arr_h2[low] -= y;
 
@@ -2238,7 +2273,7 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu(const realtype* y
 #pragma omp parallel reduction(+: excr, v_excr, dissr, enl, th_en) private(i, k, n, dj, j, vi, vf, low, up)
 	{
 		int i0;
-		double x, y, f, en, w1, w2;
+		double x, y, f, en, w1, w2, delta_en;
 
 		double* arr_h2 = new double[nb_lev_h2];
 		memset(arr_h2, 0, nb_lev_h2 * sizeof(double));
@@ -2268,43 +2303,46 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu(const realtype* y
 							y = 0.;
 							f = scaling_factor * y_data[h2eq_nb + low];
 							n = 11 * (vi * vibr_qnb_final_max * MAX_NB_J_H2 + vf * MAX_NB_J_H2 + j) + dj + 5;
+							delta_en = (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
 
-							for (i = el_min_nb; i < nb_of_el_energies; i++) 
-							{
-								en = electron_energies[i] - (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
-								if (en < 0.)
-									en = 0.;
+							for (i = el_min_nb; i < nb_of_el_energies; i++) {
+								if (electron_energies_grid[i] > delta_en)
+								{ // is it necessary such strict condition? Check the sensitivity
+									en = electron_energies[i] - delta_en;
+									if (en < 0.)
+										en = 0.;
 
-								k = get_nb_electron_energy_array(en);
+									k = get_nb_electron_energy_array(en);
 
-								if (k == 0 && en < electron_energies[k]) {
-									i0 = 0;
-									w1 = 1.;
-								}
-								else {
-									if (en < electron_energies[k])
-										k--;
-
-									i0 = k;
-									w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
-									if (w1 > 1.)
+									if (k == 0 && en < electron_energies[k]) {
+										i0 = 0;
 										w1 = 1.;
+									}
+									else {
+										if (en < electron_energies[k])
+											k--;
+
+										i0 = k;
+										w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
+										if (w1 > 1.)
+											w1 = 1.;
+									}
+									w2 = 1. - w1;
+
+									// excitation rate,
+									// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
+									x = f * y_data[i] * rates[n][i];
+
+									arr_el[i0] += x * w1;
+									arr_el[i0 + 1] += x * w2;
+
+									// must be equal to x * delta_E
+									enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
+										- electron_energies[i]) * x;  // [cm-3 s-1 eV],
+
+									arr_el[i] -= x;
+									y += x;
 								}
-								w2 = 1. - w1;
-
-								// excitation rate,
-								// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
-								x = f * y_data[i] * rates[n][i];
-
-								arr_el[i0] += x * w1;
-								arr_el[i0 + 1] += x * w2;
-
-								// must be equal to x * delta_E
-								enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
-									- electron_energies[i]) * x;  // [cm-3 s-1 eV],
-
-								arr_el[i] -= x;
-								y += x;
 							}
 							arr_h2[low] -= y;
 
@@ -2333,7 +2371,7 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu(const realtype* y
 					// transitions to C- (or D-)
 					for (dj = -4; dj <= 4; dj += 2)
 					{
-						up = h2_di_plus->get_nb(vf, j + dj);
+						up = h2_di_minus->get_nb(vf, j + dj);
 						if (up != -1)
 						{
 							const energy_level& up_lev_ref = h2_di_minus->lev_array[up];
@@ -2342,43 +2380,46 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu(const realtype* y
 							y = 0.;
 							f = scaling_factor * y_data[h2eq_nb + low];
 							n = 11 * (vi * vibr_qnb_final_max * MAX_NB_J_H2 + vf * MAX_NB_J_H2 + j) + dj + 5;
+							delta_en = (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
+							
+							for (i = el_min_nb; i < nb_of_el_energies; i++) {
+								if (electron_energies_grid[i] > delta_en)
+								{ // is it necessary such strict condition? Check the sensitivity
+									en = electron_energies[i] - delta_en;
+									if (en < 0.)
+										en = 0.;
 
-							for (i = el_min_nb; i < nb_of_el_energies; i++)
-							{
-								en = electron_energies[i] - (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
-								if (en < 0.)
-									en = 0.;
+									k = get_nb_electron_energy_array(en);
 
-								k = get_nb_electron_energy_array(en);
-
-								if (k == 0 && en < electron_energies[k]) {
-									i0 = 0;
-									w1 = 1.;
-								}
-								else {
-									if (en < electron_energies[k])
-										k--;
-
-									i0 = k;
-									w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
-									if (w1 > 1.)
+									if (k == 0 && en < electron_energies[k]) {
+										i0 = 0;
 										w1 = 1.;
+									}
+									else {
+										if (en < electron_energies[k])
+											k--;
+
+										i0 = k;
+										w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
+										if (w1 > 1.)
+											w1 = 1.;
+									}
+									w2 = 1. - w1;
+
+									// excitation rate,
+									// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
+									x = f * y_data[i] * rates[n][i];
+
+									arr_el[i0] += x * w1;
+									arr_el[i0 + 1] += x * w2;
+
+									// must be equal to x * delta_E
+									enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
+										- electron_energies[i]) * x;  // [cm-3 s-1 eV],
+
+									arr_el[i] -= x;
+									y += x;
 								}
-								w2 = 1. - w1;
-
-								// excitation rate,
-								// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
-								x = f * y_data[i] * rates[n][i];
-
-								arr_el[i0] += x * w1;
-								arr_el[i0 + 1] += x * w2;
-
-								// must be equal to x * delta_E
-								enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
-									- electron_energies[i]) * x;  // [cm-3 s-1 eV],
-
-								arr_el[i] -= x;
-								y += x;
 							}
 							arr_h2[low] -= y;
 
@@ -2428,14 +2469,14 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu(const realtype* y
 void elspectra_evolution_data::derivatives_h2_electronic_diss(const realtype* y_data, realtype* ydot_data, cross_section_table_mccc** cs, 
 	double** rates, int el_min_nb, double& enloss_rate, double& diss_rate)
 {
-	int i, k, l, vi, low;
+	int i, k, vi, low;
 	double dissr, enl, th_en;
 
 	dissr = enl = th_en = 0.;
-#pragma omp parallel reduction(+: dissr, enl, th_en) private(i, k, l, vi, low)
+#pragma omp parallel reduction(+: dissr, enl, th_en) private(i, k, vi, low)
 	{
 		int i0;
-		double en, den, x, y, w1, w2;
+		double en, delta_en, x, y, w1, w2;
 
 		double* arr_h2 = new double[nb_lev_h2];
 		memset(arr_h2, 0, nb_lev_h2 * sizeof(double));
@@ -2450,48 +2491,51 @@ void elspectra_evolution_data::derivatives_h2_electronic_diss(const realtype* y_
 			vi = low_lev_ref.v;
 
 			if (vi < USED_NB_OF_H2_VSTATES_X1SG) {
-				l = h2_di->get_nb(vi, 0);
-				
-				// energy loss by the electron at the collision,
-				den = cs[vi]->get_threshold_energy()
-					- (low_lev_ref.energy - h2_di->lev_array[l].energy) * CM_INVERSE_TO_EV;
+				// energy lost by the electron at the collision,
+				delta_en = cs[vi]->get_threshold_energy();
+
+				// the rotational energy of H2 is not taken into account
+				// l = h2_di->get_nb(vi, 0);
+				//	- (low_lev_ref.energy - h2_di->lev_array[l].energy) * CM_INVERSE_TO_EV;
 
 				y = 0.;
-				for (i = el_min_nb; i < nb_of_el_energies; i++) 
-				{	
-					en = electron_energies[i] - den;
-					if (en < 0.)
-						en = 0.;
+				for (i = el_min_nb; i < nb_of_el_energies; i++) {
+					if (electron_energies_grid[i] > delta_en)
+					{ // is it necessary such strict condition? Check the sensitivity
+						en = electron_energies[i] - delta_en;
+						if (en < 0.)
+							en = 0.;
 
-					k = get_nb_electron_energy_array(en);
+						k = get_nb_electron_energy_array(en);
 
-					if (k == 0 && en < electron_energies[k]) {
-						i0 = 0;
-						w1 = 1.;
-					}
-					else {
-						if (en < electron_energies[k])
-							k--;
-
-						i0 = k;
-						w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
-						if (w1 > 1.)
+						if (k == 0 && en < electron_energies[k]) {
+							i0 = 0;
 							w1 = 1.;
+						}
+						else {
+							if (en < electron_energies[k])
+								k--;
+
+							i0 = k;
+							w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
+							if (w1 > 1.)
+								w1 = 1.;
+						}
+						w2 = 1. - w1;
+
+						// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
+						x = y_data[i] * y_data[h2eq_nb + low] * rates[vi][i];
+
+						arr_el[i0] += x * w1;
+						arr_el[i0 + 1] += x * w2;
+
+						// must be equal to -x * delta_E
+						enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
+							- electron_energies[i]) * x;  // [cm-3 s-1 eV],
+
+						arr_el[i] -= x;
+						y += x;
 					}
-					w2 = 1. - w1;
-
-					// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
-					x = y_data[i] * y_data[h2eq_nb + low] * rates[vi][i];
-
-					arr_el[i0] += x * w1;
-					arr_el[i0 + 1] += x * w2;
-
-					// must be equal to -x * delta_E
-					enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
-						- electron_energies[i]) * x;  // [cm-3 s-1 eV],
-
-					arr_el[i] -= x;
-					y += x;
 				}
 				arr_h2[low] -= y;
 				dissr += y;
@@ -2525,7 +2569,7 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_sg_triplet(const rea
 #pragma omp parallel reduction(+: excr, enl) private(i, k, n, j, dj, vi, vf, low, up)
 	{
 		int i0;
-		double en, x, y, f, w1, w2;
+		double en, x, y, f, w1, w2, delta_en;
 
 		double* arr_h2 = new double[nb_lev_h2];
 		memset(arr_h2, 0, nb_lev_h2 * sizeof(double));
@@ -2552,43 +2596,46 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_sg_triplet(const rea
 							f = y_data[h2eq_nb + low];
 							y = 0.;
 							n = 5 * (vi * vibr_qnb_final_max * MAX_NB_J_H2 + vf * MAX_NB_J_H2 + j) + (dj + 4) / 2;
+							delta_en = (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
 
-							for (i = el_min_nb; i < nb_of_el_energies; i++)
-							{
-								en = electron_energies[i] - (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
-								if (en < 0.)
-									en = 0.;
+							for (i = el_min_nb; i < nb_of_el_energies; i++) {
+								if (electron_energies_grid[i] > delta_en)
+								{ // is it necessary such strict condition? Check the sensitivity
+									en = electron_energies[i] - delta_en;
+									if (en < 0.)
+										en = 0.;
 
-								k = get_nb_electron_energy_array(en);
+									k = get_nb_electron_energy_array(en);
 
-								if (k == 0 && en < electron_energies[k]) {
-									i0 = 0;
-									w1 = 1.;
-								}
-								else {
-									if (en < electron_energies[k])
-										k--;
-
-									i0 = k;
-									w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
-									if (w1 > 1.)
+									if (k == 0 && en < electron_energies[k]) {
+										i0 = 0;
 										w1 = 1.;
+									}
+									else {
+										if (en < electron_energies[k])
+											k--;
+
+										i0 = k;
+										w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
+										if (w1 > 1.)
+											w1 = 1.;
+									}
+									w2 = 1. - w1;
+
+									// excitation rate,
+									// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
+									x = f * y_data[i] * rates[n][i];
+
+									arr_el[i0] += x * w1;
+									arr_el[i0 + 1] += x * w2;
+
+									// must be equal to x * delta_E
+									enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
+										- electron_energies[i]) * x;  // [cm-3 s-1 eV],
+
+									arr_el[i] -= x;
+									y += x;
 								}
-								w2 = 1. - w1;
-
-								// excitation rate,
-								// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
-								x = f * y_data[i] * rates[n][i];
-
-								arr_el[i0] += x * w1;
-								arr_el[i0 + 1] += x * w2;
-
-								// must be equal to x * delta_E
-								enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
-									- electron_energies[i]) * x;  // [cm-3 s-1 eV],
-
-								arr_el[i] -= x;
-								y += x;
 							}
 							arr_h2[low] -= y;
 							excr += y;  // [cm-3 s-1]
@@ -2626,7 +2673,7 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu_triplet(const rea
 #pragma omp parallel reduction(+: excr, enl) private(i, k, n, j, dj, vi, vf, low, up)
 	{
 		int i0;
-		double en, x, y, f, w1, w2;
+		double en, x, y, f, w1, w2, delta_en;
 
 		double* arr_h2 = new double[nb_lev_h2];
 		memset(arr_h2, 0, nb_lev_h2 * sizeof(double));
@@ -2653,43 +2700,46 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu_triplet(const rea
 							f = y_data[h2eq_nb + low];
 							y = 0.;
 							n = 11 * (vi * vibr_qnb_final_max * MAX_NB_J_H2 + vf * MAX_NB_J_H2 + j) + dj + 5;
+							delta_en = (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
 
-							for (i = el_min_nb; i < nb_of_el_energies; i++)
-							{
-								en = electron_energies[i] - (up_lev_ref.energy - low_lev_ref.energy) * CM_INVERSE_TO_EV;
-								if (en < 0.)
-									en = 0.;
+							for (i = el_min_nb; i < nb_of_el_energies; i++) {
+								if (electron_energies_grid[i] > delta_en)
+								{ // is it necessary such strict condition? Check the sensitivity
+									en = electron_energies[i] - delta_en;
+									if (en < 0.)
+										en = 0.;
 
-								k = get_nb_electron_energy_array(en);
+									k = get_nb_electron_energy_array(en);
 
-								if (k == 0 && en < electron_energies[k]) {
-									i0 = 0;
-									w1 = 1.;
-								}
-								else {
-									if (en < electron_energies[k])
-										k--;
-
-									i0 = k;
-									w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
-									if (w1 > 1.)
+									if (k == 0 && en < electron_energies[k]) {
+										i0 = 0;
 										w1 = 1.;
+									}
+									else {
+										if (en < electron_energies[k])
+											k--;
+
+										i0 = k;
+										w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
+										if (w1 > 1.)
+											w1 = 1.;
+									}
+									w2 = 1. - w1;
+
+									// excitation rate,
+									// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
+									x = f * y_data[i] * rates[n][i];
+
+									arr_el[i0] += x * w1;
+									arr_el[i0 + 1] += x * w2;
+
+									// must be equal to -x * delta_E
+									enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
+										- electron_energies[i]) * x;  // [cm-3 s-1 eV],
+
+									arr_el[i] -= x;
+									y += x;
 								}
-								w2 = 1. - w1;
-
-								// excitation rate,
-								// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
-								x = f * y_data[i] * rates[n][i];
-
-								arr_el[i0] += x * w1;
-								arr_el[i0 + 1] += x * w2;
-
-								// must be equal to -x * delta_E
-								enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
-									- electron_energies[i]) * x;  // [cm-3 s-1 eV],
-
-								arr_el[i] -= x;
-								y += x;
 							}
 							arr_h2[low] -= y;
 							excr += y;  // [cm-3 s-1]
@@ -2727,7 +2777,7 @@ void elspectra_evolution_data::derivatives_h2_rotational_exc(const realtype* y_d
 #pragma omp parallel reduction(+: excr, enl, enl_p) private(i, k, n, dj, j, vi, li, lf)
 	{
 		int i0;
-		double w1, w2, en, x, y, z;
+		double w1, w2, en, x, y, z, delta_en;
 
 		double* arr_h2 = new double[nb_lev_h2];
 		memset(arr_h2, 0, nb_lev_h2 * sizeof(double));
@@ -2749,44 +2799,47 @@ void elspectra_evolution_data::derivatives_h2_rotational_exc(const realtype* y_d
 						
 						const energy_level& li_ref = h2_di->lev_array[li];
 						const energy_level& lf_ref = h2_di->lev_array[lf];
-						
-						for (i = 0; i < nb_of_el_energies; i++)
-						{
-							en = electron_energies[i] - (lf_ref.energy - li_ref.energy) * CM_INVERSE_TO_EV;
-							if (en < 0.)
-								en = 0.;
+						delta_en = (lf_ref.energy - li_ref.energy) * CM_INVERSE_TO_EV;
 
-							k = get_nb_electron_energy_array(en);
+						for (i = 0; i < nb_of_el_energies; i++) {
+							if (electron_energies_grid[i] > delta_en)
+							{ // is it necessary such strict condition? Check the sensitivity
+								en = electron_energies[i] - delta_en;
+								if (en < 0.)
+									en = 0.;
 
-							if (k == 0 && en < electron_energies[k]) {
-								i0 = 0;
-								w1 = 1.;
-							}
-							else {
-								if (en < electron_energies[k])
-									k--;
+								k = get_nb_electron_energy_array(en);
 
-								i0 = k;
-								w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
-								if (w1 > 1.)
+								if (k == 0 && en < electron_energies[k]) {
+									i0 = 0;
 									w1 = 1.;
+								}
+								else {
+									if (en < electron_energies[k])
+										k--;
+
+									i0 = k;
+									w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
+									if (w1 > 1.)
+										w1 = 1.;
+								}
+								w2 = 1. - w1;
+
+								// excitation rate,
+								// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
+								x = y_data[i] * y_data[h2eq_nb + li] * rates[n][i];
+
+								arr_el[i0] += x * w1;
+								arr_el[i0 + 1] += x * w2;
+
+								// must be equal to -x * delta_E, [cm-3 s-1 eV],
+								// is negative if electrons loose energy,
+								z += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
+									- electron_energies[i]) * x;
+
+								arr_el[i] -= x;
+								y += x;
 							}
-							w2 = 1. - w1;
-
-							// excitation rate,
-							// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
-							x = y_data[i] * y_data[h2eq_nb + li] * rates[n][i];
-
-							arr_el[i0] += x * w1;
-							arr_el[i0 + 1] += x * w2;
-
-							// must be equal to -x * delta_E, [cm-3 s-1 eV],
-							// is negative if electrons loose energy,
-							z += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
-								- electron_energies[i]) * x;
-							
-							arr_el[i] -= x;
-							y += x;
 						}
 						arr_h2[li] -= y;
 						arr_h2[lf] += y;
@@ -2833,7 +2886,7 @@ void elspectra_evolution_data::derivatives_h2_rovibr_exc(const realtype* y_data,
 #pragma omp parallel reduction(+: excr, excr1, excr2, excr3, enl, enl_p) private(i, k, n, dj, j, vi, vf, li, lf)
 	{
 		int i0;
-		double w1, w2, en, x, y, z;
+		double w1, w2, en, x, y, z, delta_en;
 
 		double* arr_h2 = new double[nb_lev_h2];
 		memset(arr_h2, 0, nb_lev_h2 * sizeof(double));
@@ -2856,48 +2909,51 @@ void elspectra_evolution_data::derivatives_h2_rovibr_exc(const realtype* y_data,
 								z = y = 0.;
 
 								n = 3 * (vi * (USED_NB_OF_H2_VSTATES_X1SG - 1) * MAX_NB_J_H2 + vf * MAX_NB_J_H2 + j) + (dj + 2) / 2;
-								if (vf > vi)
+								if (vf > vi) {
 									n -= 3 * MAX_NB_J_H2;
-
+								}
 								const energy_level& li_ref = h2_di->lev_array[li];
 								const energy_level& lf_ref = h2_di->lev_array[lf];
+								delta_en = (lf_ref.energy - li_ref.energy) * CM_INVERSE_TO_EV;
 
-								for (i = 0; i < nb_of_el_energies; i++)
-								{
-									en = electron_energies[i] - (lf_ref.energy - li_ref.energy) * CM_INVERSE_TO_EV;
-									if (en < 0.)
-										en = 0.;
+								for (i = 0; i < nb_of_el_energies; i++) {
+									if (electron_energies_grid[i] > delta_en)
+									{ // is it necessary such strict condition? Check the sensitivity
+										en = electron_energies[i] - delta_en;
+										if (en < 0.)
+											en = 0.;
 
-									k = get_nb_electron_energy_array(en);
+										k = get_nb_electron_energy_array(en);
 
-									if (k == 0 && en < electron_energies[k]) {
-										i0 = 0;
-										w1 = 1.;
-									}
-									else {
-										if (en < electron_energies[k])
-											k--;
-
-										i0 = k;
-										w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
-										if (w1 > 1.)
+										if (k == 0 && en < electron_energies[k]) {
+											i0 = 0;
 											w1 = 1.;
+										}
+										else {
+											if (en < electron_energies[k])
+												k--;
+
+											i0 = k;
+											w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
+											if (w1 > 1.)
+												w1 = 1.;
+										}
+										w2 = 1. - w1;
+
+										// excitation rate,
+										// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
+										x = y_data[i] * y_data[h2eq_nb + li] * rates[n][i];
+
+										arr_el[i0] += x * w1;
+										arr_el[i0 + 1] += x * w2;
+
+										// must be equal to x * delta_E
+										z += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
+											- electron_energies[i]) * x; // [cm-3 s-1 eV],
+
+										arr_el[i] -= x;
+										y += x;
 									}
-									w2 = 1. - w1;
-
-									// excitation rate,
-									// [cm-3] *[cm-3] *[cm2 *cm/s] = [cm-3 s-1]
-									x = y_data[i] * y_data[h2eq_nb + li] * rates[n][i];
-
-									arr_el[i0] += x * w1;
-									arr_el[i0 + 1] += x * w2;
-
-									// must be equal to x * delta_E
-									z += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
-										- electron_energies[i]) * x; // [cm-3 s-1 eV],
-									
-									arr_el[i] -= x;
-									y += x;
 								}
 								arr_h2[li] -= y;
 								arr_h2[lf] += y;
@@ -2962,7 +3018,7 @@ void elspectra_evolution_data::derivatives_hei_exc(const realtype* y_data, realt
 #pragma omp parallel reduction(+: excr, enl) private(i, k, m, li, lf, en, x, y)
 	{
 		int i0;
-		double w1, w2;
+		double w1, w2, delta_en;
 
 		double* arr_hei = new double[nb_lev_hei];
 		memset(arr_hei, 0, nb_lev_hei * sizeof(double));
@@ -2979,40 +3035,43 @@ void elspectra_evolution_data::derivatives_hei_exc(const realtype* y_data, realt
 
 			const energy_level& li_ref = hei_di->lev_array[li];
 			const energy_level& lf_ref = hei_di->lev_array[lf];
+			delta_en = (lf_ref.energy - li_ref.energy) * CM_INVERSE_TO_EV;
 
-			for (i = hei_min_nb; i < nb_of_el_energies; i++) 
-			{
-				en = electron_energies_grid[i] - (lf_ref.energy - li_ref.energy) * CM_INVERSE_TO_EV;
-				if (en < 0.)
-					en = 0.;
+			for (i = hei_min_nb; i < nb_of_el_energies; i++) {
+				if (electron_energies_grid[i] > delta_en)
+				{ // is it necessary such strict condition? Check the sensitivity
+					en = electron_energies[i] - delta_en;
+					if (en < 0.)
+						en = 0.;
 
-				k = get_nb_electron_energy_array(en);
-				if (k == 0 && en < electron_energies[k]) {
-					i0 = 0;
-					w1 = 1.;
-				}
-				else {
-					if (en < electron_energies[k])
-						k--;
-
-					i0 = k;
-					w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
-					if (w1 > 1.)
+					k = get_nb_electron_energy_array(en);
+					if (k == 0 && en < electron_energies[k]) {
+						i0 = 0;
 						w1 = 1.;
+					}
+					else {
+						if (en < electron_energies[k])
+							k--;
+
+						i0 = k;
+						w1 = (electron_energies[k + 1] - en) / (electron_energies[k + 1] - electron_energies[k]);
+						if (w1 > 1.)
+							w1 = 1.;
+					}
+					w2 = 1. - w1;
+
+					// [cm2 *cm/s] *[cm-3] *[cm-3]
+					x = hei_rates[m][i] * y_data[i] * y_data[heieq_nb + li];
+
+					arr_el[i0] += x * w1;
+					arr_el[i0 + 1] += x * w2;
+
+					enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
+						- electron_energies[i]) * x;  // [cm-3 s-1 eV],
+
+					arr_el[i] -= x;
+					y += x;
 				}
-				w2 = 1. - w1;
-
-				// [cm2 *cm/s] *[cm-3] *[cm-3]
-				x = hei_rates[m][i] * y_data[i] * y_data[heieq_nb + li];
-				
-				arr_el[i0] += x * w1;
-				arr_el[i0 + 1] += x * w2;
-
-				enl += (w1 * electron_energies[i0] + w2 * electron_energies[i0 + 1]
-					- electron_energies[i]) * x;  // [cm-3 s-1 eV],
-
-				arr_el[i] -= x;
-				y += x;
 			}
 			arr_hei[li] -= y;
 			arr_hei[lf] += y;

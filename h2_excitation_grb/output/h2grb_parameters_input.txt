@@ -1,4 +1,4 @@
-!H2-electron propagation parameters, date Mon Nov 17 16:08:51 2025
+!H2-electron propagation parameters, date Thu Dec  4 08:49:52 2025
 !Gas parameters:
 !H nuclei concentration [cm-3]:
 2.00000e+04

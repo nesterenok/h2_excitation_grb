@@ -16,7 +16,7 @@
 //      ground state   - 1Sg+ (X), 
 //      singlet states - 1Su+ (B, Bp, Bpp), 1Pu (C+-, D+-, Dp+-), 1Sg+ (EF)
 //      triplet states - 3Sg+ (a), 3Pu (c,d)
-//      triplet states (dissociative) - S3u+(b)
+//      triplet states (dissociative) - 3Su+(b)
 
 // Contribution of triplet states to the dissociation (cross section at maximum):
 // S3u+(b) - 1.64*a0^2, S3u+(e) - 0.024*a0^2, S3u+(h) - 0.045*a0^2,
@@ -39,7 +39,10 @@ struct spectra_data {
 
 // auxiliary class for saving parameters of the electronic excitation
 struct electronic_excitation_data_unit {
-    double excit_rate, direct_diss_rate, twostep_diss_rate;  // two step dissociation is known as Solomon process
+    double excit;
+    double direct_diss;
+    double twostep_diss; // two step dissociation is known as Solomon process
+    double diss_heat_input;
 };
 
 
@@ -47,12 +50,12 @@ class elspectra_evolution_data
 {
 protected:
     bool dust_is_presented;
-    int el_nb, h_nb, hp_nb, h2_nb, h2p_nb, he_nb, hep_nb, hepp_nb, 
+    int verbosity, el_nb, h_nb, hp_nb, h2_nb, h2p_nb, he_nb, hep_nb, hepp_nb,
         nb_lev_h2, nb_lev_h2_b, nb_lev_h2_cplus, nb_lev_h2_cminus, nb_lev_h2_bp, nb_lev_h2_dplus, nb_lev_h2_dminus, nb_lev_h2_bpp,
         nb_lev_h2_dprimed_minus, nb_lev_h2_dprimed_plus, nb_lev_h2_ef, nb_lev_h2_a3, nb_lev_h2_c3, nb_lev_h2_d3,
         nb_lev_hei, h2_ioniz_min_nb, he_ioniz_min_nb, h_ioniz_min_nb, h2p_ioniz_min_nb, hep_ioniz_min_nb,
         h2_b1su_min_nb, h2_c1pu_min_nb, h2_bp1su_min_nb, h2_d1pu_min_nb, h2_ef1sg_min_nb, h2_b1su_diss_min_nb, h2_c1pu_diss_min_nb, h2_bp1su_diss_min_nb, 
-        h2_d1pu_diss_min_nb, h2_b3su_diss_min_nb, h2_a3sg_min_nb, h2_c3pu_min_nb, h2_d3pu_min_nb, 
+        h2_d1pu_diss_min_nb, h2_ef1sg_diss_min_nb, h2_b3su_diss_min_nb, h2_a3sg_min_nb, h2_c3pu_min_nb, h2_d3pu_min_nb,
         hei_min_nb, nb_coll_trans_hei, nb_of_el_energies, nb_of_equat, h2eq_nb, heieq_nb, physeq_nb, min_grain_charge;
     int* indices;
 
@@ -66,6 +69,8 @@ protected:
         h2_excit_electr_bs_rate, h2_excit_electr_bps_rate, h2_excit_electr_cp_rate, h2_excit_electr_dp_rate, h2_excit_electr_efs_rate, 
         h2_excit_triplet_rate, h2_excit_vibr_rate, h2_excit_vibr_v1_rate, h2_excit_vibr_v2_rate, h2_excit_vibr_v3_rate, h2_excit_rot_rate, h2_vstate_el_exc_rate;
 
+    electronic_excitation_data_unit h2_state_data[NB_EXC_ELECTRONIC_STATES];
+
     // in eV, in electron_energies - the centre of energy interval is provided,
     double* electron_energies_grid, * electron_energy_bin_size, *electron_energies, *electron_velocities;      
     
@@ -75,7 +80,7 @@ protected:
 
     double** h2_bstate_rates, ** h2_cstate_rates, ** h2_bpstate_rates, ** h2_dstate_rates, ** h2_efstate_rates,
         ** h2_3astate_rates, ** h2_3cstate_rates, ** h2_3dstate_rates;
-    double** h2_bstate_diss_rates, ** h2_cstate_diss_rates, ** h2_bpstate_diss_rates, ** h2_dstate_diss_rates, ** h2_3bstate_diss_rates;
+    double** h2_bstate_diss_rates, ** h2_cstate_diss_rates, ** h2_bpstate_diss_rates, ** h2_dstate_diss_rates, **h2_efstate_diss_rates, ** h2_3bstate_diss_rates;
     double** h2_rot_rates, ** h2_rovibr_rates;
     double** hei_rates;
     double*  coll_partn_conc;
@@ -96,7 +101,7 @@ protected:
    
     cross_section_table_mccc** h2_bstate_cs, ** h2_cstate_cs, ** h2_bpstate_cs, ** h2_dstate_cs, **h2_efstate_cs,
         ** h2_3astate_cs, **h2_3cstate_cs, ** h2_3dstate_cs;
-    cross_section_table_mccc** h2_bstate_diss_cs, ** h2_cstate_diss_cs, ** h2_bpstate_diss_cs, ** h2_dstate_diss_cs, 
+    cross_section_table_mccc** h2_bstate_diss_cs, ** h2_cstate_diss_cs, ** h2_bpstate_diss_cs, ** h2_dstate_diss_cs, ** h2_efstate_diss_cs,
         ** h2_3bstate_diss_cs;
     cross_section_table_mccc** h2_rot_cs, **h2_rovibr_cs;
 
@@ -161,7 +166,7 @@ protected:
         double** rates, int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double& diss_rate);
 
     // H2 dissociation 
-    // through electronic excitation (direct or through triplet states),
+    // through electronic excitation (direct or through triplet state 3Su+(b)),
     // the energy lost by the electron is equal to:
     // = the threshold value given in the cross section data file - the energy of the initial state of H2 with given J,
     void init_tables_h2_electronic_diss(cross_section_table_mccc**, double**& rates, int& el_min_nb, int verbosity = 1);

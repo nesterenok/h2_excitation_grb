@@ -20,6 +20,7 @@
 
 #include <omp.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -48,8 +49,8 @@ const int VERBOSITY = 1;
 void init_specimen_conc(const string& sim_path, double& conc_h_tot, vector<double>& layer_centre_distances, vector<dynamic_array>& d);
 void init_dust_abund(const string& sim_path, vector<double>& d, double& grain_radius_init, double& grain_nb_density, double& grain_material_density);
 void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& d, const vector<double>& electron_energies_grid);
-void init_electron_spectra_test(const string& output_path, dynamic_array & init_data_test, const vector<double>& en_grid, 
-	double test_electron_conc, double test_electron_energy);
+void init_electron_spectra_mono(const string& output_path, dynamic_array & init_data_test, const vector<double>& en_grid, 
+	double electron_conc, double electron_energy);
 void init_h2_population_density(const string& sim_path, vector<dynamic_array>& d, vector<int>& qnb_v_arr, vector<int>& qnb_j_arr);
 
 
@@ -62,7 +63,7 @@ static int f_elsp(realtype t, N_Vector y, N_Vector ydot, void* user_data) {
 // simulation parameters that are initialized from file:
 //
 int nb_processors;
-double op_ratio_h2;
+double op_ratio_h2, conc_h_tot, ioniz_fract;
 
 string data_path;    // path to the input_data folder with spectroscopic, collisional data and etc.
 string output_path;  // path to the folder where data of the current simulation must be saved,
@@ -78,7 +79,7 @@ streambuf* orig_cout;
 bool dust_is_presented;
 int nb_of_time_moments, nb_of_equat, nb_of_el_energies, nb_lev_h2, nb_lev_hei, h2eq_nb, heieq_nb, physeq_nb;
 
-double conc_h_tot, ioniz_fract, grain_radius_init, grain_nb_density, grain_material_density, grain_radius, dust_mass, gas_mass, dg_ratio;
+double grain_radius_init, grain_nb_density, grain_material_density, grain_radius, dust_mass, gas_mass, dg_ratio;
 
 double enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos, 
 	enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, diss_decay_heating_rate,
@@ -164,7 +165,7 @@ int main()
 	output_path = "C:/Users/Александр/Documents/Данные и графики/paper GRB in molecular cloud/python_scripts_ism/";
 	data_path   = "C:/Users/Александр/Documents/input_data/";
 
-	// save_cross_section_table(output_path, data_path, IONIZATION_FRACTION_THERMAL_EL, THERMAL_EL_TEMPERATURE);
+	//save_cross_section_table(output_path, data_path, IONIZATION_FRACTION_THERMAL_EL, THERMAL_EL_TEMPERATURE);
 	//calc_helium_lifetimes(output_path, data_path);
 }
 
@@ -325,7 +326,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 	int i, k, time_nb, step_nb, flag;
 	long int nb_steps_tot;
 
-	double test_electron_conc(0.), test_electron_energy(0.), test_he_abund(0.), test_conc_h_tot(0.), test_ioniz_fract(0.);
+	double electron_conc(0.), electron_energy(0.), he_abund(0.);
 	double x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, rel_tol, dt, model_time, model_time_aux, model_time_aux_prev, model_time_step, model_time_out;
 
 	stringstream ss;
@@ -333,6 +334,9 @@ void simulations_monoenergetic(const string & parameter_fname)
 
 	// the class containing data used by solver,
 	elspectra_evolution_data* user_data;
+
+	conc_h_tot = 0.;
+	ioniz_fract = 0.;
 
 	//
 	// Initialization of initial data
@@ -376,7 +380,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 
 		ss.clear();
 		ss.str(text_line);
-		ss >> test_electron_conc;
+		ss >> electron_conc;
 
 		// Electron energy in test simulations in[eV]
 		do
@@ -385,7 +389,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 
 		ss.clear();
 		ss.str(text_line);
-		ss >> test_electron_energy;
+		ss >> electron_energy;
 
 		// Helium abundance in test simulations(only H2 and He are taken into account),
 		do
@@ -394,7 +398,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 
 		ss.clear();
 		ss.str(text_line);
-		ss >> test_he_abund;
+		ss >> he_abund;
 
 		// H nuclei total concentration for test simulations, [cm-3],
 		do
@@ -403,7 +407,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 
 		ss.clear();
 		ss.str(text_line);
-		ss >> test_conc_h_tot;
+		ss >> conc_h_tot;
 
 		// Ionization fraction x_e, number density of electrons n_e = n_{H,tot} * x_e,
 		do
@@ -412,7 +416,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 
 		ss.clear();
 		ss.str(text_line);
-		ss >> test_ioniz_fract;
+		ss >> ioniz_fract;
 
 		// ortho-to-para-H2 ratio,
 		// test the dependence on this parameter,
@@ -468,13 +472,10 @@ void simulations_monoenergetic(const string & parameter_fname)
 
 	memory_freeing_up();
 	init_time_intervals();
-	init_electron_energy_grid(test_electron_energy);
+	init_electron_energy_grid(electron_energy);
 
-	dynamic_array el_spectrum_test(nb_of_el_energies);
-	init_electron_spectra_test(output_path, el_spectrum_test, electron_energies_grid, test_electron_conc, test_electron_energy);
-
-	ioniz_fract = test_ioniz_fract;
-	conc_h_tot = test_conc_h_tot;
+	dynamic_array el_spectrum(nb_of_el_energies);
+	init_electron_spectra_mono(output_path, el_spectrum, electron_energies_grid, electron_conc, electron_energy);
 
 	user_data
 		= new elspectra_evolution_data(data_path, output_path, conc_h_tot, ioniz_fract, electron_energies_grid, VERBOSITY);
@@ -492,11 +493,11 @@ void simulations_monoenergetic(const string & parameter_fname)
 
 	for (i = 0; i < nb_of_el_energies; i++) {
 		// the number of electrons in the interval:
-		initial_data[i] = el_spectrum_test.arr[i] * user_data->get_electron_energy_bin(i);
+		initial_data[i] = el_spectrum.arr[i] * user_data->get_electron_energy_bin(i);
 	}
 
 	initial_data[nb_of_el_energies + H2_NB] = 0.5 * conc_h_tot;
-	initial_data[nb_of_el_energies + HE_NB] = test_he_abund * conc_h_tot;
+	initial_data[nb_of_el_energies + HE_NB] = he_abund * conc_h_tot;
 
 	// the initial distribution of energy level populations is postulated, [cm-3]
 	initial_data[h2eq_nb] = initial_data[nb_of_el_energies + H2_NB] / (op_ratio_h2 + 1.);
@@ -523,8 +524,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 	// Simulations
 	//
 
-	dynamic_array el_spectrum(nb_of_el_energies), specimen_conc(NB_OF_CHEM_SPECIES), h2_popul_dens(nb_lev_h2), hei_popul_dens(nb_lev_hei),
-		h2_pop_v(MAX_NB_H2_VSTATES_X1SG);
+	dynamic_array specimen_conc(NB_OF_CHEM_SPECIES), h2_popul_dens(nb_lev_h2), hei_popul_dens(nb_lev_hei), h2_pop_v(MAX_NB_H2_VSTATES_X1SG);
 
 	// vectors used by solver SUNDIALS CVODE
 	N_Vector y, ydot, abs_tol;
@@ -739,7 +739,6 @@ void simulations_monoenergetic(const string & parameter_fname)
 			dt = 0.5 * (model_time_aux - model_time_aux_prev);
 
 			// Energy losses, 
-			x1 = enloss_rate_mt;
 			x2 = enloss_rate_h2_rot;
 			x3 = enloss_rate_h2_vibr;
 			x4 = enloss_rate_h2_singlet;
@@ -747,6 +746,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 			x6 = enloss_rate_hei;
 			x7 = enloss_rate_h2_triplet;
 
+			x1 = enloss_rate_mt;
 			x8 = enloss_rate_coulomb_el;
 			x9 = diss_decay_heating_rate;
 			x10 = neutral_coll_heating_rate;
@@ -755,7 +755,6 @@ void simulations_monoenergetic(const string & parameter_fname)
 				enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el,
 				diss_decay_heating_rate, neutral_coll_heating_rate);
 
-			enloss_mt += (x1 + enloss_rate_mt) * dt;
 			enloss_h2_rot += (x2 + enloss_rate_h2_rot) * dt;
 			enloss_h2_vibr += (x3 + enloss_rate_h2_vibr) * dt;
 			enloss_h2_singlet += (x4 + enloss_rate_h2_singlet) * dt;
@@ -763,6 +762,8 @@ void simulations_monoenergetic(const string & parameter_fname)
 			enloss_hei += (x6 + enloss_rate_hei) * dt;
 			enloss_h2_triplet += (x7 + enloss_rate_h2_triplet) * dt;
 
+			// contribute to thermal heating
+			enloss_mt += (x1 + enloss_rate_mt) * dt;
 			enloss_coulomb_el += (x8 + enloss_rate_coulomb_el) * dt;
 			diss_decay_heating += (x9 + diss_decay_heating_rate) * dt;
 			neutral_coll_heating += (x10 + neutral_coll_heating_rate) * dt;
@@ -856,7 +857,6 @@ void simulations_monoenergetic(const string & parameter_fname)
 				hei_popul_dens_evol.push_back(hei_popul_dens);
 
 				// Energy losses, rates
-				enloss_rate_mt_arr.push_back(enloss_rate_mt);
 				enloss_rate_h2_rot_arr.push_back(enloss_rate_h2_rot);
 				enloss_rate_h2_vibr_arr.push_back(enloss_rate_h2_vibr);
 				enloss_rate_h2_singlet_arr.push_back(enloss_rate_h2_singlet);
@@ -864,6 +864,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 				enloss_rate_ioniz_arr.push_back(enloss_rate_ioniz);
 				enloss_rate_hei_arr.push_back(enloss_rate_hei);
 
+				enloss_rate_mt_arr.push_back(enloss_rate_mt);
 				enloss_rate_coulomb_el_arr.push_back(enloss_rate_coulomb_el);
 				diss_decay_heating_rate_arr.push_back(diss_decay_heating_rate);
 				neutral_coll_heating_rate_arr.push_back(neutral_coll_heating_rate);
@@ -871,8 +872,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 				enloss_rate_h2_rot_arr_pos.push_back(enloss_rate_h2_rot_pos);
 				enloss_rate_h2_vibr_arr_pos.push_back(enloss_rate_h2_vibr_pos);
 
-				// energy losses, time-integrated,
-				enloss_mt_arr.push_back(enloss_mt);
+				// Energy losses, time-integrated,
 				enloss_h2_rot_arr.push_back(enloss_h2_rot);
 				enloss_h2_vibr_arr.push_back(enloss_h2_vibr);
 				enloss_h2_singlet_arr.push_back(enloss_h2_singlet);
@@ -880,6 +880,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 				enloss_ioniz_arr.push_back(enloss_ioniz);
 				enloss_hei_arr.push_back(enloss_hei);
 
+				enloss_mt_arr.push_back(enloss_mt);
 				enloss_coulomb_el_arr.push_back(enloss_coulomb_el);
 				diss_decay_heating_arr.push_back(diss_decay_heating);
 				neutral_coll_heating_arr.push_back(neutral_coll_heating);
@@ -1729,9 +1730,34 @@ void simulations_grb(const string& parameter_fname)
 void save_simulation_report()
 {
 	int i;
-	double x1, x2, x3, x4;
+	double energy, nb_density, nb_ions, heating_effic, diss_heat_effic, rovibr_losses_effic, h2_dissociated;
+
+	char buffer[20];
 	string fname;
 	ofstream output;
+
+	// Energy in electrons, number density of electrons at the start of simulations,
+	energy = nb_density = 0.;
+	for (i = 0; i < nb_of_el_energies; i++) {
+		energy += el_spectrum_evol.front().arr[i] * 0.5 * (electron_energies_grid[i] + electron_energies_grid[i + 1]);  // [eV cm-3]
+		nb_density += el_spectrum_evol.front().arr[i];  // [cm-3]
+	}
+
+	// simple species are: "e-", "H", "H+", "H2", "H2+", "He", "He+", "He++"
+	// number density of ions at the start of the simulations,
+	nb_ions = -(specimen_conc_evol.front().arr[2] + specimen_conc_evol.front().arr[4] + specimen_conc_evol.front().arr[6]
+		+ 2. * specimen_conc_evol.front().arr[7]);  // [cm-3]
+
+	// number density of ions produced, at the end of the simulations,
+	nb_ions += specimen_conc_evol.back().arr[2] + specimen_conc_evol.back().arr[4] + specimen_conc_evol.back().arr[6]
+		+ 2. * specimen_conc_evol.back().arr[7];  // [cm-3]
+
+	heating_effic = (fabs(enloss_mt_arr.back()) + fabs(enloss_coulomb_el_arr.back()) + neutral_coll_heating_arr.back()) / energy;  // dimensionless
+	diss_heat_effic = diss_decay_heating_rate_arr.back() / energy;  // dimensionless
+
+	rovibr_losses_effic = fabs(enloss_h2_vibr_arr.back()) / energy;  // dimensionless
+	h2_dissociated = h2_diss_exc_singlet_arr.back() + h2_diss_excit_electr_triplet_arr.back() + h2_solomon_diss_arr.back();
+
 
 	// Saving parameters of the electron energy degradation,
 	fname = output_path + "h2grb_parameters_output.txt";
@@ -1740,64 +1766,64 @@ void save_simulation_report()
 	output << scientific;
 	output.precision(4);
 
-	// Energy in electrons, number density of electrons at the start of simulations,
-	x3 = x4 = 0.;
-	for (i = 0; i < nb_of_el_energies; i++) {
-		x3 += el_spectrum_evol.front().arr[i] * 0.5 * (electron_energies_grid[i] + electron_energies_grid[i + 1]);  // [eV cm-3]
-		x4 += el_spectrum_evol.front().arr[i];  // [cm-3]
-	}
+	output << left << "# Parameters of the electron energy degradation, initial number of electrons, [cm-3]: " << nb_density << endl
+		<< "# 1. Initial electron energy E, [eV cm-3]" << endl
+		<< "# 2. Number density of ions N, [cm-3]" << endl
+		<< "# 3. Mean energy per ion pair W, [eV]" << endl
+		<< "# 4. 1/W, [eV-1]" << endl
+		<< "# 5. Heating efficiency of gas (neutral and electrons), dimensionless" << endl
+		<< "# 6. Energy fraction lost in ro-vibr., dimensionless" << endl;
 
-	// simple species are: "e-", "H", "H+", "H2", "H2+", "He", "He+", "He++"
-	// number density of ions at the start of the simulations,
-	x1 = specimen_conc_evol.front().arr[2] + specimen_conc_evol.front().arr[4] + specimen_conc_evol.front().arr[6]
-		+ 2. * specimen_conc_evol.front().arr[7];  // [cm-3]
-
-	// number density of ions produced, at the end of the simulations,
-	x2 = specimen_conc_evol.back().arr[2] + specimen_conc_evol.back().arr[4] + specimen_conc_evol.back().arr[6]
-		+ 2. * specimen_conc_evol.back().arr[7];  // [cm-3]
-
-	output << left << "Parameters of the electron energy degradation:" << endl
-		<< setw(38) << "Initial number of electrons, [cm-3]: " << x4 << endl
-		<< setw(38) << "Initial electron energy E[eV cm-3]: " << x3 << endl
-		<< setw(38) << "Number of ionizations N[cm-3]: " << x2 - x1 << endl
-		<< setw(38) << "Mean energy per ion pair W: " << x3 / (x2 - x1) << endl
-		<< setw(38) << "Heating efficiency of neutral gas: " << (fabs(enloss_mt_arr.back()) + neutral_coll_heating_arr.back()) / x3 << endl
-		<< setw(38) << "Heating efficiency of electrons: " << fabs(enloss_coulomb_el_arr.back()) / x3 << endl
-		<< setw(38) << "Energy fraction lost in ro-vibr.: " << fabs(enloss_h2_vibr_arr.back()) / x3 << endl << endl;
-
-	x4 = h2_diss_exc_singlet_arr.back() + h2_diss_excit_electr_triplet_arr.back() + h2_solomon_diss_arr.back();
-
-	output << left << "Dissociation of H2" << endl
-		<< setw(38) << "H2 dissociations [cm-3]: " << x4 << endl
-		<< setw(38) << "due to Solomon, fraction: " << h2_solomon_diss_arr.back() / x4 << endl
-		<< setw(38) << "due to singlet, fraction: " << h2_diss_exc_singlet_arr.back() / x4 << endl
-		<< setw(38) << "due to triplet (including b3su), fraction: " << h2_diss_excit_electr_triplet_arr.back() / x4 << endl
-		<< setw(38) << "due to excitation to triplet (a3sg,c3Pu,d3Pu), fraction: " << h2_excit_electr_triplet_arr.back() / x4 << endl
-		<< setw(38) << "H2 dissociations, per ion pair: " << x4 / (x2 - x1) << endl << endl;
-	
-	output << left << "Excitation of H2:" << endl
-		<< setw(62) << "Electronic excitation (singlet, no direct dissociation), [cm-3]/per ion pair: "
-		<< setw(14) << h2_excit_electr_arr.back() << setw(14) << h2_excit_electr_arr.back() / (x2 - x1) << endl
-
-		<< setw(62) << "Excitation to B 1S+u (no direct dissociation), [cm-3]/per ion pair: "
-		<< setw(14) << h2_excit_electr_bs_arr.back() << setw(14) << h2_excit_electr_bs_arr.back() / (x2 - x1) << endl
-
-		<< setw(62) << "Excitation to C 1Pu (no direct dissociation), [cm-3]/per ion pair: "
-		<< setw(14) << h2_excit_electr_cp_arr.back() << setw(14) << h2_excit_electr_cp_arr.back() / (x2 - x1) << endl 
+	output << "# 7. H2 dissociation, [cm-3]" << endl
+		<< "# 8. H2 dissociation due to Solomon, fraction" << endl
+		<< "# 9. H2 dissociation due to singlet, fraction" << endl
+		<< "# 10. H2 dissociation due to all triplet (including b3su), fraction" << endl
+		<< "# 11. H2 dissociation due to excitation to triplet (a3sg,c3Pu,d3Pu), fraction" << endl;
 		
-		<< setw(62) << "Excitation to B-primed 1S+u (no direct dissociation), [cm-3]/per ion pair: "
-		<< setw(14) << h2_excit_electr_bps_arr.back() << setw(14) << h2_excit_electr_bps_arr.back() / (x2 - x1) << endl
-
-		<< setw(62) << "Excitation to D 1Pu (no direct dissociation), [cm-3]/per ion pair: "
-		<< setw(14) << h2_excit_electr_dp_arr.back() << setw(14) << h2_excit_electr_dp_arr.back() / (x2 - x1) << endl << endl;
+	output << left << "# 12. Electronic excitation (singlet, NO direct dissociation), [cm-3]" << endl
+		<< "# 13. Excitation to B 1S+u, including EF 1S+g (no direct dissociation), fraction" << endl
+		<< "# 14. Excitation to C 1Pu (no direct dissociation), fraction" << endl
+		<< "# 15. Excitation to B-primed 1S+u (no direct dissociation), fraction" << endl
+		<< "# 16. Excitation to D 1Pu (no direct dissociation), fraction" << endl;
 			
-	output << left << "Excitation of vibrational states of H2:" << endl	
-		<< setw(38) << "Vibr. excitation [cm-3]: " << h2_excit_vibr_arr.back() << endl
-		<< setw(38) << "Vibr. excitation to v=1 [cm-3]: " << h2_excit_vibr_v1_arr.back() << endl
-		<< setw(38) << "Ratio of excitations v=2/v=1: " << h2_excit_vibr_v2_arr.back() / h2_excit_vibr_v1_arr.back() << endl
-		<< setw(38) << "Ratio of excitations v=3/v=1: " << h2_excit_vibr_v3_arr.back() / h2_excit_vibr_v1_arr.back() << endl
-		<< setw(34) << "Electronic excitation [cm-3], to v = " << CALC_EL_PUMPING_VSTATE_NB << " : " << h2_excit_el_vstate_arr.back() << endl;
+	output << left << "# 17. Vibrational excitation to all v, per ion pair" << endl
+		<< "# 18. Vibrational excitation to v=1, per ion pair" << endl
+		<< "# 19. Ratio of excitations v=2/v=1" << endl
+		<< "# 20. Ratio of excitations v=3/v=1: " << endl
+		<< "# 21. Vibrational excitation through electronic states, to v = " << CALC_EL_PUMPING_VSTATE_NB << ", per ion pair" << endl;
 
+	output << "# ";
+	for (i = 1; i <= 21; i++) {
+		output << setw(13) << i;
+	}
+	output << endl;
+	
+	output << left << setw(13) << energy / nb_density
+		<< setw(13) << nb_ions 
+		<< setw(13) << energy / nb_ions 
+		<< setw(13) << nb_ions / energy 
+		<< setw(13) << heating_effic 
+		<< setw(13) << rovibr_losses_effic
+
+		<< setw(13) << h2_dissociated
+		<< setw(13) << h2_solomon_diss_arr.back() / h2_dissociated
+		<< setw(13) << h2_diss_exc_singlet_arr.back() / h2_dissociated 
+		<< setw(13) << h2_diss_excit_electr_triplet_arr.back() / h2_dissociated
+		<< setw(13) << h2_excit_electr_triplet_arr.back() / h2_dissociated 
+		
+		<< setw(13) << h2_excit_electr_arr.back()
+		<< setw(13) << h2_excit_electr_bs_arr.back() / h2_excit_electr_arr.back()
+		<< setw(13) << h2_excit_electr_cp_arr.back() / h2_excit_electr_arr.back()
+		<< setw(13) << h2_excit_electr_bps_arr.back() / h2_excit_electr_arr.back()
+		<< setw(13) << h2_excit_electr_dp_arr.back() / h2_excit_electr_arr.back()
+
+		<< setw(13) << h2_excit_vibr_arr.back() / nb_ions
+		<< setw(13) << h2_excit_vibr_v1_arr.back() / nb_ions
+		<< setw(13) << h2_excit_vibr_v2_arr.back() / h2_excit_vibr_v1_arr.back()
+		<< setw(13) << h2_excit_vibr_v3_arr.back() / h2_excit_vibr_v1_arr.back()
+		<< setw(13) << h2_excit_el_vstate_arr.back()/ nb_ions
+		<< endl;
+	
 	output.close();
 }
 
@@ -1850,15 +1876,15 @@ void init_dust_abund(const string& sim_path, vector<double>& d, double& grain_ra
 }
 
 // for test simulations,
-void init_electron_spectra_test(const string& output_path, dynamic_array& init_data_test, const vector<double>& en_grid,
-	double test_electron_conc, double test_electron_energy)
+void init_electron_spectra_mono(const string& output_path, dynamic_array& init_spectrum, const vector<double>& en_grid,
+	double electron_conc, double electron_energy)
 {
 	int i;
 	double e1, e2, w1, w2;
 
 	// the interval that contains the electron energy is [i, i+1],
 	for (i = 0; i < (int)en_grid.size(); i++) {
-		if (en_grid[i] * (1. - 1.e-9) > test_electron_energy) {
+		if (en_grid[i] * (1. - 1.e-9) > electron_energy) {
 			i--;
 			break;
 		}
@@ -1868,31 +1894,31 @@ void init_electron_spectra_test(const string& output_path, dynamic_array& init_d
 	if (i == (int)en_grid.size()) {
 		i = (int)en_grid.size() - 2;
 	}
-	memset(init_data_test.arr, 0, init_data_test.dim * sizeof(double));
+	memset(init_spectrum.arr, 0, init_spectrum.dim * sizeof(double));
 
 	if (i == (int)en_grid.size() - 2) {
-		init_data_test.arr[i] = test_electron_conc / (en_grid[i + 1] - en_grid[i]);
+		init_spectrum.arr[i] = electron_conc / (en_grid[i + 1] - en_grid[i]);
 	}
 	else {
-		if (test_electron_energy > 0.5 * (en_grid[i + 1] + en_grid[i])) {
+		if (electron_energy > 0.5 * (en_grid[i + 1] + en_grid[i])) {
 			e1 = 0.5 * (en_grid[i + 1] + en_grid[i]);
 			e2 = 0.5 * (en_grid[i + 2] + en_grid[i + 1]);
 			
-			w1 = (e2 - test_electron_energy) / (e2 - e1);
+			w1 = (e2 - electron_energy) / (e2 - e1);
 			w2 = 1. - w1;
 
-			init_data_test.arr[i] = w1 * test_electron_conc / (en_grid[i + 1] - en_grid[i]);
-			init_data_test.arr[i + 1] = w2 * test_electron_conc / (en_grid[i + 2] - en_grid[i + 1]);
+			init_spectrum.arr[i] = w1 * electron_conc / (en_grid[i + 1] - en_grid[i]);
+			init_spectrum.arr[i + 1] = w2 * electron_conc / (en_grid[i + 2] - en_grid[i + 1]);
 		}
 		else {
 			e1 = 0.5 * (en_grid[i] + en_grid[i - 1]);
 			e2 = 0.5 * (en_grid[i + 1] + en_grid[i]);
 			
-			w1 = (e2 - test_electron_energy) / (e2 - e1);
+			w1 = (e2 - electron_energy) / (e2 - e1);
 			w2 = 1. - w1;
 
-			init_data_test.arr[i - 1] = w1 * test_electron_conc / (en_grid[i] - en_grid[i - 1]);
-			init_data_test.arr[i] = w2 * test_electron_conc / (en_grid[i + 1] - en_grid[i]);
+			init_spectrum.arr[i - 1] = w1 * electron_conc / (en_grid[i] - en_grid[i - 1]);
+			init_spectrum.arr[i] = w2 * electron_conc / (en_grid[i + 1] - en_grid[i]);
 		}
 	}
 }

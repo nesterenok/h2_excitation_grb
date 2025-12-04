@@ -11,6 +11,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "constants.h"
 #include "h2_uv_pump_data.h"
@@ -75,6 +76,9 @@ void h2_band_transitions(const std::string& path, std::vector<transition>& einst
 	// transitions EF -> B
 	// Glass-Maujean, Quadrelli & Dressler, Atomic Data and Nuclear Data Tables 30, 273 (1984) - vibrationally resolved Einstein coefficients,
 	// Honl-London factors are used to calculated ro-vibrationally resolved Einstein coefficients,
+	// Comment by M. Glass-Maujean: 
+	// "To get the right non adiabatic transition probabilities, it is not so simple, the Honl-London factors are true in the adiabatic approximation only.
+	// The full equations are in the paper showing the ratio A(R)/A(P) depends strongly of the mixing between parallel and perpendicular transition."
 	else if (h2_excited_di->electronic_state == 10) {
 		name = "EF-B";
 		fname = path + "h2_additional_data/transprob_glass_maujean_ef_b.txt";
@@ -106,7 +110,7 @@ void h2_band_transitions(const std::string& path, std::vector<transition>& einst
 		ss >> e >> v >> j;  // upper level belongs to the excited electronic state,
 		up = h2_excited_di->get_nb(v, j);
 
-		ss >> e >> v >> j;  // lower level belongs to the ground electronic state,
+		ss >> e >> v >> j;  // lower level belongs to the ground (or excited) electronic state,
 		low = h2_di->get_nb(v, j);
 
 		ss >> coeff;  // Einstein coefficients in s-1,
@@ -371,7 +375,7 @@ void h2_excited_state_data(const std::string& data_path, std::vector<h2_energy_l
 				decay_list.push_back(dec_ch);
 			}
 		}
-		prob /= tot_decay_rate;  // making dimensionless
+		prob /= tot_decay_rate;  // dissociation probability, making dimensionless
 
 		parameters = new h2_energy_level_param(i, (int)decay_list.size(), prob, tot_decay_rate, kin_energy);
 
@@ -387,6 +391,7 @@ void h2_excited_state_data(const std::string& data_path, std::vector<h2_energy_l
 }
 
 // A -> B -> X
+// level_data_low must already exist,
 void h2_excited_state_data(const string& path, vector<h2_energy_level_param>& level_data_up, vector<h2_energy_level_param> level_data_low,
 	const energy_diagram* h2_excited_di_up, const energy_diagram* h2_excited_di_low, const vector<transition>& h2_band_up, const vector<transition>& h2_band_low, 
 	int verbosity)
@@ -404,7 +409,7 @@ void h2_excited_state_data(const string& path, vector<h2_energy_level_param>& le
 
 		// Calculation of the total decay rate of the levels of the upper electronic state A
 		for (k = 0; k < (int)(h2_band_up.size()); k++) {
-			if (h2_band_up[k].up_lev.j == h2_excited_di_up->lev_array[i].j && h2_band_up[k].up_lev.v == h2_excited_di_up->lev_array[i].v)
+			if (h2_band_up[k].up_lev.j == h2_excited_di_up->lev_array[i].j && h2_band_up[k].up_lev.v == h2_excited_di_up->lev_array[i].v) 
 			{
 				tot_decay_rate += h2_band_up[k].einst_coeff;  // s-1
 			}

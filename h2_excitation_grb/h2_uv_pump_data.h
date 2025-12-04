@@ -4,7 +4,7 @@
 #include "spectroscopy.h"
 
 // Number of excited electronic states taken into account,
-// B, Bp, Bpp, C, D, Dp, EF, a, b, c, d
+// order - B, C, Bp, D, EF, Bpp, Dp, b, a, c, d
 #define NB_EXC_ELECTRONIC_STATES 11
 
 // Maximal number of rotational levels of the ground electronic state X1Sg (for vibrational state v = 0),
@@ -17,15 +17,18 @@
 #define MAX_NB_H2_VSTATES_C1PU 14   // 0,1,..,13 in CLOUDY
 #define MAX_NB_H2_VSTATES_BP1SU 10  // 0,1,..,9 in CLOUDY
 #define MAX_NB_H2_VSTATES_D1PU 19   // 0,1,..,18 in CLOUDY - for D-; for D+ v=0,1,2; (for C-+, D-+ levels with j=0 were commented in original file);
-#define MAX_NB_H2_VSTATES_EF1SG 33   // 0,1,..32
+#define MAX_NB_H2_VSTATES_EF1SG 33   // 0,1,..32 in data by Scarlett, Glass-Maujean et al. (1984)
 
 // are not used
 #define MAX_NB_H2_VSTATES_BPP1SU 69  // 0,1,..68  M. Glass-Maujean, private communication (2025),
 #define MAX_NB_H2_VSTATES_DP1PU 18   // 0,1,..15 for D'-; 0,1,..17 for D'+ 
 
-#define MAX_H2_VSTATES_a3Sg 21   // 0,1,...,20  Wolniewicz L., Molecular Physics 105, 1497 (2007);
+#define MAX_H2_VSTATES_a3Sg 21   // 0,1,...,20  Wolniewicz L., Molecular Physics 105, 1497 (2007); but 0,1,...,21 Scarlett et al. (2023), private comm.
 #define MAX_H2_VSTATES_c3Pu 21   // 0,1,...,20  Scarlett et al. (2023), private comm.
 #define MAX_H2_VSTATES_d3Pu 21   // 0,1,...,20  Scarlett et al. (2023), private comm.
+
+
+
 
 // The data on Lyman and Werner band transitions is initialized by this function - vector<transition>,
 // H2 energy levels of the excited electronic state and of the ground state must be given,
