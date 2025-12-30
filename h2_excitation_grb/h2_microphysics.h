@@ -294,15 +294,16 @@ public:
 // Scarlett et al., private communication (2023), cross sections for transitions (X,v'',J'') -> (A, v',J')
 // molecular convergent close-coupling method (MCCC), 
 // cross section values in the data file are in a0^2 (Bohr radius squared), a0 = 0.529e-8 cm
-// at high energies, the cross sections are equal to 0.,
+// at high energies, the cross sections are equal to 0., or are extrapolated by power law,
 class cross_section_table_mccc : public cross_section_table
 {
 private:
 	bool is_extrapolation_on;
+	double en0, cs0, gamma2;
 public:	
 	// energy in eV, the cross section in cm2 is returned,
 	// if the energy is < min energy, the cross section at minimal energy is returned,
-	// if the energy is > max energy, the cross section is equal 0.,
+	// if the energy is > max energy, the cross section is equal 0., or are extrapolated by power law,
 	double operator() (double energy) const;
 
 	// path to the data folder, and file name with the path within the data folder must be given:

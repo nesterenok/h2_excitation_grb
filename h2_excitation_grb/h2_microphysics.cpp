@@ -732,27 +732,29 @@ cross_section_table_mccc::cross_section_table_mccc(const std::string& data_path,
 	// the cross section at this energy may not be zero - the reaction without threshold,
 	en_thr = en_arr[0];
 
-	// the value derived from ionization cross section data by Kim & Rudd, Physical Review A 50, p.3954 (1994); 
-	// no relativistic effects, energy region 1.e+3 - 1.e+4 eV
-	gamma = -0.8579128;
+	en0 = 1.e+3;  // eV 
+	gamma = gamma2 = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 2]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 2]);
 	
-/*	if (is_extrapolation_on) {
-		if ((cs_arr[nb_cs - 4] > cs_arr[nb_cs - 3]) && (cs_arr[nb_cs - 3] > cs_arr[nb_cs - 2]) && (cs_arr[nb_cs - 2] > cs_arr[nb_cs - 1]))
-		{
-			gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 2]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 2]);
-			if (gamma >= 0.) {  // -0.5
-				gamma = -10.;  // ???
-			}
-		}
-		else {
-			gamma = -10.;
-			if (verbosity) {
-				cout << "Warning: the cross section does not decrease with increasing energy, file " << endl
-					<< "	" << name << endl
-					<< "	gamma is set equal to -10;" << endl;
-			}
-		}
-	}*/
+	// the value derived from ionization cross section data by Kim & Rudd, Physical Review A 50, p.3954 (1994); 
+	// no relativistic effects, 
+	// E = 500 - 1.e+3 eV  gamma = -0.7610825481
+	// E = 1.e+3 - 1.e+4 eV  gamma = -0.8579127924
+	
+	if (gamma > -0.8579127924 && gamma < -0.7610825481) {
+		gamma2 = -0.8579127924;
+	}
+	else if (gamma > -0.7610825481) {
+		gamma = -0.7610825481;
+		gamma2 = -0.8579127924;
+	}
+
+	if (en_arr[nb_cs - 1] < en0) {
+		cs0 = cs_arr[nb_cs - 1] * pow(en0 / en_arr[nb_cs - 1], gamma);
+	}
+	else {
+		en0 = en_arr[nb_cs - 1];
+		cs0 = cs_arr[nb_cs - 1];
+	}
 }
 
 // be careful with processes having energy threshold,
@@ -768,7 +770,12 @@ double cross_section_table_mccc::operator()(double energy) const
 	}
 	else if (l >= nb_cs - 1) {
 		if (is_extrapolation_on) {
-			answ = cs_arr[nb_cs - 1] * pow(energy / en_arr[nb_cs - 1], gamma);
+			if (energy < en0) {
+				answ = cs_arr[nb_cs - 1] * pow(energy / en_arr[nb_cs - 1], gamma);
+			}
+			else {
+				answ = cs0 * pow(energy / en0, gamma2);
+			}
 		}
 		else {
 			answ = 0.;
@@ -849,6 +856,7 @@ double hei_electron_excitation_spin_forbidden::operator()(double en) const
 
 	return answ;
 }
+
 
 //
 //
@@ -1754,7 +1762,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		enloss_triplet_h2 *= CM_INVERSE_TO_EV;
 		output << left << setw(12) << enloss_triplet_h2;
 
-		// dissociation through 3Su+(e)
+		// dissociation through 3Su+(e), 3Sg+(h), 3Sg+(g), ...
 		enloss_triplet_h2_add = (*h2_3estate_cs)(electron_energies[i]) * h2_3estate_cs->get_threshold_energy() 
 			+ (*h2_3hstate_cs)(electron_energies[i]) * h2_3hstate_cs->get_threshold_energy()
 			+ (*h2_3gstate_cs)(electron_energies[i]) * h2_3gstate_cs->get_threshold_energy()
@@ -2110,3 +2118,23 @@ double h2_excitation_vibr02_cs::operator()(double energy) const
 	double x = en_thr / energy;
 	return alpha * x * x * pow(1. - x, gamma);
 }
+
+
+
+/*	if (is_extrapolation_on) {
+		if ((cs_arr[nb_cs - 4] > cs_arr[nb_cs - 3]) && (cs_arr[nb_cs - 3] > cs_arr[nb_cs - 2]) && (cs_arr[nb_cs - 2] > cs_arr[nb_cs - 1]))
+		{
+			gamma = log(cs_arr[nb_cs - 1] / cs_arr[nb_cs - 2]) / log(en_arr[nb_cs - 1] / en_arr[nb_cs - 2]);
+			if (gamma >= 0.) {  // -0.5
+				gamma = -10.;  // ???
+			}
+		}
+		else {
+			gamma = -10.;
+			if (verbosity) {
+				cout << "Warning: the cross section does not decrease with increasing energy, file " << endl
+					<< "	" << name << endl
+					<< "	gamma is set equal to -10;" << endl;
+			}
+		}
+	}*/

@@ -341,7 +341,7 @@ void h2_excited_state_data(const std::string& data_path, std::vector<h2_energy_l
 			diss_fdata.v = v;
 			diss_fdata.j = j;
 			diss_fdata.prob = prob;
-			diss_fdata.kin_energy = kin_energy * EV_TO_ERGS;  // conversion to erg;
+			diss_fdata.kin_energy = kin_energy;  // in eV;
 
 			diss_fdata_arr.push_back(diss_fdata);
 		}

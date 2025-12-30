@@ -28,15 +28,35 @@ const double log_coulomb_constant = log(1.5 * pow(BOLTZMANN_CONSTANT, 1.5)
 	/ (sqrt(M_PI) * ELECTRON_CHARGE * ELECTRON_CHARGE * ELECTRON_CHARGE)); // * T_e^1.5/n_e^0.5
 
 
+electronic_excitation_data_unit::electronic_excitation_data_unit(const electronic_excitation_data_unit &obj)
+{
+	excit = obj.excit;
+	direct_diss = obj.direct_diss;
+	twostep_diss = obj.twostep_diss;
+	diss_heat_input = obj.diss_heat_input;
+
+	enloss_excit = obj.enloss_excit;
+	enloss_direct_diss = obj.enloss_direct_diss;
+}
+
+electronic_excitation_data_unit& electronic_excitation_data_unit::operator=(const electronic_excitation_data_unit& obj)
+{
+	excit = obj.excit;
+	direct_diss = obj.direct_diss;
+	twostep_diss = obj.twostep_diss;
+	diss_heat_input = obj.diss_heat_input;
+
+	enloss_excit = obj.enloss_excit;
+	enloss_direct_diss = obj.enloss_direct_diss;
+	return *this;
+}
+
+
 elspectra_evolution_data::elspectra_evolution_data(const string& data_path, const string& output_path, double cht, double iof, const vector<double>& en_grid, int verb)
 	: verbosity(verb), conc_h_tot(cht), ioniz_fract(iof), dust_is_presented(false), grain_cs(0.), grain_nb_density(0.),
-	enloss_rate_mt(0.), enloss_rate_h2_rot(0.), enloss_rate_h2_vibr(0.), enloss_rate_h2_exc_singlet(0.), enloss_rate_h2_exc_triplet(0.), enloss_diss_h2_b(0.),
-	enloss_rate_ioniz(0.), enloss_rate_hei(0.), conc_n(0.), conc_i(0.), energy_gain_n(0.), energy_gain_e(0.), nb_gain_n(0.), nb_gain_i(0.), 
-	h2_solomon_diss_rate(0.), h2_diss_exc_singlet_rate(0.), h2_diss_exc_b_rate(0.), hei_exc_rate(0.), 
-	h2_excit_electr_rate(0.), h2_excit_electr_bs_rate(0.), h2_excit_electr_bps_rate(0.), h2_excit_electr_cp_rate(0.), h2_excit_electr_dp_rate(0.), 
-	h2_excit_electr_efs_rate(0.), h2_excit_triplet_rate(0.), h2_excit_vibr_rate(0.), 
-	h2_excit_vibr_v1_rate(0.), h2_excit_vibr_v2_rate(0.), h2_excit_vibr_v3_rate(0.), h2_excit_rot_rate(0.),
-	h2_vstate_el_exc_rate(0.), neutral_coll_heating_rate(0.), indices(0), coll_partn_conc(0), h2_coll(0)
+	enloss_rate_mt(0.), enloss_rate_h2_rot(0.), enloss_rate_h2_vibr(0.), enloss_rate_ioniz(0.), enloss_rate_hei(0.), 
+	conc_n(0.), conc_i(0.), energy_gain_n(0.), energy_gain_e(0.), nb_gain_n(0.), nb_gain_i(0.), hei_exc_rate(0.), 
+	h2_excit_rot_rate(0.), neutral_coll_heating_rate(0.), indices(0), coll_partn_conc(0), h2_coll(0)
 {
 	bool is_extrapolation_on;
 	int i, j, dj, k, li, lf, vi, vf, isotope, electronic_state, diss_data_exists;
@@ -937,8 +957,61 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	h2_d3pu_min_nb = calc_min_energy_of_transition(h2_di_d3, MAX_H2_VSTATES_d3Pu);
 
 	// States below are not dissociative, but are treated as dissociative in order to estimate their effect,
-	// 1Sg(X) -> 3Su+ (e),
-	//...
+#if (ADD_TRIPLET_STATES)
+		// 1Sg(X) -> 3Su+ (e),
+		h2_3estate_tot_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
+		for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
+			ss.clear();
+			ss.str("");
+
+			ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+			ss << vi;
+			ss << "/MCCC-el-H2-e3Su_total.X1Sg_vi=";
+			ss << vi;
+			ss << ".txt";
+
+			fname = ss.str();
+			h2_3estate_tot_cs[vi] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+		}
+		init_tables_h2_electronic_diss(h2_3estate_tot_cs, h2_3estate_tot_rates, h2_e3su_min_nb, verbosity);
+
+		// 1Sg(X) -> 3Sg+(h),
+		h2_3hstate_tot_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
+		for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
+			ss.clear();
+			ss.str("");
+
+			ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+			ss << vi;
+			ss << "/MCCC-el-H2-h3Sg_total.X1Sg_vi=";
+			ss << vi;
+			ss << ".txt";
+
+			fname = ss.str();
+			h2_3hstate_tot_cs[vi] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+		}
+		init_tables_h2_electronic_diss(h2_3hstate_tot_cs, h2_3hstate_tot_rates, h2_h3sg_min_nb, verbosity);
+
+		// 1Sg(X) -> 3Sg+(g),
+		h2_3gstate_tot_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
+		for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
+			ss.clear();
+			ss.str("");
+
+			ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+			ss << vi;
+			ss << "/MCCC-el-H2-g3Sg_total.X1Sg_vi=";
+			ss << vi;
+			ss << ".txt";
+
+			fname = ss.str();
+			h2_3gstate_tot_cs[vi] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+		}
+		init_tables_h2_electronic_diss(h2_3gstate_tot_cs, h2_3gstate_tot_rates, h2_g3sg_min_nb, verbosity);
+
+		// 1Sg(X) -> 3Pg(i),
+		// 1Sg(X) -> 3Dg(j),
+#endif
 
 	// Initialization of HeI excitation cross sections,
 	// only excitation from the ground state 1s2 1S is implemented yet,
@@ -959,6 +1032,11 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	he_nb = nb_of_el_energies + HE_NB;
 	hep_nb = nb_of_el_energies + HE_P_NB;
 	hepp_nb = nb_of_el_energies + HE_PP_NB;
+
+	for (i = 0; i < NB_EXC_ELECTRONIC_STATES; i++) {
+		h2_state_data[i].excit = h2_state_data[i].direct_diss = h2_state_data[i].twostep_diss = 
+			h2_state_data[i].diss_heat_input = h2_state_data[i].enloss_excit = h2_state_data[i].enloss_direct_diss = 0.;
+	}
 }
 
 elspectra_evolution_data::~elspectra_evolution_data()
@@ -1060,10 +1138,20 @@ elspectra_evolution_data::~elspectra_evolution_data()
 	free_2d_array(h2_dstate_diss_rates);
 	free_2d_array(h2_efstate_diss_rates);
 	free_2d_array(h2_3bstate_diss_rates);
-
+	
 	free_2d_array(h2_rot_rates);
 	free_2d_array(h2_rovibr_rates);
 	free_2d_array(hei_rates);
+
+#if(ADD_TRIPLET_STATES)
+	delete[] h2_3estate_tot_cs;
+	delete[] h2_3hstate_tot_cs;
+	delete[] h2_3gstate_tot_cs;
+	
+	free_2d_array(h2_3estate_tot_rates);
+	free_2d_array(h2_3hstate_tot_rates);
+	free_2d_array(h2_3gstate_tot_rates);
+#endif
 }
 
 void elspectra_evolution_data::init_tables_ionization(electron_impact_ionization * cs,
@@ -1545,16 +1633,13 @@ int elspectra_evolution_data::get_level_nb_h2(int v, int j) const
 }
 
 void elspectra_evolution_data::get_el_energy_losses(double& mt, double& h2_rot, double& h2_rot_p, double &h2_vibr, double& h2_vibr_p, 
-	double &h2_electr_sin, double &h2_electr_tri, double& ion, double& hei, double & el_coul, 
-	double & diss_decay_heat, double& neut_heat_coll) const
+	double& ion, double& hei, double & el_coul, double& neut_heat_coll) const
 {
 	// [eV cm-3 s-1]
 	h2_rot = enloss_rate_h2_rot;
 	h2_rot_p = enloss_rate_h2_rot_pos;
 	h2_vibr = enloss_rate_h2_vibr;
 	h2_vibr_p = enloss_rate_h2_vibr_pos;
-	h2_electr_sin = enloss_rate_h2_exc_singlet + enloss_diss_h2_singlet;  // via excitation of singlet H2 states (including direct dissociation)
-	h2_electr_tri = enloss_rate_h2_exc_triplet + enloss_diss_h2_b;        // triplet H2 states, a3,c3,d3 excitation, and dissociation through b3 
 	ion = enloss_rate_ioniz;
 	hei = enloss_rate_hei;
 
@@ -1562,52 +1647,40 @@ void elspectra_evolution_data::get_el_energy_losses(double& mt, double& h2_rot, 
 	mt = enloss_rate_mt;
 	el_coul = enloss_rate_coulomb_el;                        // Coulomb losses (collisions with thermal electrons), fast electrons lose energy
 	neut_heat_coll = neutral_coll_heating_rate;              // collisions of excited H2 with H2 and He,
-	diss_decay_heat = diss_decay_heating_rate / EV_TO_ERGS;  // in eV, heating due to dissociative excitation of H2 (B, Bp, C, D, EF), and triplet states
 }
 
-
-void elspectra_evolution_data::get_h2_diss_rates(double& sol_diss, double& diss_excit_sin, double& diss_excit_tri, double& excit_tri)
+void elspectra_evolution_data::get_h2_state_data(array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> & data)
 {
-	// [cm-3 s-1]
-	sol_diss = h2_solomon_diss_rate;
-	diss_excit_sin = h2_diss_exc_singlet_rate; 
-	// all excitations to triplet states eventually lead to dissociation
-	diss_excit_tri = h2_diss_exc_b_rate + h2_excit_triplet_rate; 		
-	excit_tri = h2_excit_triplet_rate;    // triplet state a3Sg, c3Pu, d3Pu (without dissociation to continuum)
-
+	for (int i = 0; i < NB_EXC_ELECTRONIC_STATES; i++) {
+		data[i].direct_diss = h2_state_data[i].direct_diss;
+		data[i].diss_heat_input = h2_state_data[i].diss_heat_input;
+		data[i].enloss_direct_diss = h2_state_data[i].enloss_direct_diss;
+		data[i].enloss_excit = h2_state_data[i].enloss_excit;
+		data[i].excit = h2_state_data[i].excit;
+		data[i].twostep_diss = h2_state_data[i].twostep_diss;
+	}
 }
 
-void elspectra_evolution_data::get_h2_process_rates(double& excit_electr_rate, double& excit_vibr_rate, double& excit_rot_rate, 
-	double& excit_electr_bs_rate,  double& excit_electr_bps_rate, double& excit_electr_cp_rate, double& excit_electr_dp_rate,
-	double& excit_vibr_v1_rate, double& excit_vibr_v2_rate, double& excit_vibr_v3_rate, double& el_excit_vstate_rate, double & hei_excit)
+void elspectra_evolution_data::get_h2_excitation_rates(dynamic_array& electr_vstate_exc, dynamic_array& vibr_vstate_exc,
+	double& excit_rot_rate, double & hei_excit)
 {
 	// [cm-3 s-1]
-	excit_electr_rate = h2_excit_electr_rate;  // excitation to bound singlet states (dissociation is not included)
-	excit_vibr_rate = h2_excit_vibr_rate;      // vi = 0 -> vf > 0 within the ground electronic state,
 	excit_rot_rate = h2_excit_rot_rate;        // pure rotational excitation rate from v= 0, j = 0 or j = 1, to level with j > 1[cm-3 s-1]
-
-	// dissociation must be included??
-	excit_electr_bs_rate = h2_excit_electr_bs_rate;   // singlet state S1u+(B), including S1g+(EF), direct excitation to continuum is not included
-	excit_electr_bps_rate = h2_excit_electr_bps_rate; // singlet state S1u+(B primed),
-
-	excit_electr_cp_rate = h2_excit_electr_cp_rate;  // P1u(C)
-	excit_electr_dp_rate = h2_excit_electr_dp_rate;  // P1u(D)
-
-	// only ro-vibrational excitation is taken into account,	
-	excit_vibr_v1_rate = h2_excit_vibr_v1_rate;  // vi = 0 -> vf = 1,
-	excit_vibr_v2_rate = h2_excit_vibr_v2_rate;  // vi = 0,1 -> vf = 2,
-	excit_vibr_v3_rate = h2_excit_vibr_v3_rate;  // vi = 0,1,2 -> vf = 3,
-	
-	// electronic excitation of a particular vibrational state, 
-	el_excit_vstate_rate = h2_vstate_el_exc_rate;
-	
 	hei_excit = hei_exc_rate;
+
+	
+	for (int i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
+		// only ro-vibrational excitation is taken into account, vi -> vf, vi < vf
+		vibr_vstate_exc.arr[i] = h2_vibrational_exc_vstates[i];
+		// electronic excitation of vibrational states	
+		electr_vstate_exc.arr[i] = h2_electronic_exc_vstates[i];
+	}
 }
 
 int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 {
 	int i, j;
-	double a, x1, x2, rate, log_coulomb, conc_ph2, down_rate, up_rate, scaling_factor;
+	double a, x1, x2, rate, log_coulomb, conc_ph2, down_rate, up_rate, scaling_factor, enloss_rate, excit_rate, diss_rate, twostep_diss_rate, heating_rate;
 
 	realtype* y_data, * ydot_data;
 	y_data = NV_DATA_S(y);
@@ -1725,60 +1798,58 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	ydot_data[el_nb] += rate;
 #endif
 
-	// H2 electronic states excitation,
-	// thermal energy, gained by neutral gas per s, due to dissociative decay of excited H2, [erg cm-3 s-1],
-	diss_decay_heating_rate = 0.;
-	
-	// electron energy loss rate, [eV cm-3 s-1],
-	enloss_rate_h2_exc_singlet = enloss_diss_h2_singlet = enloss_rate_h2_exc_triplet = enloss_diss_h2_b = 0.;
-	
-	// H2 dissociation rate, [cm-3 s-1],
-	h2_solomon_diss_rate = h2_diss_exc_singlet_rate = h2_diss_exc_b_rate = 0.;
-
-	// [cm-3 s-1], only pure excitations, without dissociative excitations
-	h2_excit_electr_rate = h2_excit_electr_bs_rate = h2_excit_electr_bps_rate = h2_excit_electr_cp_rate = h2_excit_electr_dp_rate 
-		= h2_excit_electr_efs_rate = h2_excit_triplet_rate = 0.;
-
-	// Electronic excitation of the particular vibrational state of the ground electronic state, [cm-3 s-1],
-	// vibrational quantum number = CALC_EL_PUMPING_VSTATE_NB, 
-	h2_vstate_el_exc_rate = 0.;
+	// Electronic excitation of vibrational states of the ground electronic state, [cm-3 s-1],
+	for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
+		h2_electronic_exc_vstates[i] = 0.;
+	}
 	
 	// 1Su+(X) -> 1Su+(B)
 	scaling_factor = 1.;
 	derivatives_h2_electronic_sg_su(y_data, ydot_data, h2_di_b, h2_b_state_data, h2_bstate_rates, MAX_NB_H2_VSTATES_B1SU, h2_b1su_min_nb, 
-		enloss_rate_h2_exc_singlet, h2_solomon_diss_rate, h2_excit_electr_bs_rate, diss_decay_heating_rate, h2_vstate_el_exc_rate, scaling_factor);
+		enloss_rate, excit_rate, twostep_diss_rate, heating_rate, h2_electronic_exc_vstates, scaling_factor);
 
-	h2_excit_electr_rate += h2_excit_electr_bs_rate;
-	h2_state_data[0].excit = h2_excit_electr_bs_rate;
-	h2_state_data[0].twostep_diss = h2_solomon_diss_rate;
-	h2_state_data[0].diss_heat_input = diss_decay_heating_rate;
-
-	// 1Su(X) -> 1Su+(Bp)
-	derivatives_h2_electronic_sg_su(y_data, ydot_data, h2_di_bp, h2_bp_state_data, h2_bpstate_rates, MAX_NB_H2_VSTATES_BP1SU, h2_bp1su_min_nb, 
-		enloss_rate_h2_exc_singlet, h2_solomon_diss_rate, h2_excit_electr_bps_rate, diss_decay_heating_rate, h2_vstate_el_exc_rate, scaling_factor);
-
-	h2_excit_electr_rate += h2_excit_electr_bps_rate;
+	h2_state_data[0].enloss_excit = enloss_rate;
+	h2_state_data[0].excit = excit_rate;
+	h2_state_data[0].twostep_diss = twostep_diss_rate;
+	h2_state_data[0].diss_heat_input = heating_rate;
 
 	// 1Su(X) -> 1Pu(C-/+)
 	derivatives_h2_electronic_sg_pu(y_data, ydot_data, h2_di_cplus, h2_di_cminus, h2_cplus_state_data, h2_cminus_state_data,
-		h2_cstate_rates, MAX_NB_H2_VSTATES_C1PU, h2_c1pu_min_nb, enloss_rate_h2_exc_singlet, h2_solomon_diss_rate, h2_excit_electr_cp_rate, 
-		diss_decay_heating_rate, h2_vstate_el_exc_rate, scaling_factor);
+		h2_cstate_rates, MAX_NB_H2_VSTATES_C1PU, h2_c1pu_min_nb, enloss_rate, excit_rate, twostep_diss_rate, heating_rate,
+		h2_electronic_exc_vstates, scaling_factor);
 
-	h2_excit_electr_rate += h2_excit_electr_cp_rate;
+	h2_state_data[1].enloss_excit = enloss_rate;
+	h2_state_data[1].excit = excit_rate;
+	h2_state_data[1].twostep_diss = twostep_diss_rate;
+	h2_state_data[1].diss_heat_input = heating_rate;
+
+	// 1Su(X) -> 1Su+(Bp)
+	derivatives_h2_electronic_sg_su(y_data, ydot_data, h2_di_bp, h2_bp_state_data, h2_bpstate_rates, MAX_NB_H2_VSTATES_BP1SU, h2_bp1su_min_nb, 
+		enloss_rate, excit_rate, twostep_diss_rate, heating_rate, h2_electronic_exc_vstates, scaling_factor);
+
+	h2_state_data[2].enloss_excit = enloss_rate;
+	h2_state_data[2].excit = excit_rate;
+	h2_state_data[2].twostep_diss = twostep_diss_rate;
+	h2_state_data[2].diss_heat_input = heating_rate;
 
 	// 1Su(X) -> 1Pu(D-/+)
 	derivatives_h2_electronic_sg_pu(y_data, ydot_data, h2_di_dplus, h2_di_dminus, h2_dplus_state_data, h2_dminus_state_data,
-		h2_dstate_rates, MAX_NB_H2_VSTATES_D1PU, h2_d1pu_min_nb, enloss_rate_h2_exc_singlet, h2_solomon_diss_rate, h2_excit_electr_dp_rate,
-		diss_decay_heating_rate, h2_vstate_el_exc_rate, scaling_factor);
+		h2_dstate_rates, MAX_NB_H2_VSTATES_D1PU, h2_d1pu_min_nb, enloss_rate, excit_rate, twostep_diss_rate, heating_rate, 
+		h2_electronic_exc_vstates, scaling_factor);
 
-	h2_excit_electr_rate += h2_excit_electr_dp_rate;
+	h2_state_data[3].enloss_excit = enloss_rate;
+	h2_state_data[3].excit = excit_rate;
+	h2_state_data[3].twostep_diss = twostep_diss_rate;
+	h2_state_data[3].diss_heat_input = heating_rate;
 
 	// 1Su(X) -> 1Sg(EF)
 	derivatives_h2_electronic_sg_sg(y_data, ydot_data, h2_di_ef, h2_ef_state_data, h2_efstate_rates, MAX_NB_H2_VSTATES_EF1SG, h2_ef1sg_min_nb,
-		enloss_rate_h2_exc_singlet, h2_solomon_diss_rate, h2_excit_electr_efs_rate, diss_decay_heating_rate, h2_vstate_el_exc_rate, scaling_factor);
+		enloss_rate, excit_rate, twostep_diss_rate, heating_rate, h2_electronic_exc_vstates, scaling_factor);
 
-	h2_excit_electr_bs_rate += h2_excit_electr_efs_rate;
-	h2_excit_electr_rate += h2_excit_electr_efs_rate;
+	h2_state_data[4].enloss_excit = enloss_rate;
+	h2_state_data[4].excit = excit_rate;
+	h2_state_data[4].twostep_diss = twostep_diss_rate;
+	h2_state_data[4].diss_heat_input = heating_rate;
 
 	// additional electronic states
 	// 1Su(X) -> 1Su+(Bpp), 
@@ -1787,79 +1858,149 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	// Padovani et al. A&A, 682, A131 (2024); Zammit et al. Phys. Rev. A 95, 022708 (2017b)
 	scaling_factor = 0.35;
 	derivatives_h2_electronic_sg_su(y_data, ydot_data, h2_di_bpp, h2_bpp_state_data, h2_bpstate_rates, MAX_NB_H2_VSTATES_BP1SU, h2_bp1su_min_nb, 
-		enloss_rate_h2_exc_singlet, h2_solomon_diss_rate, h2_excit_electr_rate, diss_decay_heating_rate, h2_vstate_el_exc_rate, scaling_factor);
+		enloss_rate, excit_rate, twostep_diss_rate, heating_rate, h2_electronic_exc_vstates, scaling_factor);
+
+	h2_state_data[5].enloss_excit = enloss_rate;
+	h2_state_data[5].excit = excit_rate;
+	h2_state_data[5].twostep_diss = twostep_diss_rate;
+	h2_state_data[5].diss_heat_input = heating_rate;
 
 	// the same cross sections as for the D (3ps) state, scaling factor is 0.4,
 	scaling_factor = 0.4;
 	derivatives_h2_electronic_sg_pu(y_data, ydot_data, h2_di_dprimed_plus, h2_di_dprimed_minus, h2_dprimed_plus_state_data, h2_dprimed_minus_state_data,
-		h2_dstate_rates, MAX_NB_H2_VSTATES_D1PU, h2_d1pu_min_nb, enloss_rate_h2_exc_singlet, h2_solomon_diss_rate, h2_excit_electr_rate,
-		diss_decay_heating_rate, h2_vstate_el_exc_rate, scaling_factor);
+		h2_dstate_rates, MAX_NB_H2_VSTATES_D1PU, h2_d1pu_min_nb, enloss_rate, excit_rate, twostep_diss_rate, heating_rate, 
+		h2_electronic_exc_vstates, scaling_factor);
+
+	h2_state_data[6].enloss_excit = enloss_rate;
+	h2_state_data[6].excit = excit_rate;
+	h2_state_data[6].twostep_diss = twostep_diss_rate;
+	h2_state_data[6].diss_heat_input = heating_rate;
 
 	// dissociative excitation,
 	// This process must be accompanied by the heating of the gas - is not taken into account yet,
 	// 1Su+(B)
 	derivatives_h2_electronic_diss(y_data, ydot_data, h2_bstate_diss_cs, h2_bstate_diss_rates, h2_b1su_diss_min_nb, 
-		enloss_diss_h2_singlet, h2_diss_exc_singlet_rate);
+		enloss_rate, diss_rate);
 
-	// 1Su+(Bp)
-	derivatives_h2_electronic_diss(y_data, ydot_data, h2_bpstate_diss_cs, h2_bpstate_diss_rates, h2_bp1su_diss_min_nb,
-		enloss_diss_h2_singlet, h2_diss_exc_singlet_rate);
+	h2_state_data[0].enloss_direct_diss = enloss_rate;
+	h2_state_data[0].direct_diss = diss_rate;
 
 	// 1Pu(C)
 	derivatives_h2_electronic_diss(y_data, ydot_data, h2_cstate_diss_cs, h2_cstate_diss_rates, h2_c1pu_diss_min_nb,
-		enloss_diss_h2_singlet, h2_diss_exc_singlet_rate);
+		enloss_rate, diss_rate);
+
+	h2_state_data[1].enloss_direct_diss = enloss_rate;
+	h2_state_data[1].direct_diss = diss_rate;
+
+	// 1Su+(Bp)
+	derivatives_h2_electronic_diss(y_data, ydot_data, h2_bpstate_diss_cs, h2_bpstate_diss_rates, h2_bp1su_diss_min_nb,
+		enloss_rate, diss_rate);
+
+	h2_state_data[2].enloss_direct_diss = enloss_rate;
+	h2_state_data[2].direct_diss = diss_rate;
 
 	// 1Pu(D)
 	derivatives_h2_electronic_diss(y_data, ydot_data, h2_dstate_diss_cs, h2_dstate_diss_rates, h2_d1pu_diss_min_nb,
-		enloss_diss_h2_singlet, h2_diss_exc_singlet_rate);
+		enloss_rate, diss_rate);
+
+	h2_state_data[3].enloss_direct_diss = enloss_rate;
+	h2_state_data[3].direct_diss = diss_rate;
 
 	// 1Sg+(EF)
 	derivatives_h2_electronic_diss(y_data, ydot_data, h2_efstate_diss_cs, h2_efstate_diss_rates, h2_ef1sg_diss_min_nb,
-		enloss_diss_h2_singlet, h2_diss_exc_singlet_rate);
+		enloss_rate, diss_rate);
+
+	h2_state_data[4].enloss_direct_diss = enloss_rate;
+	h2_state_data[4].direct_diss = diss_rate;
 
 	//
 	// Triplet states,
 	// s3u(b) (fully dissociative)
+	// all the excitation to triplet states eventually lead to the dissociation,
+	// the energy distribution of H atoms has a peak around 5.5 eV (for H2 in v=0);  
+	// Trevisan & Tennyson, Plasma Phys. Control. Fusion 44, 1263 (2002); Dalgarno et al. ApJ Suppl. Ser. 125, p.237 (1999)
 	derivatives_h2_electronic_diss(y_data, ydot_data, h2_3bstate_diss_cs, h2_3bstate_diss_rates, h2_b3su_diss_min_nb, 
-		enloss_diss_h2_b, h2_diss_exc_b_rate);
+		enloss_rate, diss_rate);
+
+	h2_state_data[7].enloss_direct_diss = enloss_rate;
+	h2_state_data[7].direct_diss = diss_rate;
+	h2_state_data[7].diss_heat_input = 5.5 * diss_rate;  // [eV cm-3 s-1]
 
 	// S1g(X) -> S3g+(a)
+	// energy distribution of H atoms for v = 0, Liu et al. ApJ 716, 701 (2010)
 	derivatives_h2_electronic_sg_sg_triplet(y_data, ydot_data, h2_di_a3, h2_3astate_rates, MAX_H2_VSTATES_a3Sg, h2_a3sg_min_nb,
-		enloss_rate_h2_exc_triplet, h2_excit_triplet_rate);
+		enloss_rate, excit_rate);
+
+	h2_state_data[8].enloss_excit = enloss_rate;
+	h2_state_data[8].excit = excit_rate;
+	h2_state_data[8].diss_heat_input = 3. * excit_rate;  // kinetic energy of both H atoms
 
 	// S1g(X) -> P3u(c)
 	derivatives_h2_electronic_sg_pu_triplet(y_data, ydot_data, h2_di_c3, h2_3cstate_rates, MAX_H2_VSTATES_c3Pu, h2_c3pu_min_nb,
-		enloss_rate_h2_exc_triplet, h2_excit_triplet_rate);
+		enloss_rate, excit_rate);
+
+	h2_state_data[9].enloss_excit = enloss_rate;
+	h2_state_data[9].excit = excit_rate;
+	h2_state_data[9].diss_heat_input = 3. * excit_rate;
 
 	// S1g(X) -> P3u(d)
 	derivatives_h2_electronic_sg_pu_triplet(y_data, ydot_data, h2_di_d3, h2_3dstate_rates, MAX_H2_VSTATES_d3Pu, h2_d3pu_min_nb,
-		enloss_rate_h2_exc_triplet, h2_excit_triplet_rate);
+		enloss_rate, excit_rate);
 
-	// all the excitation to triplet states eventually lead to the dissociation,
-	// the energy distribution of H atoms is uncertain but cannot be much different from a mean of 5.4 eV 
-	// Dalgarno et al. ApJ Suppl. Ser. 125, p.237 (1999)
-	diss_decay_heating_rate += 5.4 * EV_TO_ERGS * (h2_diss_exc_b_rate + h2_excit_triplet_rate);
+	h2_state_data[10].enloss_excit = enloss_rate;
+	h2_state_data[10].excit = excit_rate;
+	h2_state_data[10].diss_heat_input = 3. * excit_rate;
+
+#if(ADD_TRIPLET_STATES)
+	derivatives_h2_electronic_diss(y_data, ydot_data, h2_3estate_tot_cs, h2_3estate_tot_rates, h2_e3su_min_nb,
+		enloss_rate, diss_rate);
+	
+	h2_state_data[11].enloss_direct_diss = enloss_rate;
+	h2_state_data[11].direct_diss = diss_rate;
+	h2_state_data[11].diss_heat_input = 3. * diss_rate;  // [eV cm-3 s-1]
+
+	derivatives_h2_electronic_diss(y_data, ydot_data, h2_3hstate_tot_cs, h2_3hstate_tot_rates, h2_h3sg_min_nb,
+		enloss_rate, diss_rate);
+
+	h2_state_data[11].enloss_direct_diss += enloss_rate;
+	h2_state_data[11].direct_diss += diss_rate;
+	h2_state_data[11].diss_heat_input += 3. * diss_rate;  // [eV cm-3 s-1]
+
+	derivatives_h2_electronic_diss(y_data, ydot_data, h2_3gstate_tot_cs, h2_3gstate_tot_rates, h2_g3sg_min_nb,
+		enloss_rate, diss_rate);
+
+	h2_state_data[11].enloss_direct_diss += enloss_rate;
+	h2_state_data[11].direct_diss += diss_rate;
+	h2_state_data[11].diss_heat_input += 3. * diss_rate;  // [eV cm-3 s-1]
+#endif
 
 	// the decrease of population densities of H2 is taken into account in the functions above,
-	// all excitations to triplet states lead eventually to dissociation, 
-	x1 = h2_solomon_diss_rate + h2_diss_exc_singlet_rate + h2_diss_exc_b_rate + h2_excit_triplet_rate;
+	// all excitations to triplet states lead eventually to dissociation,
+	x1 = 0.;
+	for (i = 0; i < NB_EXC_ELECTRONIC_STATES; i++) {
+		x1 += h2_state_data[i].direct_diss + h2_state_data[i].twostep_diss;
+		energy_gain_n += h2_state_data[i].diss_heat_input;  // [erg cm-3 s-1]
+	}
+
 	ydot_data[h2_nb] -= x1;
 	ydot_data[h_nb] += 2. * x1;
 
-	energy_gain_n += diss_decay_heating_rate;  // [erg cm-3 s-1]
-	
 	// if electrons loose energy, the gain is negative, < 0
 	// pos means positive, e.g. only collisions in which electrons gain energy are taken into account,
 	enloss_rate_h2_rot = enloss_rate_h2_vibr = enloss_rate_h2_rot_pos = enloss_rate_h2_vibr_pos = 0.;  // [eV cm-3 s-1]
-	h2_excit_vibr_rate = h2_excit_vibr_v1_rate = h2_excit_vibr_v2_rate = h2_excit_vibr_v3_rate = h2_excit_rot_rate = 0.;  // [cm-3 s-1],
+	h2_excit_rot_rate = 0.;  // [cm-3 s-1],
+
+	// Vibrational excitation of vibrational states of the ground electronic state, [cm-3 s-1],
+	for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
+		h2_vibrational_exc_vstates[i] = 0.;
+	}
 
 #if (ROVIBRATIONAL_EXC_LOSSES)
 	// pure H2 rotational excitation,
 	derivatives_h2_rotational_exc(y_data, ydot_data, h2_rot_rates, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, h2_excit_rot_rate);
 
 	// H2 ro-vibrational excitation, 
-	derivatives_h2_rovibr_exc(y_data, ydot_data, h2_rovibr_rates, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos, 
-		h2_excit_vibr_rate, h2_excit_vibr_v1_rate, h2_excit_vibr_v2_rate, h2_excit_vibr_v3_rate);
+	derivatives_h2_rovibr_exc(y_data, ydot_data, h2_rovibr_rates, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos, h2_vibrational_exc_vstates);
 	
 	// energy losses related to vibrational excitation include energy loss due to pure rotational excitation,
 	enloss_rate_h2_vibr += enloss_rate_h2_rot;
@@ -2007,13 +2148,13 @@ void elspectra_evolution_data::derivatives_ionization(const realtype* y_data, re
 
 void elspectra_evolution_data::derivatives_h2_electronic_sg_su(const realtype* y_data, realtype* ydot_data, 
 	const energy_diagram* h2_di_exc, const vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb, 
-	double& enloss_rate, double& diss_rate, double& excit_rate, double& th_energy_deriv, double& vstate_exc_rate, double scaling_factor)
+	double& enloss_rate, double& excit_rate, double& diss_rate, double& th_energy_deriv, double(&vstate_exc)[MAX_NB_H2_VSTATES_X1SG], double scaling_factor)
 {
 	int i, k, j, n, dj, vi, vf, low, up;
-	double dissr, excr, v_excr, enl, th_en;
+	double dissr, excr,enl, th_en;
 
-	excr = v_excr = dissr = enl = th_en = 0.;
-#pragma omp parallel reduction(+: dissr, excr, v_excr, enl, th_en) private(i, k, n, dj, j, vi, vf, low, up)
+	excr = dissr = enl = th_en = 0.;
+#pragma omp parallel reduction(+: dissr, excr, enl, th_en) private(i, k, n, dj, j, vi, vf, low, up)
 	{
 		int i0;
 		double en, x, y, f, w1, w2, delta_en;
@@ -2023,6 +2164,9 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_su(const realtype* y
 
 		double* arr_el = new double[nb_of_el_energies];
 		memset(arr_el, 0, nb_of_el_energies * sizeof(double));
+
+		double* arr_v = new double[MAX_NB_H2_VSTATES_X1SG];
+		memset(arr_v, 0, MAX_NB_H2_VSTATES_X1SG * sizeof(double));
 
 #pragma omp for schedule(dynamic, 1)
 		for (low = 0; low < nb_lev_h2; low++)
@@ -2094,15 +2238,13 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_su(const realtype* y
 								arr_h2[i] += x;
 
 								// excitation rate of the particular vibrational state of the ground electronic state,
-								if (get_vibr_nb_h2(i) == CALC_EL_PUMPING_VSTATE_NB) {
-									v_excr += x;
-								}
+								arr_v[ get_vibr_nb_h2(i) ] += x;
 							}
 							// the downward transition (dissociative) to the vibrational continuum, 
 							dissr += y * lev_param_ref.diss_prob;  // [cm-3 s-1]
 
 							// thermal energy gain by neutral gas per s,
-							th_en += y * lev_param_ref.diss_prob * lev_param_ref.kin_energy;  // [erg cm-3 s-1]
+							th_en += y * lev_param_ref.diss_prob * lev_param_ref.kin_energy;  // [eV cm-3 s-1]
 
 							// summed excitation rate, X -> A [cm-3 s-1]
 							excr += y;
@@ -2120,28 +2262,30 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_su(const realtype* y
 			for (i = 0; i < nb_lev_h2; i++) {
 				ydot_data[h2eq_nb + i] += arr_h2[i];
 			}
+			for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
+				vstate_exc[i] += arr_v[i];
+			}
 		}
 		delete[] arr_h2;
 		delete[] arr_el;
+		delete[] arr_v;
 	}
 
-	excit_rate += excr;
-	vstate_exc_rate += v_excr;
-
-	diss_rate += dissr;
-	enloss_rate += enl;
-	th_energy_deriv += th_en;
+	enloss_rate = enl;
+	excit_rate = excr;
+	diss_rate = dissr;
+	th_energy_deriv = th_en;
 }
 
 void elspectra_evolution_data::derivatives_h2_electronic_sg_sg(const realtype* y_data, realtype* ydot_data, 
 	const energy_diagram* h2_di_exc, const vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb, 
-	double& enloss_rate, double& diss_rate, double& excit_rate, double& th_energy_deriv, double& vstate_exc_rate, double scaling_factor)
+	double& enloss_rate, double& excit_rate, double& diss_rate, double& th_energy_deriv, double(&vstate_exc)[MAX_NB_H2_VSTATES_X1SG], double scaling_factor)
 {
 	int i, k, j, n, dj, vi, vf, low, up;
-	double dissr, excr, v_excr, enl, th_en;
+	double dissr, excr, enl, th_en;
 
-	excr = v_excr = dissr = enl = th_en = 0.;
-#pragma omp parallel reduction(+: dissr, excr, v_excr, enl, th_en) private(i, k, n, dj, j, vi, vf, low, up)
+	excr = dissr = enl = th_en = 0.;
+#pragma omp parallel reduction(+: dissr, excr, enl, th_en) private(i, k, n, dj, j, vi, vf, low, up)
 	{
 		int i0;
 		double en, x, y, f, w1, w2, delta_en;
@@ -2151,6 +2295,9 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_sg(const realtype* y
 
 		double* arr_el = new double[nb_of_el_energies];
 		memset(arr_el, 0, nb_of_el_energies * sizeof(double));
+
+		double* arr_v = new double[MAX_NB_H2_VSTATES_X1SG];
+		memset(arr_v, 0, MAX_NB_H2_VSTATES_X1SG * sizeof(double));
 
 #pragma omp for schedule(dynamic, 1)
 		for (low = 0; low < nb_lev_h2; low++)
@@ -2222,15 +2369,13 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_sg(const realtype* y
 								arr_h2[i] += x;
 
 								// excitation rate of the particular vibrational state of the ground electronic state,
-								if (get_vibr_nb_h2(i) == CALC_EL_PUMPING_VSTATE_NB) {
-									v_excr += x;
-								}
+								arr_v[get_vibr_nb_h2(i)] += x;
 							}
 							// the downward transition (dissociative) to the vibrational continuum, 
 							dissr += y * lev_param_ref.diss_prob;  // [cm-3 s-1]
 
 							// thermal energy gain by neutral gas per s,
-							th_en += y * lev_param_ref.diss_prob * lev_param_ref.kin_energy;  // [erg cm-3 s-1]
+							th_en += y * lev_param_ref.diss_prob * lev_param_ref.kin_energy;  // [eV cm-3 s-1]
 
 							// summed excitation rate, X -> A [cm-3 s-1]
 							excr += y;
@@ -2248,29 +2393,31 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_sg(const realtype* y
 			for (i = 0; i < nb_lev_h2; i++) {
 				ydot_data[h2eq_nb + i] += arr_h2[i];
 			}
+			for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
+				vstate_exc[i] += arr_v[i];
+			}
 		}
 		delete[] arr_h2;
 		delete[] arr_el;
+		delete[] arr_v;
 	}
 
-	excit_rate += excr;
-	vstate_exc_rate += v_excr;
-
-	diss_rate += dissr;
-	enloss_rate += enl;
-	th_energy_deriv += th_en;
+	enloss_rate = enl;
+	excit_rate = excr;
+	diss_rate = dissr;
+	th_energy_deriv = th_en;
 }
 
 void elspectra_evolution_data::derivatives_h2_electronic_sg_pu(const realtype* y_data, realtype* ydot_data,
 	const energy_diagram* h2_di_plus, const energy_diagram* h2_di_minus, 
 	const vector<h2_energy_level_param> h2_state_plus_data, const vector<h2_energy_level_param> h2_state_minus_data, double** rates, int vibr_qnb_final_max, 
-	int el_min_nb, double& enloss_rate, double& diss_rate, double& excit_rate, double& th_energy_deriv, double& vstate_exc_rate, double scaling_factor)
+	int el_min_nb, double& enloss_rate, double& excit_rate, double& diss_rate, double& th_energy_deriv, double(&vstate_exc)[MAX_NB_H2_VSTATES_X1SG], double scaling_factor)
 {
 	int i, k, j, n, dj, vi, vf, low, up;
-	double excr, v_excr, dissr, enl, th_en;
+	double excr, dissr, enl, th_en;
 
-	excr = v_excr = dissr = enl = th_en = 0.;
-#pragma omp parallel reduction(+: excr, v_excr, dissr, enl, th_en) private(i, k, n, dj, j, vi, vf, low, up)
+	excr = dissr = enl = th_en = 0.;
+#pragma omp parallel reduction(+: excr, dissr, enl, th_en) private(i, k, n, dj, j, vi, vf, low, up)
 	{
 		int i0;
 		double x, y, f, en, w1, w2, delta_en;
@@ -2280,6 +2427,9 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu(const realtype* y
 
 		double* arr_el = new double[nb_of_el_energies];
 		memset(arr_el, 0, nb_of_el_energies * sizeof(double));
+
+		double* arr_v = new double[MAX_NB_H2_VSTATES_X1SG];
+		memset(arr_v, 0, MAX_NB_H2_VSTATES_X1SG * sizeof(double));
 
 #pragma omp for schedule(dynamic, 1)
 		for (low = 0; low < nb_lev_h2; low++)
@@ -2353,15 +2503,13 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu(const realtype* y
 								arr_h2[i] += x;
 
 								// excitation rate of the particular vibrational state of the ground electronic state,
-								if (get_vibr_nb_h2(i) == CALC_EL_PUMPING_VSTATE_NB) {
-									v_excr += x;
-								}
+								arr_v[get_vibr_nb_h2(i)] += x;
 							}
 							// the downward transition (dissociative) to the vibrational continuum, 
 							dissr += y * lev_param_ref.diss_prob;  // [cm-3 s-1]
 
 							// thermal energy gain by neutral gas per s,
-							th_en += y * lev_param_ref.diss_prob * lev_param_ref.kin_energy;  // [erg cm-3 s-1]
+							th_en += y * lev_param_ref.diss_prob * lev_param_ref.kin_energy;  // [eV cm-3 s-1]
 
 							// summed excitation rate, [cm-3 s-1]
 							excr += y;
@@ -2430,9 +2578,7 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu(const realtype* y
 								arr_h2[i] += x;
 
 								// excitation rate of the particular vibrational state of the ground electronic state,
-								if (get_vibr_nb_h2(i) == CALC_EL_PUMPING_VSTATE_NB) {
-									v_excr += x;
-								}
+								arr_v[get_vibr_nb_h2(i)] += x;
 							}
 
 							dissr += y * lev_param_ref.diss_prob;
@@ -2452,17 +2598,19 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu(const realtype* y
 			for (i = 0; i < nb_lev_h2; i++) {
 				ydot_data[h2eq_nb + i] += arr_h2[i];
 			}
+			for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
+				vstate_exc[i] += arr_v[i];
+			}
 		}
 		delete[] arr_h2;
 		delete[] arr_el;
+		delete[] arr_v;
 	}
 
-	excit_rate += excr;
-	vstate_exc_rate += v_excr;
-
-	diss_rate += dissr;
-	enloss_rate += enl;
-	th_energy_deriv += th_en;
+	enloss_rate = enl;
+	excit_rate = excr;
+	diss_rate = dissr;
+	th_energy_deriv = th_en;
 }
 
 
@@ -2554,8 +2702,8 @@ void elspectra_evolution_data::derivatives_h2_electronic_diss(const realtype* y_
 		delete[] arr_h2;
 		delete[] arr_el;
 	}
-	diss_rate += dissr;
-	enloss_rate += enl;
+	enloss_rate = enl;
+	diss_rate = dissr;
 }
 
 
@@ -2658,8 +2806,8 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_sg_triplet(const rea
 		delete[] arr_el;
 	}
 
-	excit_rate += excr;
-	enloss_rate += enl;
+	enloss_rate = enl;
+	excit_rate = excr;
 }
 
 
@@ -2762,8 +2910,8 @@ void elspectra_evolution_data::derivatives_h2_electronic_sg_pu_triplet(const rea
 		delete[] arr_el;
 	}
 
-	excit_rate += excr;
-	enloss_rate += enl;
+	enloss_rate = enl;
+	excit_rate = excr;
 }
 
 
@@ -2849,7 +2997,7 @@ void elspectra_evolution_data::derivatives_h2_rotational_exc(const realtype* y_d
 							enl_p += z;
 						}
 
-						// rotational excitation rate from v= 0, j = 0 or j = 1, to level with j > 1 [cm-3 s-1]
+						// pure rotational excitation rate from v= 0, j = 0 or j = 1, to level with j > 1 [cm-3 s-1]
 						if ((li == 0 || li == 1) && lf > 1) {
 							excr += y;
 						}
@@ -2870,20 +3018,21 @@ void elspectra_evolution_data::derivatives_h2_rotational_exc(const realtype* y_d
 		delete[] arr_h2;
 		delete[] arr_el;
 	}
-	excit_rate += excr;
+	
 	enloss_rate += enl;
+	excit_rate += excr;
 	enloss_rate_pos += enl_p;
 }
 
 
 void elspectra_evolution_data::derivatives_h2_rovibr_exc(const realtype* y_data, realtype* ydot_data, double**& rates, 
-	double& enloss_rate, double& enloss_rate_pos, double& excit_rate, double& excit_v1_rate, double& excit_v2_rate, double& excit_v3_rate)
+	double& enloss_rate, double& enloss_rate_pos, double(&vstate_exc)[MAX_NB_H2_VSTATES_X1SG])
 {
 	int i, k, n, j, dj, vi, vf, li, lf;
-	double excr, excr1, excr2, excr3, enl, enl_p;
+	double enl, enl_p;
 
-	excr = excr1 = excr2 = excr3 = enl = enl_p = 0.;
-#pragma omp parallel reduction(+: excr, excr1, excr2, excr3, enl, enl_p) private(i, k, n, dj, j, vi, vf, li, lf)
+	enl = enl_p = 0.;
+#pragma omp parallel reduction(+: enl, enl_p) private(i, k, n, dj, j, vi, vf, li, lf)
 	{
 		int i0;
 		double w1, w2, en, x, y, z, delta_en;
@@ -2893,6 +3042,9 @@ void elspectra_evolution_data::derivatives_h2_rovibr_exc(const realtype* y_data,
 
 		double* arr_el = new double[nb_of_el_energies];
 		memset(arr_el, 0, nb_of_el_energies * sizeof(double));
+
+		double *arr_v = new double[MAX_NB_H2_VSTATES_X1SG];
+		memset(arr_v, 0, MAX_NB_H2_VSTATES_X1SG * sizeof(double));
 
 #pragma omp for schedule(dynamic, 1)
 		for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
@@ -2963,24 +3115,8 @@ void elspectra_evolution_data::derivatives_h2_rovibr_exc(const realtype* y_data,
 									enl_p += z;
 								}
 
-								// total excitation rate from the state vi = 0, [cm-3 s-1]
-								if (vi == 0) {
-									excr += y;
-								}
-
-								// vi = 0 -> vf = 1
-								if (vi == 0 && vf == 1) {
-									excr1 += y;
-								}
-
-								// vi = 0,1 -> vf = 2
-								if ((vi == 0 || vi == 1) && vf == 2) {
-									excr2 += y;
-								}
-
-								// vi = 0,1,2 -> vf = 3
-								if ((vi == 0 || vi == 1 || vi == 2) && vf == 3) {
-									excr3 += y;
+								if (vi < vf) {
+									arr_v[vf] += y;
 								}
 							}
 						}
@@ -2996,15 +3132,14 @@ void elspectra_evolution_data::derivatives_h2_rovibr_exc(const realtype* y_data,
 			for (i = 0; i < nb_lev_h2; i++) {
 				ydot_data[h2eq_nb + i] += arr_h2[i];
 			}
+			for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
+				vstate_exc[i] += arr_v[i];
+			}
 		}
 		delete[] arr_h2;
 		delete[] arr_el;
+		delete[] arr_v;
 	}
-	excit_rate += excr;
-	excit_v1_rate += excr1;
-	excit_v2_rate += excr2;
-	excit_v3_rate += excr3;
-
 	enloss_rate += enl;
 	enloss_rate_pos += enl_p;
 }

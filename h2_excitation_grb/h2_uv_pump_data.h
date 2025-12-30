@@ -4,8 +4,12 @@
 #include "spectroscopy.h"
 
 // Number of excited electronic states taken into account,
-// order - B, C, Bp, D, EF, Bpp, Dp, b, a, c, d
-#define NB_EXC_ELECTRONIC_STATES 11
+// order - B, C, Bp, D, EF, Bpp, Dp, b, a, c, d, additional triplet states
+#define NB_EXC_ELECTRONIC_STATES 12
+#define NB_EXC_ELECTRONIC_SINGLET_STATES 7
+
+// only excited states
+const std::string H2_ELECTRONIC_STATE_NAMES[] = { "B1Su", "C1Pu", "Bp1Su", "D1Pu", "EF1Sg", "Bpp1Su", "Dp1Pu", "b3Su", "a3Sg", "c3Pu", "d3Pu", "triplet"};
 
 // Maximal number of rotational levels of the ground electronic state X1Sg (for vibrational state v = 0),
 #define MAX_NB_J_H2 32  // 0,1,..,31
@@ -26,7 +30,6 @@
 #define MAX_H2_VSTATES_a3Sg 21   // 0,1,...,20  Wolniewicz L., Molecular Physics 105, 1497 (2007); but 0,1,...,21 Scarlett et al. (2023), private comm.
 #define MAX_H2_VSTATES_c3Pu 21   // 0,1,...,20  Scarlett et al. (2023), private comm.
 #define MAX_H2_VSTATES_d3Pu 21   // 0,1,...,20  Scarlett et al. (2023), private comm.
-
 
 
 

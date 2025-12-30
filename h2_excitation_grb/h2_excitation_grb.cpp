@@ -24,6 +24,7 @@
 #include <cmath>
 #include <limits>
 #include <vector>
+#include <array>
 #include <cstring>
 #include <ctime>
 #include <sstream>
@@ -48,8 +49,8 @@ const int VERBOSITY = 1;
 // output_path - path to the folder where data of the current simulations must be saved,
 void init_specimen_conc(const string& sim_path, double& conc_h_tot, vector<double>& layer_centre_distances, vector<dynamic_array>& d);
 void init_dust_abund(const string& sim_path, vector<double>& d, double& grain_radius_init, double& grain_nb_density, double& grain_material_density);
-void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& d, const vector<double>& electron_energies_grid);
-void init_electron_spectra_mono(const string& output_path, dynamic_array & init_data_test, const vector<double>& en_grid, 
+void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& init_data, const vector<double>& electron_energies_grid);
+void init_electron_spectra_mono(dynamic_array & init_data, const vector<double>& en_grid, 
 	double electron_conc, double electron_energy);
 void init_h2_population_density(const string& sim_path, vector<dynamic_array>& d, vector<int>& qnb_v_arr, vector<int>& qnb_j_arr);
 
@@ -60,20 +61,6 @@ static int f_elsp(realtype t, N_Vector y, N_Vector ydot, void* user_data) {
 }
 
 //
-// simulation parameters that are initialized from file:
-//
-int nb_processors;
-double op_ratio_h2, conc_h_tot, ioniz_fract;
-
-string data_path;    // path to the input_data folder with spectroscopic, collisional data and etc.
-string output_path;  // path to the folder where data of the current simulation must be saved,
-string sim_path;     // path to the folder with simulation data (GRB propagation results)
-
-stringstream linux_out_fname;
-ofstream linux_out;
-streambuf* orig_cout;
-
-//
 // internal parameters used to save simulation data,
 //
 bool dust_is_presented;
@@ -81,48 +68,44 @@ int nb_of_time_moments, nb_of_equat, nb_of_el_energies, nb_lev_h2, nb_lev_hei, h
 
 double grain_radius_init, grain_nb_density, grain_material_density, grain_radius, dust_mass, gas_mass, dg_ratio;
 
-double enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos, 
-	enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, diss_decay_heating_rate,
-	neutral_coll_heating_rate;
+double enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos, enloss_rate_ioniz, 
+	enloss_rate_hei, enloss_rate_coulomb_el, neutral_coll_heating_rate;
 
-double enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_h2_singlet, enloss_h2_triplet, enloss_ioniz, enloss_hei, 
-	enloss_coulomb_el, diss_decay_heating, neutral_coll_heating;
+double enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_ioniz, enloss_hei, enloss_coulomb_el, neutral_coll_heating;
 
-double h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_excit_triplet_rate, hei_exc_rate, h2_excit_electr_rate, h2_excit_vibr_rate, h2_excit_rot_rate,
-	h2_excit_electr_bs_rate, h2_excit_electr_bps_rate, h2_excit_electr_cp_rate, h2_excit_electr_dp_rate, 
-	h2_excit_triplet_rate, h2_excit_vibr_v1_rate, h2_excit_vibr_v2_rate, h2_excit_vibr_v3_rate, h2_el_excit_vstate_rate;
-
-double h2_solomon_diss, h2_diss_exc_singlet, h2_diss_excit_electr_triplet, hei_exc, h2_excit_electr, h2_excit_vibr, h2_excit_rot,
-	h2_excit_electr_bs, h2_excit_electr_bps, h2_excit_electr_cp, h2_excit_electr_dp, h2_excit_electr_triplet, 
-	h2_excit_vibr_v1, h2_excit_vibr_v2, h2_excit_vibr_v3, h2_el_excit_vstate;
+double hei_excit_rate, h2_excit_rot_rate;
+double hei_excit, h2_excit_rot;
 
 // the array with initial values of variables,
 double* initial_data;
 
 vector<double> time_cloud_arr;      // in s
-vector<double> electron_energies_grid, electron_energy_bin_size; // in eV,
+vector<double> electron_energies_grid, electron_energy_bin_size;  // in eV,
+
+// array for saving the data on excitation of each of the states, 
+array< electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> h2_state_data, h2_state_data_rates, h2_state_data_aux;
+
+// Excitation and dissociation rates [cm-3 s-1], energy loss rate [eV cm-3 s-1], as a function of time
+vector< array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> > h2_state_data_rate_arr;
+vector< dynamic_array> h2_electr_vstates_rate_arr, h2_vibr_vstates_rate_arr;
+
+// Number of excitations and dissociations [cm-3], energy loss [eV cm-3] during the time interval [0, t] as a function of time t,
+vector< array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> > h2_state_data_arr;
+vector< dynamic_array> h2_electr_vstates_arr, h2_vibr_vstates_arr;
 
 // Energy loss rates in [eV cm-3 s-1], as a function of time
 vector<double> enloss_rate_mt_arr, enloss_rate_h2_rot_arr, enloss_rate_h2_rot_arr_pos, enloss_rate_h2_vibr_arr, enloss_rate_h2_vibr_arr_pos,
-enloss_rate_h2_singlet_arr, enloss_rate_h2_triplet_arr, enloss_rate_ioniz_arr, enloss_rate_hei_arr,
-enloss_rate_coulomb_el_arr, diss_decay_heating_rate_arr, neutral_coll_heating_rate_arr;
+	enloss_rate_ioniz_arr, enloss_rate_hei_arr, enloss_rate_coulomb_el_arr, neutral_coll_heating_rate_arr;
 
 // Energy loss in [eV cm-3] during the time interval [0, t] as a function of time t,
-vector<double> enloss_mt_arr, enloss_h2_rot_arr, enloss_h2_vibr_arr, enloss_h2_singlet_arr, enloss_h2_triplet_arr, enloss_ioniz_arr,
-enloss_hei_arr, enloss_coulomb_el_arr, diss_decay_heating_arr, neutral_coll_heating_arr;
+vector<double> enloss_mt_arr, enloss_h2_rot_arr, enloss_h2_vibr_arr, enloss_ioniz_arr, enloss_hei_arr, 
+	enloss_coulomb_el_arr, neutral_coll_heating_arr;
 
-// Excitation rates in [cm-3 s-1], as a function of time
-// electronic excitation to bound singlet states, without dissociation
-vector<double> h2_excit_electr_rate_arr, h2_excit_vibr_rate_arr, h2_excit_rot_rate_arr;
+// Pure rotational excitations as a function of time, rates
+vector<double> h2_excit_rot_rate_arr;
 
 // Number of excitations in [cm-3] up to a given time, as a function of time
-// bs - S1u+(B), bps - S1u+(Bp), cp - P1u(C-/+), dp - P1u(D-/+),
-vector<double> h2_excit_electr_arr, h2_excit_vibr_arr, h2_excit_rot_arr,
-h2_excit_electr_bs_arr, h2_excit_electr_bps_arr, h2_excit_electr_cp_arr, h2_excit_electr_dp_arr, h2_excit_electr_triplet_arr, 
-h2_excit_vibr_v1_arr, h2_excit_vibr_v2_arr, h2_excit_vibr_v3_arr, h2_excit_el_vstate_arr, hei_exc_arr;
-
-// Dissociated concentration of H2 in [cm-3] up to a given time, as a function of time
-vector<double> h2_solomon_diss_arr, h2_diss_exc_singlet_arr, h2_diss_excit_electr_triplet_arr;
+vector<double> h2_excit_rot_arr, hei_excit_arr;
 
 // Physical parameters as a function of time,
 vector<double> neutral_temp_arr, ion_temp_arr, dust_charge_arr;
@@ -139,16 +122,14 @@ vector<dynamic_array> el_spectrum_evol;
 // Concentration[time nb][specimen nb], or [time nb][level nb]
 vector<dynamic_array> specimen_conc_evol, h2_popdens_evol, h2_popdens_v_evol, hei_popul_dens_evol;  // in [cm-3]
 
-time_t timer;
-char* ctime_str;
-
 // these are called inside the simulations routine:
 void memory_freeing_up();
 void init_time_intervals();
 void init_electron_energy_grid(double max_electron_energy);
-void save_simulation_report();
 
-void simulations_monoenergetic(const string& parameter_fname);
+void simulations_monoenergetic(const string& data_path, const string& output_path, double conc_h_tot, double he_abund, double ioniz_fract,
+	double op_ratio_h2, double electron_conc, double electron_energy);
+
 void simulations_grb(const string& parameter_fname);
 
 
@@ -157,10 +138,157 @@ void simulations_grb(const string& parameter_fname);
 // windows - "C:/Users/Александр/Documents/input_data/"
 int main()
 {	
-	string fname;
+	char text_line[MAX_TEXT_LINE_WIDTH];
+
+	int i, nb_processors(6), nb;
+	double op_ratio_h2, conc_h_tot, ioniz_fract;
+	double x, electron_conc, he_abund;
 	
+	vector<double> electron_energy_arr;
+
+	string fname;
+	string data_path;    // path to the input_data folder with spectroscopic, collisional data and etc.
+	string output_path;  // path to the folder where data of the current simulation must be saved,
+	string sim_path;     // path to the folder with simulation data (GRB propagation results)
+
+	stringstream ss;
+	ifstream input;
+
+	//
+	// Initialization of initial data
+	//
 	fname = "input_parameters_mono.txt";
-	simulations_monoenergetic(fname);
+
+	input.open(fname.c_str());
+	if (!input) {
+		cout << "Error in " << SOURCE_NAME << ": can't open file with cross section data " << fname << endl;
+		exit(1);
+	}
+
+	while (!input.eof())
+	{
+		do // comment lines are read:
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> nb_processors;
+
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> data_path;
+
+		// path to the directory for the output
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+#ifdef __linux__
+		// if path has not spaces:
+		ss.clear();
+		ss.str(text_line);
+		ss >> output_path;
+#else
+		// path may have spaces (for linux does not work)
+		output_path = text_line;
+#endif
+
+		// H nuclei total concentration, in [cm-3],
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> conc_h_tot;
+
+		// Helium abundance (only H2 and He are taken into account),
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> he_abund;
+
+		// Ionization fraction x_e, number density of electrons n_e = n_{H,tot} * x_e,
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> ioniz_fract;
+
+		// ortho-to-para-H2 ratio,
+		// test the dependence on this parameter,
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> op_ratio_h2;
+
+		// electron concentration, in [cm-3]
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> electron_conc;
+
+		// Nb of electron energies to calculate:
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> nb;
+
+		// Electron energies, in [eV]
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+
+		electron_energy_arr.clear();
+		for (i = 0; i < nb; i++) {
+			ss >> x;
+			electron_energy_arr.push_back(x);
+		}
+		input.close();
+	}
+
+#ifdef _OPENMP
+	omp_set_num_threads(nb_processors);
+
+#pragma omp parallel 
+	{
+#pragma omp master 
+		{
+			cout << "OpenMP is supported" << endl;
+			cout << "Nb of threads: " << omp_get_num_threads() << endl;
+		}
+	}
+#else
+	cout << "No OpenMP" << endl;
+#endif
+
+	
+	for (i = 0; i < nb; i++) {
+		simulations_monoenergetic(data_path, output_path, conc_h_tot, he_abund, ioniz_fract, op_ratio_h2, electron_conc, 
+			electron_energy_arr[i]);
+	}
 
 	output_path = "C:/Users/Александр/Documents/Данные и графики/paper GRB in molecular cloud/python_scripts_ism/";
 	data_path   = "C:/Users/Александр/Documents/input_data/";
@@ -176,74 +304,60 @@ int main()
 
 void memory_freeing_up()
 {
+	int i;
 	if (VERBOSITY) {
 		cout << "The memory is freeing up" << endl;
 	}
 	delete[] initial_data;
 
 	enloss_rate_mt = enloss_rate_h2_rot = enloss_rate_h2_rot_pos = enloss_rate_h2_vibr = enloss_rate_h2_vibr_pos 
-		= enloss_rate_h2_singlet = enloss_rate_h2_triplet = enloss_rate_ioniz = enloss_rate_hei = enloss_rate_coulomb_el 
-		= diss_decay_heating_rate = neutral_coll_heating_rate = 0.;
+		= enloss_rate_ioniz = enloss_rate_hei = enloss_rate_coulomb_el = neutral_coll_heating_rate = 0.;
 
-	enloss_mt = enloss_h2_rot = enloss_h2_vibr = enloss_h2_singlet = enloss_h2_triplet = enloss_ioniz = enloss_hei
-		= enloss_coulomb_el = diss_decay_heating = neutral_coll_heating = 0.;
+	enloss_mt = enloss_h2_rot = enloss_h2_vibr = enloss_ioniz = enloss_hei = enloss_coulomb_el = neutral_coll_heating = 0.;
 
-	h2_solomon_diss_rate = h2_diss_exc_singlet_rate = h2_diss_excit_triplet_rate = 0.;
-	h2_solomon_diss = h2_diss_exc_singlet = h2_diss_excit_electr_triplet = 0.;
+	h2_excit_rot_rate = hei_excit_rate = 0.;
+	h2_excit_rot = hei_excit = 0.;
 
-	h2_excit_electr_rate = h2_excit_vibr_rate = h2_excit_rot_rate
-		= h2_excit_electr_bs_rate = h2_excit_electr_bps_rate = h2_excit_electr_cp_rate = h2_excit_electr_dp_rate = h2_excit_triplet_rate
-		= h2_excit_vibr_v1_rate = h2_excit_vibr_v2_rate = h2_excit_vibr_v3_rate = h2_el_excit_vstate_rate = hei_exc_rate = 0.;
+	for (i = 0; i < NB_EXC_ELECTRONIC_STATES; i++) {
+		h2_state_data[i].excit = h2_state_data[i].direct_diss = h2_state_data[i].twostep_diss =
+			h2_state_data[i].diss_heat_input = h2_state_data[i].enloss_excit = h2_state_data[i].enloss_direct_diss = 0;
 
-	h2_excit_electr = h2_excit_vibr = h2_excit_rot = h2_excit_electr_bs = h2_excit_electr_bps = h2_excit_electr_cp = h2_excit_electr_dp 
-		= h2_excit_electr_triplet = h2_excit_vibr_v1 = h2_excit_vibr_v2 = h2_excit_vibr_v3 = h2_el_excit_vstate = hei_exc = 0.;
+		h2_state_data_rates[i].excit = h2_state_data_rates[i].direct_diss = h2_state_data_rates[i].twostep_diss =
+			h2_state_data_rates[i].diss_heat_input = h2_state_data_rates[i].enloss_excit = h2_state_data_rates[i].enloss_direct_diss = 0;
+
+		h2_state_data_aux[i].excit = h2_state_data_aux[i].direct_diss = h2_state_data_aux[i].twostep_diss =
+			h2_state_data_aux[i].diss_heat_input = h2_state_data_aux[i].enloss_excit = h2_state_data_aux[i].enloss_direct_diss = 0;
+	}
+
+	h2_state_data_rate_arr.clear();
+	h2_electr_vstates_rate_arr.clear();
+	h2_vibr_vstates_rate_arr.clear();
+
+	h2_state_data_arr.clear();
+	h2_electr_vstates_arr.clear();
+	h2_vibr_vstates_arr.clear();
 
 	enloss_rate_mt_arr.clear();
 	enloss_rate_h2_rot_arr.clear();
 	enloss_rate_h2_rot_arr_pos.clear();
 	enloss_rate_h2_vibr_arr.clear();
 	enloss_rate_h2_vibr_arr_pos.clear();
-	enloss_rate_h2_singlet_arr.clear(); 
-	enloss_rate_h2_triplet_arr.clear(); 
 	enloss_rate_ioniz_arr.clear(); 
 	enloss_rate_hei_arr.clear();
 	enloss_rate_coulomb_el_arr.clear();
-	diss_decay_heating_rate_arr.clear(); 
 	neutral_coll_heating_rate_arr.clear();
 
 	enloss_mt_arr.clear(); 
 	enloss_h2_rot_arr.clear(); 
 	enloss_h2_vibr_arr.clear();
-	enloss_h2_singlet_arr.clear(); 
-	enloss_h2_triplet_arr.clear();
 	enloss_ioniz_arr.clear();
 	enloss_hei_arr.clear(); 
 	enloss_coulomb_el_arr.clear(); 
-	diss_decay_heating_arr.clear();
 	neutral_coll_heating_arr.clear();
 
-	h2_excit_electr_rate_arr.clear();
-	h2_excit_vibr_rate_arr.clear(); 
 	h2_excit_rot_rate_arr.clear();
-
-	h2_excit_electr_arr.clear();
-	h2_excit_vibr_arr.clear(); 
 	h2_excit_rot_arr.clear();
-	h2_excit_electr_bs_arr.clear();
-	h2_excit_electr_bps_arr.clear();
-	h2_excit_electr_cp_arr.clear();
-	h2_excit_electr_dp_arr.clear();
-	h2_excit_electr_triplet_arr.clear();
-	
-	h2_excit_vibr_v1_arr.clear(); 
-	h2_excit_vibr_v2_arr.clear(); 
-	h2_excit_vibr_v3_arr.clear(); 
-	h2_excit_el_vstate_arr.clear();
-	hei_exc_arr.clear();
-
-	h2_solomon_diss_arr.clear(); 
-	h2_diss_exc_singlet_arr.clear(); 
-	h2_diss_excit_electr_triplet_arr.clear();
+	hei_excit_arr.clear();
 
 	neutral_temp_arr.clear();
 	ion_temp_arr.clear();
@@ -285,7 +399,7 @@ void init_electron_energy_grid(double max_electron_energy)
 	}
 	electron_energies_grid.push_back(ELECTRON_ENERGY_FIXED);
 
-	// two extra interval is added at the end,
+	// two extra intervals are added at the end,
 	k = (int)(NB_OF_BINS_PER_ORDER_EL * log10((double)max_electron_energy / ELECTRON_ENERGY_FIXED)) + 2;
 	for (i = 0; i < k; i++) {
 		electron_energies_grid.push_back(electron_energies_grid.back() * x);
@@ -318,122 +432,44 @@ void init_time_intervals()
 }
 
 
-void simulations_monoenergetic(const string & parameter_fname)
+void simulations_monoenergetic(const string& data_path, const string& output_path, double conc_h_tot, double he_abund, double ioniz_fract, 
+	double op_ratio_h2, double electron_conc, double electron_energy)
 {
-	char text_line[MAX_TEXT_LINE_WIDTH];
 	bool must_be_saved;
-	
 	int i, k, time_nb, step_nb, flag;
 	long int nb_steps_tot;
 
-	double electron_conc(0.), electron_energy(0.), he_abund(0.);
-	double x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, rel_tol, dt, model_time, model_time_aux, model_time_aux_prev, model_time_step, model_time_out;
+	double x1, x2, x3, x4, x5, x6, x7, rel_tol, dt, model_time, model_time_aux, model_time_aux_prev, model_time_step, model_time_out;
 
 	stringstream ss;
-	ifstream input;
+	string output_path_2;
+
+	stringstream linux_out_fname;
+	ofstream linux_out;
+	streambuf* orig_cout;
+
+	time_t timer;
+	char* ctime_str;
 
 	// the class containing data used by solver,
 	elspectra_evolution_data* user_data;
 
-	conc_h_tot = 0.;
-	ioniz_fract = 0.;
+	// directory name for saving the data on the specific electron energy,
+	i = (int) log10(conc_h_tot);
+	k = rounding(conc_h_tot / pow(10., i));
+	
+	ss.clear();
+	ss.str("");
+	ss << output_path << "nh_" << k << "e" << i << "_";
 
-	//
-	// Initialization of initial data
-	//
-	input.open(parameter_fname.c_str());
-	if (!input) {
-		cout << "Error in " << SOURCE_NAME << ": can't open file with cross section data " << parameter_fname << endl;
-		exit(1);
-	}
+	i = rounding(electron_energy);
+	ss << i << "ev" << "/";
 
-	while (!input.eof())
-	{
-		do // comment lines are read:
-			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
-		while (text_line[0] == '#');
-
-		ss.clear();
-		ss.str(text_line);
-		ss >> nb_processors;
-
-		do
-			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
-		while (text_line[0] == '#');
-
-		ss.clear();
-		ss.str(text_line);
-		ss >> data_path;
-
-		// path to the directory for the output
-		do
-			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
-		while (text_line[0] == '#');
-
-		// path may have spaces,
-		output_path = text_line;
-
-		// electron concentration in test simulations in [cm-3]
-		do
-			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
-		while (text_line[0] == '#');
-
-		ss.clear();
-		ss.str(text_line);
-		ss >> electron_conc;
-
-		// Electron energy in test simulations in[eV]
-		do
-			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
-		while (text_line[0] == '#');
-
-		ss.clear();
-		ss.str(text_line);
-		ss >> electron_energy;
-
-		// Helium abundance in test simulations(only H2 and He are taken into account),
-		do
-			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
-		while (text_line[0] == '#');
-
-		ss.clear();
-		ss.str(text_line);
-		ss >> he_abund;
-
-		// H nuclei total concentration for test simulations, [cm-3],
-		do
-			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
-		while (text_line[0] == '#');
-
-		ss.clear();
-		ss.str(text_line);
-		ss >> conc_h_tot;
-
-		// Ionization fraction x_e, number density of electrons n_e = n_{H,tot} * x_e,
-		do
-			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
-		while (text_line[0] == '#');
-
-		ss.clear();
-		ss.str(text_line);
-		ss >> ioniz_fract;
-
-		// ortho-to-para-H2 ratio,
-		// test the dependence on this parameter,
-		do
-			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
-		while (text_line[0] == '#');
-
-		ss.clear();
-		ss.str(text_line);
-		ss >> op_ratio_h2;
-
-		input.close();
-	}
+	output_path_2 = ss.str();
 
 #ifdef __linux__
 	linux_out_fname.str("");
-	linux_out_fname << output_path;
+	linux_out_fname << output_path_2;
 	linux_out_fname << "out";
 	linux_out_fname << "_screen";
 	linux_out_fname << ".txt";
@@ -448,23 +484,11 @@ void simulations_monoenergetic(const string & parameter_fname)
 	cout.rdbuf(linux_out.rdbuf());
 #endif
 
-#ifdef _OPENMP
-	omp_set_num_threads(nb_processors);
-
-#pragma omp parallel 
-	{
-#pragma omp master 
-		{
-			cout << "OpenMP is supported" << endl;
-			cout << "Nb of threads: " << omp_get_num_threads() << endl;
-		}
-	}
-#else
-	cout << "No OpenMP" << endl;
-#endif
-
 	timer = time(NULL);
 	ctime_str = ctime(&timer);
+
+	cout << scientific;
+	cout.precision(3);
 
 	cout << ctime_str << endl
 		<< "Start of the simulations of the evolution of electron spectra" << endl
@@ -475,7 +499,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 	init_electron_energy_grid(electron_energy);
 
 	dynamic_array el_spectrum(nb_of_el_energies);
-	init_electron_spectra_mono(output_path, el_spectrum, electron_energies_grid, electron_conc, electron_energy);
+	init_electron_spectra_mono(el_spectrum, electron_energies_grid, electron_conc, electron_energy);
 
 	user_data
 		= new elspectra_evolution_data(data_path, output_path, conc_h_tot, ioniz_fract, electron_energies_grid, VERBOSITY);
@@ -518,24 +542,26 @@ void simulations_monoenergetic(const string & parameter_fname)
 	dg_ratio = 0.;
 
 	user_data->set_dust_parameters(dust_is_presented, grain_radius, grain_nb_density);
-	save_model_parameters(output_path, conc_h_tot, op_ratio_h2, ioniz_fract, dg_ratio, grain_radius, grain_nb_density);
+	save_model_parameters(output_path_2, conc_h_tot, op_ratio_h2, ioniz_fract, dg_ratio, grain_radius, grain_nb_density);
 
 	//
 	// Simulations
 	//
 
+	model_time_aux = model_time = 0.;
+
+	// Auxiliary arrays, 
+	// the arrays are initialized by zeros in the class constructor,
 	dynamic_array specimen_conc(NB_OF_CHEM_SPECIES), h2_popul_dens(nb_lev_h2), hei_popul_dens(nb_lev_hei), h2_pop_v(MAX_NB_H2_VSTATES_X1SG);
+
+	dynamic_array h2_electr_vstates(MAX_NB_H2_VSTATES_X1SG), h2_electr_vstates_rates(MAX_NB_H2_VSTATES_X1SG),
+		h2_electr_vstates_aux(MAX_NB_H2_VSTATES_X1SG);
+
+	dynamic_array h2_vibr_vstates(MAX_NB_H2_VSTATES_X1SG), h2_vibr_vstates_rates(MAX_NB_H2_VSTATES_X1SG),
+		h2_vibr_vstates_aux(MAX_NB_H2_VSTATES_X1SG);
 
 	// vectors used by solver SUNDIALS CVODE
 	N_Vector y, ydot, abs_tol;
-
-	cout << scientific;
-	cout.precision(3);
-
-	//elspectra_evolution_data user_data_(data_path, output_path, conc_h_tot, ioniz_fract, electron_energies_grid, VERBOSITY);
-	//user_data_.set_dust_parameters(dust_is_presented, grain_radius, grain_nb_density);
-
-	model_time_aux = model_time = 0.;
 
 	SUNMatrix A;
 	SUNLinearSolver LS;
@@ -589,9 +615,7 @@ void simulations_monoenergetic(const string & parameter_fname)
 	// restart of the solver with new values of initial conditions,
 	// flag = CVodeReInit(cvode_mem, model_time, y);
 
-	// update the members of user_data class,
-	//f_elsp(model_time, y, ydot,  (void*) user_data);
-
+	//
 	// for initial time moment:
 	for (i = 0; i < nb_of_el_energies; i++) {
 		el_spectrum.arr[i] = NV_Ith_S(y, i);  // number of electrons in the energy interval (is not divided by energy bin),
@@ -611,8 +635,9 @@ void simulations_monoenergetic(const string & parameter_fname)
 	memset(h2_pop_v.arr, 0, MAX_NB_H2_VSTATES_X1SG * sizeof(double));
 	for (i = 0; i < nb_lev_h2; i++) {
 		k = user_data->get_vibr_nb_h2(i);
-		if (k >= 0)
+		if (k >= 0) {
 			h2_pop_v.arr[k] += NV_Ith_S(y, h2eq_nb + i);
+		}
 	}
 	h2_popdens_v_evol.push_back(h2_pop_v);
 
@@ -621,64 +646,56 @@ void simulations_monoenergetic(const string & parameter_fname)
 	}
 	hei_popul_dens_evol.push_back(hei_popul_dens);
 
+	//
+	// update the members of user_data class,
+	f_elsp(model_time, y, ydot, (void*)user_data);
+
+	user_data->get_el_energy_losses(enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos,
+		enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, neutral_coll_heating_rate);
+
+	user_data->get_h2_state_data(h2_state_data_rates);
+
+	user_data->get_h2_excitation_rates(h2_electr_vstates_rates, h2_vibr_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
+
 	// Energy loss rates
-	// Please, check that all variables are set to zero,
 	enloss_rate_mt_arr.push_back(enloss_rate_mt);
 	enloss_rate_h2_rot_arr.push_back(enloss_rate_h2_rot);
 	enloss_rate_h2_vibr_arr.push_back(enloss_rate_h2_vibr);
-	enloss_rate_h2_singlet_arr.push_back(enloss_rate_h2_singlet);
-	enloss_rate_h2_triplet_arr.push_back(enloss_rate_h2_triplet);
 	enloss_rate_ioniz_arr.push_back(enloss_rate_ioniz);
 	enloss_rate_hei_arr.push_back(enloss_rate_hei);
 
 	enloss_rate_coulomb_el_arr.push_back(enloss_rate_coulomb_el);
-	diss_decay_heating_rate_arr.push_back(diss_decay_heating_rate);
 	neutral_coll_heating_rate_arr.push_back(neutral_coll_heating_rate);
 
 	enloss_rate_h2_rot_arr_pos.push_back(enloss_rate_h2_rot_pos);
 	enloss_rate_h2_vibr_arr_pos.push_back(enloss_rate_h2_vibr_pos);
 
-	// energy losses, time-integrated
+	// Energy losses, time-integrated
+	// Please, check that all variables at this step are set to zero,
 	enloss_mt_arr.push_back(enloss_mt);
 	enloss_h2_rot_arr.push_back(enloss_h2_rot);
 	enloss_h2_vibr_arr.push_back(enloss_h2_vibr);
-	enloss_h2_singlet_arr.push_back(enloss_h2_singlet);
-	enloss_h2_triplet_arr.push_back(enloss_h2_triplet);
 	enloss_ioniz_arr.push_back(enloss_ioniz);
 	enloss_hei_arr.push_back(enloss_hei);
 
 	enloss_coulomb_el_arr.push_back(enloss_coulomb_el);
-	diss_decay_heating_arr.push_back(diss_decay_heating);
 	neutral_coll_heating_arr.push_back(neutral_coll_heating);
 
-	// Excitation rates,
-	h2_excit_electr_rate_arr.push_back(h2_excit_electr_rate);
-	h2_excit_vibr_rate_arr.push_back(h2_excit_vibr_rate);
+	// Excitation,
 	h2_excit_rot_rate_arr.push_back(h2_excit_rot_rate);
-
-	// Excitation, time-integrated
-	h2_excit_electr_arr.push_back(h2_excit_electr);
-	h2_excit_vibr_arr.push_back(h2_excit_vibr);
 	h2_excit_rot_arr.push_back(h2_excit_rot);
+	hei_excit_arr.push_back(hei_excit);
 
-	h2_excit_electr_bs_arr.push_back(h2_excit_electr_bs);
-	h2_excit_electr_bps_arr.push_back(h2_excit_electr_bps);
-	h2_excit_electr_cp_arr.push_back(h2_excit_electr_cp);
-	h2_excit_electr_dp_arr.push_back(h2_excit_electr_dp);
+	// H2 data
+	h2_state_data_rate_arr.push_back(h2_state_data_rates);
+	h2_electr_vstates_rate_arr.push_back(h2_electr_vstates_rates);
+	h2_vibr_vstates_rate_arr.push_back(h2_vibr_vstates_rates);
+
+	h2_state_data_arr.push_back(h2_state_data);
+	h2_electr_vstates_arr.push_back(h2_electr_vstates);
+	h2_vibr_vstates_arr.push_back(h2_vibr_vstates);
 	
-	h2_excit_vibr_v1_arr.push_back(h2_excit_vibr_v1);
-	h2_excit_vibr_v2_arr.push_back(h2_excit_vibr_v2);
-	h2_excit_vibr_v3_arr.push_back(h2_excit_vibr_v3);
-	h2_excit_el_vstate_arr.push_back(h2_el_excit_vstate_rate);
-
-	hei_exc_arr.push_back(hei_exc);
-
-	// Dissociation, time-integrated
-	h2_solomon_diss_arr.push_back(h2_solomon_diss);
-	h2_diss_exc_singlet_arr.push_back(h2_diss_exc_singlet);
-	h2_diss_excit_electr_triplet_arr.push_back(h2_diss_excit_electr_triplet);
-	h2_excit_electr_triplet_arr.push_back(h2_excit_electr_triplet);
-
+	// Physical parameters
 	neutral_temp_arr.push_back(NV_Ith_S(y, physeq_nb));
 	ion_temp_arr.push_back(NV_Ith_S(y, physeq_nb + 1));
 	dust_charge_arr.push_back(NV_Ith_S(y, physeq_nb + 2) * grain_nb_density);  // dust charge per cm3
@@ -736,87 +753,65 @@ void simulations_monoenergetic(const string & parameter_fname)
 			// update the members of user_data class,
 			f_elsp(model_time_aux, y, ydot, user_data);
 
+			// Note the factor 0.5,
 			dt = 0.5 * (model_time_aux - model_time_aux_prev);
 
 			// Energy losses, 
-			x2 = enloss_rate_h2_rot;
-			x3 = enloss_rate_h2_vibr;
-			x4 = enloss_rate_h2_singlet;
-			x5 = enloss_rate_ioniz;
-			x6 = enloss_rate_hei;
-			x7 = enloss_rate_h2_triplet;
-
-			x1 = enloss_rate_mt;
-			x8 = enloss_rate_coulomb_el;
-			x9 = diss_decay_heating_rate;
-			x10 = neutral_coll_heating_rate;
+			x1 = enloss_rate_h2_rot;
+			x2 = enloss_rate_h2_vibr;
+			x3 = enloss_rate_ioniz;
+			x4 = enloss_rate_hei;
+			
+			x5 = enloss_rate_mt;
+			x6 = enloss_rate_coulomb_el;
+			x7 = neutral_coll_heating_rate;
 
 			user_data->get_el_energy_losses(enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos,
-				enloss_rate_h2_singlet, enloss_rate_h2_triplet, enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el,
-				diss_decay_heating_rate, neutral_coll_heating_rate);
+				enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, neutral_coll_heating_rate);
 
-			enloss_h2_rot += (x2 + enloss_rate_h2_rot) * dt;
-			enloss_h2_vibr += (x3 + enloss_rate_h2_vibr) * dt;
-			enloss_h2_singlet += (x4 + enloss_rate_h2_singlet) * dt;
-			enloss_ioniz += (x5 + enloss_rate_ioniz) * dt;
-			enloss_hei += (x6 + enloss_rate_hei) * dt;
-			enloss_h2_triplet += (x7 + enloss_rate_h2_triplet) * dt;
-
+			enloss_h2_rot += (x1 + enloss_rate_h2_rot) * dt;
+			enloss_h2_vibr += (x2 + enloss_rate_h2_vibr) * dt;
+			enloss_ioniz += (x3 + enloss_rate_ioniz) * dt;
+			enloss_hei += (x4 + enloss_rate_hei) * dt;
+		
 			// contribute to thermal heating
-			enloss_mt += (x1 + enloss_rate_mt) * dt;
-			enloss_coulomb_el += (x8 + enloss_rate_coulomb_el) * dt;
-			diss_decay_heating += (x9 + diss_decay_heating_rate) * dt;
-			neutral_coll_heating += (x10 + neutral_coll_heating_rate) * dt;
+			enloss_mt += (x5 + enloss_rate_mt) * dt;
+			enloss_coulomb_el += (x6 + enloss_rate_coulomb_el) * dt;
+			neutral_coll_heating += (x7 + neutral_coll_heating_rate) * dt;
 
-			// Dissociation rates
-			x1 = h2_solomon_diss_rate;
-			x2 = h2_diss_exc_singlet_rate;
-			x3 = h2_diss_excit_triplet_rate;
-			x4 = h2_excit_triplet_rate;
+			// H2 state data
+			for (i = 0; i < NB_EXC_ELECTRONIC_STATES; i++) {
+				h2_state_data_aux[i] = h2_state_data_rates[i];
+			}
+			
+			user_data->get_h2_state_data(h2_state_data_rates);
 
-			user_data->get_h2_diss_rates(h2_solomon_diss_rate, h2_diss_exc_singlet_rate, h2_diss_excit_triplet_rate, h2_excit_triplet_rate);
-
-			h2_solomon_diss += (x1 + h2_solomon_diss_rate) * dt;
-			h2_diss_exc_singlet += (x2 + h2_diss_exc_singlet_rate) * dt;
-			h2_diss_excit_electr_triplet += (x3 + h2_diss_excit_triplet_rate) * dt;
-			h2_excit_electr_triplet += (x4 + h2_excit_triplet_rate) * dt;
+			for (i = 0; i < NB_EXC_ELECTRONIC_STATES; i++) {
+				h2_state_data[i].excit += (h2_state_data_aux[i].excit + h2_state_data_rates[i].excit) * dt;
+				h2_state_data[i].direct_diss += (h2_state_data_aux[i].direct_diss + h2_state_data_rates[i].direct_diss) * dt;
+				h2_state_data[i].twostep_diss += (h2_state_data_aux[i].twostep_diss + h2_state_data_rates[i].twostep_diss) * dt;
+				h2_state_data[i].diss_heat_input += (h2_state_data_aux[i].diss_heat_input + h2_state_data_rates[i].diss_heat_input) * dt;
+				h2_state_data[i].enloss_excit += (h2_state_data_aux[i].enloss_excit + h2_state_data_rates[i].enloss_excit) * dt;
+				h2_state_data[i].enloss_direct_diss += (h2_state_data_aux[i].enloss_direct_diss + h2_state_data_rates[i].enloss_direct_diss) * dt;
+			}
 
 			// Excitation rates,
-			x1 = h2_excit_electr_rate;
-			x2 = h2_excit_vibr_rate;
-			x3 = h2_excit_rot_rate;
+			for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
+				h2_electr_vstates_aux.arr[i] = h2_electr_vstates_rates.arr[i];
+				h2_vibr_vstates_aux.arr[i] = h2_vibr_vstates_rates.arr[i];
 
-			x4 = h2_excit_electr_bs_rate;
-			x5 = h2_excit_electr_bps_rate;
-			x6 = h2_excit_electr_cp_rate;
-			x7 = h2_excit_electr_dp_rate;
+			}
+			x1 = h2_excit_rot_rate;
+			x2 = hei_excit_rate;
+
+			user_data->get_h2_excitation_rates(h2_electr_vstates_rates, h2_vibr_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
 			
-			x8 = h2_excit_vibr_v1_rate;
-			x9 = h2_excit_vibr_v2_rate;
-			x10 = h2_excit_vibr_v3_rate;
-			x11 = h2_el_excit_vstate_rate;
-
-			x12 = hei_exc_rate;
-
-			user_data->get_h2_process_rates(h2_excit_electr_rate, h2_excit_vibr_rate, h2_excit_rot_rate,
-				h2_excit_electr_bs_rate, h2_excit_electr_bps_rate, h2_excit_electr_cp_rate, h2_excit_electr_dp_rate,
-				h2_excit_vibr_v1_rate, h2_excit_vibr_v2_rate, h2_excit_vibr_v3_rate, h2_el_excit_vstate_rate, hei_exc_rate);
-
-			h2_excit_electr += (x1 + h2_excit_electr_rate) * dt;
-			h2_excit_vibr += (x2 + h2_excit_vibr_rate) * dt;
-			h2_excit_rot += (x3 + h2_excit_rot_rate) * dt;
-
-			h2_excit_electr_bs += (x4 + h2_excit_electr_bs_rate) * dt;
-			h2_excit_electr_bps += (x5 + h2_excit_electr_bps_rate) * dt;
-			h2_excit_electr_cp += (x6 + h2_excit_electr_cp_rate) * dt;
-			h2_excit_electr_dp += (x7 + h2_excit_electr_dp_rate) * dt;
-			
-			h2_excit_vibr_v1 += (x8 + h2_excit_vibr_v1_rate) * dt;
-			h2_excit_vibr_v2 += (x9 + h2_excit_vibr_v2_rate) * dt;
-			h2_excit_vibr_v3 += (x10 + h2_excit_vibr_v3_rate) * dt;
-			h2_el_excit_vstate += (x11 + h2_el_excit_vstate_rate) * dt;
-
-			hei_exc += (x12 + hei_exc_rate) * dt;
+			for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
+				h2_electr_vstates.arr[i] += (h2_electr_vstates_aux.arr[i] + h2_electr_vstates_rates.arr[i]) *dt;
+				h2_vibr_vstates.arr[i] += (h2_vibr_vstates_aux.arr[i] + h2_vibr_vstates_rates.arr[i]) *dt;
+			}
+			h2_excit_rot += (x1 + h2_excit_rot_rate) * dt;
+			hei_excit += (x2 + hei_excit_rate) * dt;
 
 			flag = CVodeGetNumSteps(cvode_mem, &nb_steps_tot);
 
@@ -846,8 +841,9 @@ void simulations_monoenergetic(const string & parameter_fname)
 				memset(h2_pop_v.arr, 0, MAX_NB_H2_VSTATES_X1SG * sizeof(double));
 				for (i = 0; i < nb_lev_h2; i++) {
 					k = user_data->get_vibr_nb_h2(i);
-					if (k >= 0)
+					if (k >= 0) {
 						h2_pop_v.arr[k] += NV_Ith_S(y, h2eq_nb + i);
+					}
 				}
 				h2_popdens_v_evol.push_back(h2_pop_v);
 
@@ -859,14 +855,11 @@ void simulations_monoenergetic(const string & parameter_fname)
 				// Energy losses, rates
 				enloss_rate_h2_rot_arr.push_back(enloss_rate_h2_rot);
 				enloss_rate_h2_vibr_arr.push_back(enloss_rate_h2_vibr);
-				enloss_rate_h2_singlet_arr.push_back(enloss_rate_h2_singlet);
-				enloss_rate_h2_triplet_arr.push_back(enloss_rate_h2_triplet);
 				enloss_rate_ioniz_arr.push_back(enloss_rate_ioniz);
 				enloss_rate_hei_arr.push_back(enloss_rate_hei);
 
 				enloss_rate_mt_arr.push_back(enloss_rate_mt);
 				enloss_rate_coulomb_el_arr.push_back(enloss_rate_coulomb_el);
-				diss_decay_heating_rate_arr.push_back(diss_decay_heating_rate);
 				neutral_coll_heating_rate_arr.push_back(neutral_coll_heating_rate);
 
 				enloss_rate_h2_rot_arr_pos.push_back(enloss_rate_h2_rot_pos);
@@ -875,105 +868,67 @@ void simulations_monoenergetic(const string & parameter_fname)
 				// Energy losses, time-integrated,
 				enloss_h2_rot_arr.push_back(enloss_h2_rot);
 				enloss_h2_vibr_arr.push_back(enloss_h2_vibr);
-				enloss_h2_singlet_arr.push_back(enloss_h2_singlet);
-				enloss_h2_triplet_arr.push_back(enloss_h2_triplet);
 				enloss_ioniz_arr.push_back(enloss_ioniz);
 				enloss_hei_arr.push_back(enloss_hei);
 
 				enloss_mt_arr.push_back(enloss_mt);
 				enloss_coulomb_el_arr.push_back(enloss_coulomb_el);
-				diss_decay_heating_arr.push_back(diss_decay_heating);
 				neutral_coll_heating_arr.push_back(neutral_coll_heating);
 
-				// Excitations, rates
-				h2_excit_electr_rate_arr.push_back(h2_excit_electr_rate);
-				h2_excit_vibr_rate_arr.push_back(h2_excit_vibr_rate);
+				// H2 data
+				h2_state_data_rate_arr.push_back(h2_state_data_rates);
+				h2_electr_vstates_rate_arr.push_back(h2_electr_vstates_rates);
+				h2_vibr_vstates_rate_arr.push_back(h2_vibr_vstates_rates);
+
+				h2_state_data_arr.push_back(h2_state_data);
+				h2_electr_vstates_arr.push_back(h2_electr_vstates);
+				h2_vibr_vstates_arr.push_back(h2_vibr_vstates);
+
+				// Excitations, rates and time-integrated
 				h2_excit_rot_rate_arr.push_back(h2_excit_rot_rate);
-
-				// Excitations, time-integrated,
-				h2_excit_electr_arr.push_back(h2_excit_electr);
-				h2_excit_vibr_arr.push_back(h2_excit_vibr);
 				h2_excit_rot_arr.push_back(h2_excit_rot);
-
-				h2_excit_electr_bs_arr.push_back(h2_excit_electr_bs);
-				h2_excit_electr_bps_arr.push_back(h2_excit_electr_bps);
-				h2_excit_electr_cp_arr.push_back(h2_excit_electr_cp);
-				h2_excit_electr_dp_arr.push_back(h2_excit_electr_dp);
-				
-				h2_excit_vibr_v1_arr.push_back(h2_excit_vibr_v1);
-				h2_excit_vibr_v2_arr.push_back(h2_excit_vibr_v2);
-				h2_excit_vibr_v3_arr.push_back(h2_excit_vibr_v3);
-				h2_excit_el_vstate_arr.push_back(h2_el_excit_vstate);
-
-				hei_exc_arr.push_back(hei_exc);
-
-				// Dissociations, time-integrated,
-				h2_solomon_diss_arr.push_back(h2_solomon_diss);
-				h2_diss_exc_singlet_arr.push_back(h2_diss_exc_singlet);
-				h2_diss_excit_electr_triplet_arr.push_back(h2_diss_excit_electr_triplet);
-				h2_excit_electr_triplet_arr.push_back(h2_excit_electr_triplet);
+				hei_excit_arr.push_back(hei_excit);
 
 				neutral_temp_arr.push_back(NV_Ith_S(y, physeq_nb));
 				ion_temp_arr.push_back(NV_Ith_S(y, physeq_nb + 1));
 				dust_charge_arr.push_back(NV_Ith_S(y, physeq_nb + 2) * grain_nb_density);  // dust charge per cm3
 
-				save_electron_spectrum_evolution(output_path, electron_energies_grid, electron_energy_bin_size, time_cloud_arr, el_spectrum_evol, conc_h_tot);
+				save_electron_spectrum_evolution(output_path_2, electron_energies_grid, electron_energy_bin_size, time_cloud_arr, el_spectrum_evol, conc_h_tot);
 
-				save_specimen_conc_evolution(output_path, time_cloud_arr, specimen_conc_evol, conc_h_tot);
+				save_specimen_conc_evolution(output_path_2, time_cloud_arr, specimen_conc_evol, conc_h_tot);
 
-				save_h2_populations_evolution(output_path, time_cloud_arr, h2_popdens_evol, h2_popdens_v_evol, conc_h_tot, nb_lev_h2);
+				save_h2_populations_evolution(output_path_2, time_cloud_arr, h2_popdens_evol, h2_popdens_v_evol, conc_h_tot, nb_lev_h2);
 
-				save_hei_populations_evolution(output_path, time_cloud_arr, hei_popul_dens_evol, conc_h_tot, nb_lev_hei);
+				save_hei_populations_evolution(output_path_2, time_cloud_arr, hei_popul_dens_evol, conc_h_tot, nb_lev_hei);
 
-				save_electron_energy_loss_rates(output_path, conc_h_tot, time_cloud_arr,
+				save_electron_energy_loss_rates(output_path_2, conc_h_tot, time_cloud_arr,
 					enloss_rate_mt_arr,
 					enloss_rate_h2_rot_arr,
 					enloss_rate_h2_rot_arr_pos,
 					enloss_rate_h2_vibr_arr,
 					enloss_rate_h2_vibr_arr_pos,
-					enloss_rate_h2_singlet_arr,
-					enloss_rate_h2_triplet_arr,
 					enloss_rate_ioniz_arr,
 					enloss_rate_hei_arr,
 					enloss_rate_coulomb_el_arr,
-					diss_decay_heating_rate_arr,
-					neutral_coll_heating_rate_arr);
+					neutral_coll_heating_rate_arr, 
+					h2_state_data_rate_arr);
 
-				save_electron_energy_losses(output_path, conc_h_tot, time_cloud_arr,
+				save_electron_energy_losses(output_path_2, conc_h_tot, time_cloud_arr,
 					enloss_mt_arr,
 					enloss_h2_rot_arr,
 					enloss_h2_vibr_arr,
-					enloss_h2_singlet_arr,
-					enloss_h2_triplet_arr,
 					enloss_ioniz_arr,
 					enloss_hei_arr,
 					enloss_coulomb_el_arr,
-					diss_decay_heating_arr,
-					neutral_coll_heating_arr);
+					neutral_coll_heating_arr, 
+					h2_state_data_arr);
 
-				save_excit_rates(output_path, conc_h_tot, time_cloud_arr, h2_excit_electr_rate_arr, h2_excit_vibr_rate_arr, h2_excit_rot_rate_arr);
+				// Saving H2 electronic excitation data
+				save_electronic_states_excit_rates(output_path_2, conc_h_tot, time_cloud_arr, h2_state_data_rate_arr);
 
-				save_excit(output_path, conc_h_tot, time_cloud_arr,
-					h2_excit_electr_arr,
-					h2_excit_vibr_arr,
-					h2_excit_rot_arr,
-					h2_excit_electr_bs_arr,
-					h2_excit_electr_bps_arr,
-					h2_excit_electr_cp_arr,
-					h2_excit_electr_dp_arr,
-					h2_excit_vibr_v1_arr,
-					h2_excit_vibr_v2_arr,
-					h2_excit_vibr_v3_arr,
-					h2_excit_el_vstate_arr,
-					hei_exc_arr);
-
-				save_diss(output_path, conc_h_tot, time_cloud_arr,
-					h2_solomon_diss_arr,
-					h2_diss_exc_singlet_arr,
-					h2_diss_excit_electr_triplet_arr,
-					h2_excit_electr_triplet_arr);
-
-				save_phys_parameters(output_path, time_cloud_arr, neutral_temp_arr, ion_temp_arr, dust_charge_arr, specimen_conc_evol, conc_h_tot);
+				// Saving H2 vibrational excitation data
+				save_vibrational_states_excit_rates(output_path_2, conc_h_tot, time_cloud_arr, h2_electr_vstates_rate_arr, h2_vibr_vstates_rate_arr,
+					h2_excit_rot_rate_arr);
 			}
 		}
 		else {
@@ -996,10 +951,21 @@ void simulations_monoenergetic(const string & parameter_fname)
 	// Free the matrix memory
 	SUNMatDestroy(A);
 
-	save_simulation_report();
+	save_output_parameters(output_path, conc_h_tot, electron_energies_grid, electron_energy_bin_size,
+		el_spectrum_evol,
+		specimen_conc_evol,
+		enloss_mt_arr,
+		enloss_coulomb_el_arr,
+		neutral_coll_heating_arr,
+		enloss_h2_vibr_arr,
+		h2_state_data_arr,
+		h2_electr_vstates_arr,
+		h2_vibr_vstates_arr,
+		h2_excit_rot_arr,
+		hei_excit_arr);
 }
 
-
+/*
 void simulations_grb(const string& parameter_fname)
 {
 	char text_line[MAX_TEXT_LINE_WIDTH];
@@ -1399,7 +1365,7 @@ void simulations_grb(const string& parameter_fname)
 	h2_excit_vibr_v3_arr.push_back(h2_excit_vibr_v3);
 	h2_excit_el_vstate_arr.push_back(h2_el_excit_vstate_rate);
 
-	hei_exc_arr.push_back(hei_exc);
+	hei_excit_arr.push_back(hei_exc);
 
 	// Dissociation, time-integrated
 	h2_solomon_diss_arr.push_back(h2_solomon_diss);
@@ -1632,7 +1598,7 @@ void simulations_grb(const string& parameter_fname)
 				h2_excit_vibr_v3_arr.push_back(h2_excit_vibr_v3);
 				h2_excit_el_vstate_arr.push_back(h2_el_excit_vstate);
 
-				hei_exc_arr.push_back(hei_exc);
+				hei_excit_arr.push_back(hei_exc);
 
 				// Dissociations, time-integrated,
 				h2_solomon_diss_arr.push_back(h2_solomon_diss);
@@ -1692,7 +1658,7 @@ void simulations_grb(const string& parameter_fname)
 					h2_excit_vibr_v2_arr,
 					h2_excit_vibr_v3_arr,
 					h2_excit_el_vstate_arr,
-					hei_exc_arr);
+					hei_excit_arr);
 
 				save_diss(output_path, conc_h_tot, time_cloud_arr,
 					h2_solomon_diss_arr,
@@ -1724,108 +1690,7 @@ void simulations_grb(const string& parameter_fname)
 	SUNMatDestroy(A);
 
 	save_simulation_report();
-}
-
-
-void save_simulation_report()
-{
-	int i;
-	double energy, nb_density, nb_ions, heating_effic, diss_heat_effic, rovibr_losses_effic, h2_dissociated;
-
-	char buffer[20];
-	string fname;
-	ofstream output;
-
-	// Energy in electrons, number density of electrons at the start of simulations,
-	energy = nb_density = 0.;
-	for (i = 0; i < nb_of_el_energies; i++) {
-		energy += el_spectrum_evol.front().arr[i] * 0.5 * (electron_energies_grid[i] + electron_energies_grid[i + 1]);  // [eV cm-3]
-		nb_density += el_spectrum_evol.front().arr[i];  // [cm-3]
-	}
-
-	// simple species are: "e-", "H", "H+", "H2", "H2+", "He", "He+", "He++"
-	// number density of ions at the start of the simulations,
-	nb_ions = -(specimen_conc_evol.front().arr[2] + specimen_conc_evol.front().arr[4] + specimen_conc_evol.front().arr[6]
-		+ 2. * specimen_conc_evol.front().arr[7]);  // [cm-3]
-
-	// number density of ions produced, at the end of the simulations,
-	nb_ions += specimen_conc_evol.back().arr[2] + specimen_conc_evol.back().arr[4] + specimen_conc_evol.back().arr[6]
-		+ 2. * specimen_conc_evol.back().arr[7];  // [cm-3]
-
-	heating_effic = (fabs(enloss_mt_arr.back()) + fabs(enloss_coulomb_el_arr.back()) + neutral_coll_heating_arr.back()) / energy;  // dimensionless
-	diss_heat_effic = diss_decay_heating_rate_arr.back() / energy;  // dimensionless
-
-	rovibr_losses_effic = fabs(enloss_h2_vibr_arr.back()) / energy;  // dimensionless
-	h2_dissociated = h2_diss_exc_singlet_arr.back() + h2_diss_excit_electr_triplet_arr.back() + h2_solomon_diss_arr.back();
-
-
-	// Saving parameters of the electron energy degradation,
-	fname = output_path + "h2grb_parameters_output.txt";
-	output.open(fname.c_str());
-
-	output << scientific;
-	output.precision(4);
-
-	output << left << "# Parameters of the electron energy degradation, initial number of electrons, [cm-3]: " << nb_density << endl
-		<< "# 1. Initial electron energy E, [eV cm-3]" << endl
-		<< "# 2. Number density of ions N, [cm-3]" << endl
-		<< "# 3. Mean energy per ion pair W, [eV]" << endl
-		<< "# 4. 1/W, [eV-1]" << endl
-		<< "# 5. Heating efficiency of gas (neutral and electrons), dimensionless" << endl
-		<< "# 6. Energy fraction lost in ro-vibr., dimensionless" << endl;
-
-	output << "# 7. H2 dissociation, [cm-3]" << endl
-		<< "# 8. H2 dissociation due to Solomon, fraction" << endl
-		<< "# 9. H2 dissociation due to singlet, fraction" << endl
-		<< "# 10. H2 dissociation due to all triplet (including b3su), fraction" << endl
-		<< "# 11. H2 dissociation due to excitation to triplet (a3sg,c3Pu,d3Pu), fraction" << endl;
-		
-	output << left << "# 12. Electronic excitation (singlet, NO direct dissociation), [cm-3]" << endl
-		<< "# 13. Excitation to B 1S+u, including EF 1S+g (no direct dissociation), fraction" << endl
-		<< "# 14. Excitation to C 1Pu (no direct dissociation), fraction" << endl
-		<< "# 15. Excitation to B-primed 1S+u (no direct dissociation), fraction" << endl
-		<< "# 16. Excitation to D 1Pu (no direct dissociation), fraction" << endl;
-			
-	output << left << "# 17. Vibrational excitation to all v, per ion pair" << endl
-		<< "# 18. Vibrational excitation to v=1, per ion pair" << endl
-		<< "# 19. Ratio of excitations v=2/v=1" << endl
-		<< "# 20. Ratio of excitations v=3/v=1: " << endl
-		<< "# 21. Vibrational excitation through electronic states, to v = " << CALC_EL_PUMPING_VSTATE_NB << ", per ion pair" << endl;
-
-	output << "# ";
-	for (i = 1; i <= 21; i++) {
-		output << setw(13) << i;
-	}
-	output << endl;
-	
-	output << left << setw(13) << energy / nb_density
-		<< setw(13) << nb_ions 
-		<< setw(13) << energy / nb_ions 
-		<< setw(13) << nb_ions / energy 
-		<< setw(13) << heating_effic 
-		<< setw(13) << rovibr_losses_effic
-
-		<< setw(13) << h2_dissociated
-		<< setw(13) << h2_solomon_diss_arr.back() / h2_dissociated
-		<< setw(13) << h2_diss_exc_singlet_arr.back() / h2_dissociated 
-		<< setw(13) << h2_diss_excit_electr_triplet_arr.back() / h2_dissociated
-		<< setw(13) << h2_excit_electr_triplet_arr.back() / h2_dissociated 
-		
-		<< setw(13) << h2_excit_electr_arr.back()
-		<< setw(13) << h2_excit_electr_bs_arr.back() / h2_excit_electr_arr.back()
-		<< setw(13) << h2_excit_electr_cp_arr.back() / h2_excit_electr_arr.back()
-		<< setw(13) << h2_excit_electr_bps_arr.back() / h2_excit_electr_arr.back()
-		<< setw(13) << h2_excit_electr_dp_arr.back() / h2_excit_electr_arr.back()
-
-		<< setw(13) << h2_excit_vibr_arr.back() / nb_ions
-		<< setw(13) << h2_excit_vibr_v1_arr.back() / nb_ions
-		<< setw(13) << h2_excit_vibr_v2_arr.back() / h2_excit_vibr_v1_arr.back()
-		<< setw(13) << h2_excit_vibr_v3_arr.back() / h2_excit_vibr_v1_arr.back()
-		<< setw(13) << h2_excit_el_vstate_arr.back()/ nb_ions
-		<< endl;
-	
-	output.close();
-}
+}*/
 
 
 //
@@ -1876,7 +1741,7 @@ void init_dust_abund(const string& sim_path, vector<double>& d, double& grain_ra
 }
 
 // for test simulations,
-void init_electron_spectra_mono(const string& output_path, dynamic_array& init_spectrum, const vector<double>& en_grid,
+void init_electron_spectra_mono(dynamic_array& init_spectrum, const vector<double>& en_grid,
 	double electron_conc, double electron_energy)
 {
 	int i;

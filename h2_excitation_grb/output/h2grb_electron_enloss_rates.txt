@@ -1,6 +1,5 @@
 !Energy loss rates of electrons, parameter < 0 if electrons lose energy, rate in [eV cm-3 s-1],
 !tot - total rate, 
-!mt - momentum transfer, 
 !rot      - H2 rotational excitation,
 !rot_pos  - H2 rotational excitation, electrons gain energy,
 !vibr     - H2 ro-vibrational excitation (within the ground electronic state, including pure rotational transitions),
@@ -9,12 +8,23 @@
 !elec_t - H2 electronic states excitation (triplet),
 !ion - molecule/atom ionization,
 !hei - HeI excitation by electron impact
+!mt - momentum transfer, 
 !ecoul - Coulomb loses on electrons,
-!ndiss - neutral heating rate due to H2 dissociation, > 0
 !ncoll - neutral heating rate due to collisions H2-H2, H2-He,
+!ndiss - neutral heating rate due to H2 dissociation, > 0
 !H nuclei concentration [cm-3], nb of times,
-! 2.000000e+04   3      
-!time(s)     tot        mt         rot        rot_pos    vibr       vibr_pos   elec_s     elec_t     ion        hei        ecoul      ndiss      ncoll      
-0.000e+00    0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.00e+00   
-1.000e+01    -1.12e-03  -2.76e-07  -1.92e-09  8.14e-18   -7.15e-09  4.72e-16   -4.38e-04  -7.92e-07  -6.83e-04  -3.73e-13  0.00e+00   1.68e-06   2.65e-15   
-1.080e+01    -1.12e-03  -2.76e-07  -2.07e-09  9.49e-18   -7.72e-09  5.51e-16   -4.38e-04  -7.99e-07  -6.83e-04  -3.73e-13  0.00e+00   1.68e-06   2.87e-15   
+! 2.000e+04      13     
+!time(s)    tot         rot         rot_pos     vibr        vibr_pos    elec_s      elec_t      ion         hei         mt          ecoul       ncoll       ndiss       
+0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.000e+00   
+1.000e+01   -1.121e-03  -1.919e-09  8.140e-18   -7.151e-09  4.721e-16   -4.376e-04  -7.922e-07  -6.827e-04  -3.728e-13  -2.762e-07  0.000e+00   2.654e-15   3.591e-18   
+1.080e+01   -1.121e-03  -2.072e-09  9.492e-18   -7.722e-09  5.505e-16   -4.376e-04  -7.994e-07  -6.827e-04  -3.728e-13  -2.764e-07  0.000e+00   2.867e-15   3.600e-18   
+1.166e+01   -1.122e-03  -2.238e-09  1.107e-17   -8.339e-09  6.419e-16   -4.377e-04  -8.072e-07  -6.828e-04  -3.728e-13  -2.765e-07  0.000e+00   3.098e-15   3.610e-18   
+1.259e+01   -1.122e-03  -2.417e-09  1.291e-17   -9.004e-09  7.485e-16   -4.377e-04  -8.157e-07  -6.828e-04  -3.728e-13  -2.767e-07  0.000e+00   3.348e-15   3.620e-18   
+1.359e+01   -1.122e-03  -2.610e-09  1.506e-17   -9.724e-09  8.729e-16   -4.377e-04  -8.248e-07  -6.829e-04  -3.729e-13  -2.769e-07  0.000e+00   3.618e-15   3.631e-18   
+1.468e+01   -1.122e-03  -2.818e-09  1.756e-17   -1.050e-08  1.018e-15   -4.378e-04  -8.346e-07  -6.829e-04  -3.729e-13  -2.771e-07  0.000e+00   3.910e-15   3.643e-18   
+1.585e+01   -1.122e-03  -3.043e-09  2.048e-17   -1.134e-08  1.187e-15   -4.379e-04  -8.453e-07  -6.830e-04  -3.729e-13  -2.773e-07  0.000e+00   4.226e-15   3.657e-18   
+1.711e+01   -1.122e-03  -3.286e-09  2.389e-17   -1.224e-08  1.384e-15   -4.379e-04  -8.567e-07  -6.831e-04  -3.730e-13  -2.775e-07  0.000e+00   4.567e-15   3.671e-18   
+1.848e+01   -1.122e-03  -3.549e-09  2.786e-17   -1.322e-08  1.614e-15   -4.380e-04  -8.691e-07  -6.832e-04  -3.730e-13  -2.777e-07  0.000e+00   4.937e-15   3.686e-18   
+1.995e+01   -1.122e-03  -3.832e-09  3.250e-17   -1.428e-08  1.882e-15   -4.380e-04  -8.825e-07  -6.832e-04  -3.731e-13  -2.780e-07  0.000e+00   5.337e-15   3.703e-18   
+2.154e+01   -1.123e-03  -4.139e-09  3.791e-17   -1.542e-08  2.195e-15   -4.381e-04  -8.970e-07  -6.833e-04  -3.731e-13  -2.783e-07  0.000e+00   5.771e-15   3.720e-18   
+2.326e+01   -1.123e-03  -4.470e-09  4.422e-17   -1.665e-08  2.560e-15   -4.382e-04  -9.126e-07  -6.834e-04  -3.732e-13  -2.786e-07  0.000e+00   6.240e-15   3.740e-18   

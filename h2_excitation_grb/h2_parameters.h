@@ -52,7 +52,7 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 #define ELECTRON_ENERGY_FIXED 1.   // eV, the energy grid intervals are equal at E < E_fixed,
 #define MAX_ELECTRON_ENERGY 1.e+6  // eV, may be lower than in the input file with initial spectrum,
 #define MIN_MODEL_TIME 1.e+1   // in s, minimal model time at which data are saved,
-#define MAX_MODEL_TIME 1.e+6   // maximal model time in s (the simulations are done up to this time),
+#define MAX_MODEL_TIME 1.e+8   // maximal model time in s (the simulations are done up to this time),
 
 // the number of vibrational states of the ground electronic state of H2 taken into account in electron-impact excitation,
 // must be less or equal than maximal, MAX_NB_H2_VSTATES_X1SG,
@@ -61,10 +61,6 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 // Note: the deexcitation of electronically excited levels is not treated correctly if v qnb < 14 
 //       (the ro-vibrational levels are presented in the decay list of excited levels, but are not taken into account in the simulations);
 #define USED_NB_OF_H2_VSTATES_X1SG 15
-
-// Calculation of the electronic pumping rate of the particular vibrational state of the ground electronic state
-#define CALC_EL_PUMPING_VSTATE_NB 3
-
 
 // ----------------------------------------------------
 // Electron spectra evolution
@@ -93,3 +89,7 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 // collisions of H2 with H2, He
 #define H2_COLLISIONS_WITH_H2_HE 1
 #define THERMAL_NEUTRAL_TEMPERATURE 15.  // in K
+
+// Additional triplet states,
+// the states are treated as dissociative in order to estimate their effect
+#define ADD_TRIPLET_STATES 0
