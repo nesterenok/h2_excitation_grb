@@ -17,6 +17,8 @@ C:/Users/Александр/Documents/Visual Studio 2019/h2_excitation_grb/h2_excitation_
 # Electron concentration, in [cm-3],
 0.01
 # Nb of electron energies to calculate
-8
+#8
+1
 # Electron energy list, in [eV], must be integer, be careful - no empty line at the end!
-30.  100.  300.  1000.  3000.  10000.  30000.  100000.
+#3.6520e+01  100.  300.  1000.  3000.  10000.  30000.  100000.
+100.

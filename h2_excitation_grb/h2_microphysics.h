@@ -1,12 +1,15 @@
 #pragma once
-#include <cstring>
+#include <string>
 #include <vector>
 #include "spectroscopy.h"
 #include "dynamic_array.h"
 
-// Saving cross section table
-void save_cross_section_table(const std::string& output_path, const std::string& data_path,
-	double ionization_fraction, double thermal_electron_temp);
+// ratio of ionization channel rates 1/(1 + 2)
+// 1. H2 + e- -> H2+ + e- + e-
+// 2. H2 + e- -> H + H+ + e- + e- 
+// Straub et al., Physical Review A 54, 2146 (1996);
+// = average of the ratio for energies, where cross section >= 0.5 * maximal cross section
+#define H2_IONIZ_CHANNEL_RATIO 0.074
 
 // Calculation of lifetimes of HeI states,
 void calc_helium_lifetimes(const std::string& output_path, const std::string& data_path);
@@ -168,6 +171,7 @@ public:
 // He+ + e- -> He++ + e- + e-
 // Binary-Encounter-Dipole (BED) model, 
 // for one-electron ions the differential oscillator strength as for H atom (Kim & Rudd, 1994),
+// Note, for accurate calculation, double ionization of He must be taken into account, He + e- -> He++ + e- + e- +e-
 class hep_electron_ionization_data : public electron_ionization_data {
 public:
 	hep_electron_ionization_data();
@@ -250,43 +254,6 @@ public:
 };
 
 
-// Is not used,
-// Auxiliary classes for the calculation of ionization rates and electron spectra evolution,
-class cross_section_integral_2d
-{
-protected:
-	double err, x1, x2, z1, z2;
-	electron_impact_ionization* ionization;
-
-public:
-	double operator() (double x);
-	// x - initial projectile energy, 
-	// z - ejected electron energy (slowest electron after collision),
-	// returns integral of cross section, [cm2 eV]
-	double get(double xx1, double xx2, double zz1, double zz2);
-
-	cross_section_integral_2d(electron_impact_ionization* ei, double err);
-};
-
-// is not used
-class cross_section_integral_weight
-{
-protected:
-	double err, x1, x2, y1, y2, z1, z2;
-	electron_impact_ionization* ionization;
-
-public:
-	double operator() (double x);
-	// x - initial projectile electron energy, 
-	// y - final projectile energy (fastest electron after collision), 
-	// z - energy of the ejected electron, z <= y,
-	// returns integral of diff. cross section on [x1, x2] and [z1, z2] but the scattered energy is lying in the given interval [y1, y2], [cm2 eV],
-	double get(double xx1, double xx2, double yy1, double yy2, double zz1, double zz2);
-
-	cross_section_integral_weight(electron_impact_ionization* ei, double err);
-};
-
-
 //
 // Electronic excitation of H2 ground state 1Sg+(X), 
 // Scarlett et al., Atomic Data and Nuclear Data Tables 137, 101361 (2021), 
@@ -350,6 +317,8 @@ public:
 };
 
 
+
+
 // Is not used,
 // Excitation of H2 vibration states,
 // Janev et al. "Collision Processes in Low-Temperature Hydrogen Plasmas", FZ-Juelich Report No. 4105 (2003)
@@ -361,4 +330,40 @@ protected:
 public:
 	double operator() (double energy) const;
 	h2_excitation_vibr02_cs();
+};
+
+// Is not used,
+// Auxiliary classes for the calculation of ionization rates and electron spectra evolution,
+class cross_section_integral_2d
+{
+protected:
+	double err, x1, x2, z1, z2;
+	electron_impact_ionization* ionization;
+
+public:
+	double operator() (double x);
+	// x - initial projectile energy, 
+	// z - ejected electron energy (slowest electron after collision),
+	// returns integral of cross section, [cm2 eV]
+	double get(double xx1, double xx2, double zz1, double zz2);
+
+	cross_section_integral_2d(electron_impact_ionization* ei, double err);
+};
+
+// is not used
+class cross_section_integral_weight
+{
+protected:
+	double err, x1, x2, y1, y2, z1, z2;
+	electron_impact_ionization* ionization;
+
+public:
+	double operator() (double x);
+	// x - initial projectile electron energy, 
+	// y - final projectile energy (fastest electron after collision), 
+	// z - energy of the ejected electron, z <= y,
+	// returns integral of diff. cross section on [x1, x2] and [z1, z2] but the scattered energy is lying in the given interval [y1, y2], [cm2 eV],
+	double get(double xx1, double xx2, double yy1, double yy2, double zz1, double zz2);
+
+	cross_section_integral_weight(electron_impact_ionization* ei, double err);
 };

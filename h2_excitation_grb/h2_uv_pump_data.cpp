@@ -1,5 +1,6 @@
 // Checks:
 // 23.01.2024 - memcpy instead of cycle.
+// 13.02.2026 
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
@@ -154,11 +155,13 @@ void print_statistics(string output_path, string name, const std::vector<transit
 			j = nb - 1;
 		arr[j]++;
 
-		if (einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV < trans_en_low)
+		if (einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV < trans_en_low) {
 			trans_en_low = einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV;
+		}
 
-		if (einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV > trans_en_high)
+		if (einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV > trans_en_high) {
 			trans_en_high = einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV;
+		}
 
 		if (einstein_coeff_vector[i].low_lev.el == 0 && einstein_coeff_vector[i].low_lev.v == 0 
 			&& (einstein_coeff_vector[i].low_lev.j == 0 || einstein_coeff_vector[i].low_lev.j == 1)) 
@@ -318,11 +321,6 @@ void h2_excited_state_data(const std::string& data_path, std::vector<h2_energy_l
 			cout << "Error in " << SOURCE_NAME << ": can't open " << fname << endl;
 			exit(1);
 		}
-		else {
-			if (verbosity) {
-				cout << "	reading data from file: " << fname << endl;
-			}
-		}
 
 		while (!input.eof()) {
 			// comment lines are read (all lines must be commented, no empty lines at the file end)
@@ -340,7 +338,7 @@ void h2_excited_state_data(const std::string& data_path, std::vector<h2_energy_l
 
 			diss_fdata.v = v;
 			diss_fdata.j = j;
-			diss_fdata.prob = prob;
+			diss_fdata.prob = prob;              // s-1
 			diss_fdata.kin_energy = kin_energy;  // in eV;
 
 			diss_fdata_arr.push_back(diss_fdata);
@@ -381,7 +379,7 @@ void h2_excited_state_data(const std::string& data_path, std::vector<h2_energy_l
 
 		for (k = 0; k < parameters->nb_of_decays; k++) {
 			parameters->decay_level_nbs[k] = decay_list[k].nb;
-			parameters->decay_probs[k] = decay_list[k].rate / tot_decay_rate;
+			parameters->decay_probs[k] = decay_list[k].rate / tot_decay_rate;  // dimensionless
 		}
 
 		level_data.push_back(*parameters);
@@ -407,7 +405,8 @@ void h2_excited_state_data(const string& path, vector<h2_energy_level_param>& le
 		decay_list.clear();
 		prob = tot_decay_rate = kin_energy = 0.;
 
-		// Calculation of the total decay rate of the levels of the upper electronic state A
+		// Calculation of the total decay rate of the levels of the upper electronic state A,
+		// No dissociation to the continuum in this case,
 		for (k = 0; k < (int)(h2_band_up.size()); k++) {
 			if (h2_band_up[k].up_lev.j == h2_excited_di_up->lev_array[i].j && h2_band_up[k].up_lev.v == h2_excited_di_up->lev_array[i].v) 
 			{
@@ -455,6 +454,7 @@ void h2_excited_state_data(const string& path, vector<h2_energy_level_param>& le
 			x += parameters->decay_probs[k];
 		}
 
+		// Check that total probability is 1:
 		x += parameters->diss_prob;
 		if (x < 1. - 10. * numeric_limits<double>::epsilon()) {
 			if (verbosity) {

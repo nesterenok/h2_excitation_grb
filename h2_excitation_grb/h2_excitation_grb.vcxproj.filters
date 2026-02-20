@@ -54,6 +54,9 @@
     <ClCompile Include="..\..\..\input_data\mathematics\linear_algebra.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="h2_electron_cs_table.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dynamic_array.h">
@@ -99,6 +102,9 @@
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\input_data\mathematics\linear_algebra.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="h2_electron_cs_table.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>

@@ -35,6 +35,7 @@ void save_electron_energy_loss_rates(const std::string& output_path, double conc
     const std::vector<double>& enloss_rates_h2_rot,
     const std::vector<double>& enloss_rates_h2_rot_pos,
     const std::vector<double>& enloss_rates_h2_vibr,
+    const std::vector<double>& enloss_rates_h2_vibr_01,
     const std::vector<double>& enloss_rates_h2_vibr_pos,
     const std::vector<double>& enloss_rates_ioniz,
     const std::vector<double>& enloss_rates_hei,
@@ -47,6 +48,7 @@ void save_electron_energy_losses(const std::string& output_path, double conc_h_t
     const std::vector<double>& enloss_mt,
     const std::vector<double>& enloss_h2_rot,
     const std::vector<double>& enloss_h2_vibr,
+    const std::vector<double>& enloss_h2_vibr_01,
     const std::vector<double>& enloss_ioniz,
     const std::vector<double>& enloss_hei,
     const std::vector<double>& enloss_coulomb_el,
@@ -73,11 +75,13 @@ void save_output_parameters(const std::string& output_path, double conc_h_tot, c
     const std::vector<double>& enloss_coulomb_el_arr,
     const std::vector<double>& neutral_coll_heating_arr,
     const std::vector<double>& enloss_h2_vibr_arr,
+    const std::vector<double>& enloss_h2_vibr_arr_01,
     std::vector< std::array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES>> & h2_state_data_arr,
     const std::vector<dynamic_array> & h2_electr_vstates_arr,
     const std::vector<dynamic_array> & h2_vibr_vstates_arr, 
     const std::vector<double>& h2_excit_rot_arr, 
-    const std::vector<double>& hei_excit_arr);
+    const std::vector<double>& hei_excit_arr, 
+    const std::vector<double>& energy_in_rovibr_levels_arr);
 
 
 // Not used

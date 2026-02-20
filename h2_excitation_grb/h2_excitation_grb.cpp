@@ -38,6 +38,7 @@
 #include "dynamic_array.h"
 #include "h2_elspectrum_eqs.h"
 #include "h2_saving_data.h"
+#include"h2_electron_cs_table.h"
 
 #define MAX_TEXT_LINE_WIDTH 3350  // maximal size of the comment lines in the files in symbols,
 #define SOURCE_NAME "h2_excitation_grb.cpp"
@@ -68,10 +69,11 @@ int nb_of_time_moments, nb_of_equat, nb_of_el_energies, nb_lev_h2, nb_lev_hei, h
 
 double grain_radius_init, grain_nb_density, grain_material_density, grain_radius, dust_mass, gas_mass, dg_ratio;
 
-double enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos, enloss_rate_ioniz, 
-	enloss_rate_hei, enloss_rate_coulomb_el, neutral_coll_heating_rate;
+double enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_01, enloss_rate_h2_vibr_pos, 
+	enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, neutral_coll_heating_rate;
 
-double enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_ioniz, enloss_hei, enloss_coulomb_el, neutral_coll_heating;
+double enloss_mt, enloss_h2_rot, enloss_h2_vibr, enloss_h2_vibr_01, enloss_ioniz, enloss_hei, enloss_coulomb_el, neutral_coll_heating, 
+	energy_in_rovibr_levels;
 
 double hei_excit_rate, h2_excit_rot_rate;
 double hei_excit, h2_excit_rot;
@@ -95,11 +97,14 @@ vector< dynamic_array> h2_electr_vstates_arr, h2_vibr_vstates_arr;
 
 // Energy loss rates in [eV cm-3 s-1], as a function of time
 vector<double> enloss_rate_mt_arr, enloss_rate_h2_rot_arr, enloss_rate_h2_rot_arr_pos, enloss_rate_h2_vibr_arr, enloss_rate_h2_vibr_arr_pos,
-	enloss_rate_ioniz_arr, enloss_rate_hei_arr, enloss_rate_coulomb_el_arr, neutral_coll_heating_rate_arr;
+	enloss_rate_h2_vibr_arr_01, enloss_rate_ioniz_arr, enloss_rate_hei_arr, enloss_rate_coulomb_el_arr, neutral_coll_heating_rate_arr;
 
 // Energy loss in [eV cm-3] during the time interval [0, t] as a function of time t,
-vector<double> enloss_mt_arr, enloss_h2_rot_arr, enloss_h2_vibr_arr, enloss_ioniz_arr, enloss_hei_arr, 
+vector<double> enloss_mt_arr, enloss_h2_rot_arr, enloss_h2_vibr_arr, enloss_h2_vibr_arr_01, enloss_ioniz_arr, enloss_hei_arr,
 	enloss_coulomb_el_arr, neutral_coll_heating_arr;
+
+// Energy locked in ro-vibrational levels of H2 [eV cm-3]
+vector<double> energy_in_rovibr_levels_arr;
 
 // Pure rotational excitations as a function of time, rates
 vector<double> h2_excit_rot_rate_arr;
@@ -140,7 +145,7 @@ int main()
 {	
 	char text_line[MAX_TEXT_LINE_WIDTH];
 
-	int i, nb_processors(6), nb;
+	int i, ji, nb_processors(6), nb(1);
 	double op_ratio_h2, conc_h_tot, ioniz_fract;
 	double x, electron_conc, he_abund;
 	
@@ -284,16 +289,19 @@ int main()
 	cout << "No OpenMP" << endl;
 #endif
 
-	
 	for (i = 0; i < nb; i++) {
 		simulations_monoenergetic(data_path, output_path, conc_h_tot, he_abund, ioniz_fract, op_ratio_h2, electron_conc, 
 			electron_energy_arr[i]);
 	}
 
-	output_path = "C:/Users/Александр/Documents/Данные и графики/paper GRB in molecular cloud/python_scripts_ism/";
+	// please, check the saving directory,
+	output_path = "C:/Users/Александр/Documents/Данные и графики/paper Numerical model of fast electron energy deposition/python/";
+	//output_path = "C:/Users/Александр/Documents/Данные и графики/paper GRB in molecular cloud/python_scripts_ism/";
 	data_path   = "C:/Users/Александр/Documents/input_data/";
 
-	//save_cross_section_table(output_path, data_path, IONIZATION_FRACTION_THERMAL_EL, THERMAL_EL_TEMPERATURE);
+	ioniz_fract = 1.e-7;
+	ji = 0;  // check initial J of H2 (0 or 1)
+	//save_cross_section_table(output_path, data_path, ioniz_fract, THERMAL_EL_TEMPERATURE, ji);
 	//calc_helium_lifetimes(output_path, data_path);
 }
 
@@ -310,13 +318,14 @@ void memory_freeing_up()
 	}
 	delete[] initial_data;
 
-	enloss_rate_mt = enloss_rate_h2_rot = enloss_rate_h2_rot_pos = enloss_rate_h2_vibr = enloss_rate_h2_vibr_pos 
+	enloss_rate_mt = enloss_rate_h2_rot = enloss_rate_h2_rot_pos = enloss_rate_h2_vibr = enloss_rate_h2_vibr_01 = enloss_rate_h2_vibr_pos
 		= enloss_rate_ioniz = enloss_rate_hei = enloss_rate_coulomb_el = neutral_coll_heating_rate = 0.;
 
-	enloss_mt = enloss_h2_rot = enloss_h2_vibr = enloss_ioniz = enloss_hei = enloss_coulomb_el = neutral_coll_heating = 0.;
+	enloss_mt = enloss_h2_rot = enloss_h2_vibr = enloss_h2_vibr_01 = enloss_ioniz = enloss_hei = enloss_coulomb_el = neutral_coll_heating = 0.;
 
 	h2_excit_rot_rate = hei_excit_rate = 0.;
 	h2_excit_rot = hei_excit = 0.;
+	energy_in_rovibr_levels = 0.;
 
 	for (i = 0; i < NB_EXC_ELECTRONIC_STATES; i++) {
 		h2_state_data[i].excit = h2_state_data[i].direct_diss = h2_state_data[i].twostep_diss =
@@ -342,6 +351,7 @@ void memory_freeing_up()
 	enloss_rate_h2_rot_arr_pos.clear();
 	enloss_rate_h2_vibr_arr.clear();
 	enloss_rate_h2_vibr_arr_pos.clear();
+	enloss_rate_h2_vibr_arr_01.clear();
 	enloss_rate_ioniz_arr.clear(); 
 	enloss_rate_hei_arr.clear();
 	enloss_rate_coulomb_el_arr.clear();
@@ -350,10 +360,12 @@ void memory_freeing_up()
 	enloss_mt_arr.clear(); 
 	enloss_h2_rot_arr.clear(); 
 	enloss_h2_vibr_arr.clear();
+	enloss_h2_vibr_arr_01.clear();
 	enloss_ioniz_arr.clear();
 	enloss_hei_arr.clear(); 
 	enloss_coulomb_el_arr.clear(); 
 	neutral_coll_heating_arr.clear();
+	energy_in_rovibr_levels_arr.clear();
 
 	h2_excit_rot_rate_arr.clear();
 	h2_excit_rot_arr.clear();
@@ -439,7 +451,8 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	int i, k, time_nb, step_nb, flag;
 	long int nb_steps_tot;
 
-	double x1, x2, x3, x4, x5, x6, x7, rel_tol, dt, model_time, model_time_aux, model_time_aux_prev, model_time_step, model_time_out;
+	double x1, x2, x3, x4, x5, x6, x7, x8, rel_tol, dt, model_time, model_time_aux, model_time_aux_prev, model_time_step, model_time_out, 
+		energy_in_rovibr_levels;
 
 	stringstream ss;
 	string output_path_2;
@@ -465,6 +478,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	i = rounding(electron_energy);
 	ss << i << "ev" << "/";
 
+	// full path of the saving directory,
 	output_path_2 = ss.str();
 
 #ifdef __linux__
@@ -520,7 +534,10 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 		initial_data[i] = el_spectrum.arr[i] * user_data->get_electron_energy_bin(i);
 	}
 
-	initial_data[nb_of_el_energies + H2_NB] = 0.5 * conc_h_tot;
+	// initial ionization fraction is taken into account in specimen abundances
+	initial_data[nb_of_el_energies + EL_NB] = conc_h_tot * ioniz_fract;
+	initial_data[nb_of_el_energies + H2_NB] = 0.5 * conc_h_tot * (1. - ioniz_fract);
+	initial_data[nb_of_el_energies + H2_P_NB] = 0.5 * conc_h_tot * ioniz_fract;
 	initial_data[nb_of_el_energies + HE_NB] = he_abund * conc_h_tot;
 
 	// the initial distribution of energy level populations is postulated, [cm-3]
@@ -650,17 +667,20 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	// update the members of user_data class,
 	f_elsp(model_time, y, ydot, (void*)user_data);
 
-	user_data->get_el_energy_losses(enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos,
-		enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, neutral_coll_heating_rate);
+	user_data->get_el_energy_losses(enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_01, 
+		enloss_rate_h2_vibr_pos, enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, neutral_coll_heating_rate);
 
 	user_data->get_h2_state_data(h2_state_data_rates);
 
 	user_data->get_h2_excitation_rates(h2_electr_vstates_rates, h2_vibr_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
+	
+	energy_in_rovibr_levels = user_data->get_energy_h2_rovibr(y);
 
 	// Energy loss rates
 	enloss_rate_mt_arr.push_back(enloss_rate_mt);
 	enloss_rate_h2_rot_arr.push_back(enloss_rate_h2_rot);
 	enloss_rate_h2_vibr_arr.push_back(enloss_rate_h2_vibr);
+	enloss_rate_h2_vibr_arr_01.push_back(enloss_rate_h2_vibr_01);
 	enloss_rate_ioniz_arr.push_back(enloss_rate_ioniz);
 	enloss_rate_hei_arr.push_back(enloss_rate_hei);
 
@@ -675,6 +695,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	enloss_mt_arr.push_back(enloss_mt);
 	enloss_h2_rot_arr.push_back(enloss_h2_rot);
 	enloss_h2_vibr_arr.push_back(enloss_h2_vibr);
+	enloss_h2_vibr_arr_01.push_back(enloss_h2_vibr_01);
 	enloss_ioniz_arr.push_back(enloss_ioniz);
 	enloss_hei_arr.push_back(enloss_hei);
 
@@ -694,6 +715,8 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	h2_state_data_arr.push_back(h2_state_data);
 	h2_electr_vstates_arr.push_back(h2_electr_vstates);
 	h2_vibr_vstates_arr.push_back(h2_vibr_vstates);
+
+	energy_in_rovibr_levels_arr.push_back(energy_in_rovibr_levels);
 	
 	// Physical parameters
 	neutral_temp_arr.push_back(NV_Ith_S(y, physeq_nb));
@@ -759,6 +782,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 			// Energy losses, 
 			x1 = enloss_rate_h2_rot;
 			x2 = enloss_rate_h2_vibr;
+			x8 = enloss_rate_h2_vibr_01;
 			x3 = enloss_rate_ioniz;
 			x4 = enloss_rate_hei;
 			
@@ -766,11 +790,12 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 			x6 = enloss_rate_coulomb_el;
 			x7 = neutral_coll_heating_rate;
 
-			user_data->get_el_energy_losses(enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_pos,
-				enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, neutral_coll_heating_rate);
+			user_data->get_el_energy_losses(enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_01, 
+				enloss_rate_h2_vibr_pos, enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el, neutral_coll_heating_rate);
 
 			enloss_h2_rot += (x1 + enloss_rate_h2_rot) * dt;
 			enloss_h2_vibr += (x2 + enloss_rate_h2_vibr) * dt;
+			enloss_h2_vibr_01 += (x8 + enloss_rate_h2_vibr_01) * dt;
 			enloss_ioniz += (x3 + enloss_rate_ioniz) * dt;
 			enloss_hei += (x4 + enloss_rate_hei) * dt;
 		
@@ -855,6 +880,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 				// Energy losses, rates
 				enloss_rate_h2_rot_arr.push_back(enloss_rate_h2_rot);
 				enloss_rate_h2_vibr_arr.push_back(enloss_rate_h2_vibr);
+				enloss_rate_h2_vibr_arr_01.push_back(enloss_rate_h2_vibr_01);
 				enloss_rate_ioniz_arr.push_back(enloss_rate_ioniz);
 				enloss_rate_hei_arr.push_back(enloss_rate_hei);
 
@@ -868,6 +894,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 				// Energy losses, time-integrated,
 				enloss_h2_rot_arr.push_back(enloss_h2_rot);
 				enloss_h2_vibr_arr.push_back(enloss_h2_vibr);
+				enloss_h2_vibr_arr_01.push_back(enloss_h2_vibr_01);
 				enloss_ioniz_arr.push_back(enloss_ioniz);
 				enloss_hei_arr.push_back(enloss_hei);
 
@@ -883,6 +910,9 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 				h2_state_data_arr.push_back(h2_state_data);
 				h2_electr_vstates_arr.push_back(h2_electr_vstates);
 				h2_vibr_vstates_arr.push_back(h2_vibr_vstates);
+
+				energy_in_rovibr_levels = user_data->get_energy_h2_rovibr(y);
+				energy_in_rovibr_levels_arr.push_back(energy_in_rovibr_levels);
 
 				// Excitations, rates and time-integrated
 				h2_excit_rot_rate_arr.push_back(h2_excit_rot_rate);
@@ -906,6 +936,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 					enloss_rate_h2_rot_arr,
 					enloss_rate_h2_rot_arr_pos,
 					enloss_rate_h2_vibr_arr,
+					enloss_rate_h2_vibr_arr_01,
 					enloss_rate_h2_vibr_arr_pos,
 					enloss_rate_ioniz_arr,
 					enloss_rate_hei_arr,
@@ -917,6 +948,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 					enloss_mt_arr,
 					enloss_h2_rot_arr,
 					enloss_h2_vibr_arr,
+					enloss_h2_vibr_arr_01,
 					enloss_ioniz_arr,
 					enloss_hei_arr,
 					enloss_coulomb_el_arr,
@@ -958,11 +990,13 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 		enloss_coulomb_el_arr,
 		neutral_coll_heating_arr,
 		enloss_h2_vibr_arr,
+		enloss_h2_vibr_arr_01,
 		h2_state_data_arr,
 		h2_electr_vstates_arr,
 		h2_vibr_vstates_arr,
 		h2_excit_rot_arr,
-		hei_excit_arr);
+		hei_excit_arr, 
+		energy_in_rovibr_levels_arr);
 }
 
 /*
@@ -1740,7 +1774,8 @@ void init_dust_abund(const string& sim_path, vector<double>& d, double& grain_ra
 	input.close();
 }
 
-// for test simulations,
+// for mono-energetic spectrum simulations,
+// concentration in [cm-3], energy in [eV], return spectrum of electrons [cm-3 eV-1]
 void init_electron_spectra_mono(dynamic_array& init_spectrum, const vector<double>& en_grid,
 	double electron_conc, double electron_energy)
 {

@@ -27,10 +27,9 @@ const std::string H2_ELECTRONIC_STATE_NAMES[] = { "B1Su", "C1Pu", "Bp1Su", "D1Pu
 #define MAX_NB_H2_VSTATES_BPP1SU 69  // 0,1,..68  M. Glass-Maujean, private communication (2025),
 #define MAX_NB_H2_VSTATES_DP1PU 18   // 0,1,..15 for D'-; 0,1,..17 for D'+ 
 
-#define MAX_H2_VSTATES_a3Sg 21   // 0,1,...,20  Wolniewicz L., Molecular Physics 105, 1497 (2007); but 0,1,...,21 Scarlett et al. (2023), private comm.
-#define MAX_H2_VSTATES_c3Pu 21   // 0,1,...,20  Scarlett et al. (2023), private comm.
-#define MAX_H2_VSTATES_d3Pu 21   // 0,1,...,20  Scarlett et al. (2023), private comm.
-
+#define MAX_H2_VSTATES_a3Sg 21   // 0,1,...,20  Wolniewicz L., Molecular Physics 105, 1497 (2007); but 0,1,...,21 Scarlett et al. (2025), private comm.
+#define MAX_H2_VSTATES_c3Pu 21   // 0,1,...,20  Scarlett et al. (2025), private comm.
+#define MAX_H2_VSTATES_d3Pu 21   // 0,1,...,20  Scarlett et al. (2025), private comm.
 
 
 // The data on Lyman and Werner band transitions is initialized by this function - vector<transition>,
@@ -65,12 +64,13 @@ public:
 	// nb of excited level in the set of energy levels,
 	int nb, nb_of_decays;
 	// dissociation probability is dimensionless, total decay rate in s-1, total decay includes dissociation, 
-	// kinetic energy released in the dissociation, in erg,
+	// kinetic energy released in the dissociation, in eV,
 	double diss_prob, tot_decay, kin_energy;
 	
 	// arrays containing decay channel information: the number of level, decay probability (dimensionless),
 	int * decay_level_nbs;
 	double * decay_probs;
+	// Maybe, add vibration number array?
 
 	// the relation operators are needed to sort transition vector by energy:
 	bool operator == (h2_energy_level_param obj) const { return (nb == obj.nb); }

@@ -157,6 +157,7 @@
     <ClCompile Include="..\..\c_type_shock\c_type_shock\coll_rates_h2.cpp" />
     <ClCompile Include="..\..\c_type_shock\c_type_shock\spectroscopy.cpp" />
     <ClCompile Include="dynamic_array.cpp" />
+    <ClCompile Include="h2_electron_cs_table.cpp" />
     <ClCompile Include="h2_elspectrum_eqs.cpp" />
     <ClCompile Include="h2_excitation_grb.cpp" />
     <ClCompile Include="h2_microphysics.cpp" />
@@ -174,6 +175,7 @@
     <ClInclude Include="..\..\c_type_shock\c_type_shock\coll_rates_h2.h" />
     <ClInclude Include="..\..\c_type_shock\c_type_shock\spectroscopy.h" />
     <ClInclude Include="dynamic_array.h" />
+    <ClInclude Include="h2_electron_cs_table.h" />
     <ClInclude Include="h2_elspectrum_eqs.h" />
     <ClInclude Include="h2_microphysics.h" />
     <ClInclude Include="h2_parameters.h" />
