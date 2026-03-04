@@ -16,6 +16,55 @@
 using namespace std;
 
 
+void save_model_parameters_mono(const std::string& output_path, double conc_h_tot, double op_ratio_h2, double ioniz_fract, 
+	double he_abund, double electron_conc, double electron_energy)
+{
+	time_t timer;
+	char* ctime_str;
+
+	string fname;
+	ofstream output;
+
+	fname = output_path + "h2grb_parameters_input.txt";
+	output.open(fname.c_str());
+
+	output << scientific;
+	output.precision(5);
+
+	timer = time(NULL);
+	ctime_str = ctime(&timer);
+
+	output << "!H2-electron propagation parameters, date " << ctime_str;
+	output << left << "!Gas parameters:" << endl
+		<< "!H nuclei concentration [cm-3]:" << endl << conc_h_tot << endl
+		<< "!Initial H2 concentration [cm-3]:" << endl << 0.5 * conc_h_tot << endl
+		<< "!Initial H2 OPR:" << endl << op_ratio_h2 << endl;
+	
+	output << "!He abundance:" << endl << he_abund << endl
+		<< "!Electron concentration [cm-3]:" << endl << electron_conc << endl
+		<< "!Electron energy [eV]:" << endl << electron_energy << endl;
+
+	output << left << "!Coulomb losses (0/1):" << endl << CALC_EL_LOSSES_THERMAL_EL << endl
+		<< "!Ionization fraction of thermal electrons:" << endl << ioniz_fract << endl
+		<< "!Thermal electron temperature [K]:" << endl << THERMAL_EL_TEMPERATURE << endl;
+
+	output << left << "!Collisions of H2 with H2, He included (0/1):" << endl << H2_COLLISIONS_WITH_H2_HE << endl
+		<< "!Temperature of the neutral gas in the cloud [K]:" << endl << THERMAL_NEUTRAL_TEMPERATURE << endl;
+
+	output << left << "!Nb of H2 vibrational states taking into account in electron-impact excitation:" << endl << USED_NB_OF_H2_VSTATES_X1SG << endl;
+	output << left << "!Nb of bins per order in the electron energy grid (default 100):" << endl
+		<< NB_OF_BINS_PER_ORDER_EL << endl;
+
+#ifdef _OPENMP
+	output << left << "!Nb of processors in OpenMP:" << endl
+		<< omp_get_max_threads() << endl;
+#else
+	output << left << "!No OpenMP" << endl << "1" << endl;
+#endif
+
+	output.close();
+}
+
 void save_model_parameters(const std::string& output_path,  double conc_h_tot, double op_ratio_h2, double ioniz_fract, double dust_gas_mass_ratio, 
 	double grain_radius, double grain_nb_density, double grb_cloud_distance, double grb_distance, double hcolumn_dens, int layer_nb)
 {
@@ -74,6 +123,7 @@ void save_model_parameters(const std::string& output_path,  double conc_h_tot, d
 	output.close();
 }
 
+
 void save_electron_spectrum_evolution(const string& output_path, const vector<double>& electron_energies_grid, const vector<double>& electron_energy_bin_size,
 	const vector<double>& time_moments, const vector<dynamic_array>& spectrum_data, double conc_h_tot)
 {
@@ -90,14 +140,12 @@ void save_electron_spectrum_evolution(const string& output_path, const vector<do
 	output.open(fname.c_str());
 
 	output << "!Electron spectrum evolution," << endl
-		// << "!first row: distance from the GRB source to cloud layer centre [pc], H column density from the cloud boundary to layer centre [cm-2] <<
 		<< "!first row: H nuclei concentration [cm-3], nb of rows (= nb of el. energies) and nb of times," << endl
 		<< "!second row: time (s)," << endl
 		<< "!data: col.1 - centre of the energy bin [eV], col.2 - bin semi-length [eV], col.3 - spectrum N(E) [cm-3 eV-1]," << endl;
 
 	output << scientific;
 	output.precision(6);
-	//output << left << "! " << setw(15) << grb_distance / PARSEC << setw(15) << hcolumn_dens;
 	output << left << "! " << setw(15) << conc_h_tot << setw(7) << nb_of_el_energies << setw(7) << nb_of_times << endl;
 
 	output.precision(4);
@@ -188,8 +236,9 @@ void save_specimen_conc_evolution(const string& output_path, const vector<double
 		for (i = 0; i < NB_OF_CHEM_SPECIES; i++) 
 		{
 			w = conc_data[l].arr[i];
-			if (w < MINIMAL_ABUNDANCE)
+			if (w < MINIMAL_ABUNDANCE) {
 				w = MINIMAL_ABUNDANCE;
+			}
 			output << left << setw(12) << w;
 		}
 		output << endl;
@@ -232,8 +281,9 @@ void save_h2_populations_evolution(const string& output_path, const vector<doubl
 		for (i = 0; i < nb_lev_h2; i++) 
 		{
 			w = h2_popdens_data[l].arr[i];
-			if (w < MINIMAL_ABUNDANCE)
+			if (w < MINIMAL_ABUNDANCE) {
 				w = MINIMAL_ABUNDANCE;
+			}
 			output << left << setw(12) << w;
 		}
 		output << endl;
@@ -251,8 +301,8 @@ void save_h2_populations_evolution(const string& output_path, const vector<doubl
 		<< "!second row: summed value, v state nb," << endl;
 
 	output << left << "! " << setw(15) << conc_h_tot << setw(7) << (int)h2_popdens_v_data.size() << setw(7) << MAX_NB_H2_VSTATES_X1SG << endl;
-
 	output << left << setw(13) << "!time(s)" << setw(13) << "sum";
+
 	for (v = 0; v < MAX_NB_H2_VSTATES_X1SG; v++) {
 		output << left << setw(12) << v;
 	}
@@ -273,8 +323,9 @@ void save_h2_populations_evolution(const string& output_path, const vector<doubl
 		for (v = 0; v < MAX_NB_H2_VSTATES_X1SG; v++)
 		{
 			w = h2_popdens_v_data[l].arr[v];
-			if (w < MINIMAL_ABUNDANCE)
+			if (w < MINIMAL_ABUNDANCE) {
 				w = MINIMAL_ABUNDANCE;
+			}
 			output << left << setw(12) << w;
 		}
 		output << endl;
@@ -317,8 +368,9 @@ void save_hei_populations_evolution(const string& output_path, const vector<doub
 		for (i = 0; i < nb_lev_hei; i++)
 		{
 			w = hei_popdens_data[l].arr[i];
-			if (w < MINIMAL_ABUNDANCE)
+			if (w < MINIMAL_ABUNDANCE) {
 				w = MINIMAL_ABUNDANCE;
+			}
 			output << left << setw(12) << w;
 		}
 		output << endl;
@@ -578,7 +630,7 @@ void save_vibrational_states_excit_rates(const string& output_path, double conc_
 	output << left << "!Excitation of vibrational states of the ground electronic state," << endl
 		<< "!First parameter - pure rotational excitation [cm-3 s-1], from v= 0, j = 0 or j = 1, to level with j > 1" << endl
 		<< "!For each vibration state (0,1,...14) two parameters:" << endl
-		<< "!1. Vibrational excitation rate, vi -> vf, vi < vf (within the ground electronic state) [cm-3 s-1]," << endl
+		<< "!1. Vibrational excitation rate, vi = 0 -> vf, vi < vf (within the ground electronic state) [cm-3 s-1]," << endl
 		<< "!2. Excitation rate of vibration state through electronic excitation [cm-3 s-1]," << endl;
 
 	output << left << "!H nuclei concentration [cm-3], nb of times," << endl
@@ -608,6 +660,7 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 	const vector<double>& enloss_mt_arr,
 	const vector<double>& enloss_coulomb_el_arr,
 	const vector<double>& neutral_coll_heating_arr,
+	const vector<double>& enloss_h2_rot,
 	const vector<double>& enloss_h2_vibr_arr,
 	const vector<double>& enloss_h2_vibr_arr_01,
 	vector< array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES>>& h2_state_data_arr,
@@ -711,25 +764,32 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 			<< "!3. Mean energy per ion pair (per secondary electron) W [eV]" << endl
 			<< "!4. 1/W [eV-1]" << endl
 			<< "!5. Gas heating efficiency (mom. transf., Coulomb, coll. with neutrals, residual rot. H2 populations), dimensionless - depends on max time" << endl
-			<< "!6. Gas heating through H2 dissociation (singlet two-step), dimensionless" << endl
-			<< "!7. Gas heating through H2 dissociation (triplet), dimensionless" << endl
+			<< "!6. Gas heating through H2 dissociation: singlet two-step, dimensionless" << endl
+			<< "!7. Gas heating through H2 dissociation: triplet + singlet two-step, dimensionless" << endl
 			<< "!8. Fraction of energy locked in ro-vibrational levels of H2 (final - initial), dimensionless" << endl
+			
 			<< "!9. Energy fraction lost in ro-vibr., dimensionless" << endl
 			<< "!10. Energy fraction lost in ro-vibr. v = 0 -> 1, dimensionless" << endl
 			<< "!11. Ratio of ro-vibr. excitations to v=2/v=1, dimensionless" << endl
+			<< "!12. Energy fraction lost in pure rotational exc., dimensionless" << endl
 
-			<< "!12. Helium excitations per He+" << endl
-			<< "!13. Mean energy per He+ [eV]" << endl
-			<< "!14. Mean energy per H2+ [eV]" << endl
-			<< "!15. Mean energy per H+ [eV]" << endl
+			<< "!13. Helium excitations per He+" << endl
+			<< "!14. Mean energy per He+ [eV]" << endl
+			<< "!15. Mean energy per H2+ [eV]" << endl
+			<< "!16. Mean energy per H+ [eV]" << endl
 
-			<< "!16. Number of excitations of B per H2+/H+ ion" << endl
-			<< "!17. Number of excitations of C per H2+/H+ ion" << endl
-			<< "!18. Number of H2 dissociations per H2+/H+ ion (direct, two-step dissociation, triplet)" << endl;
+			<< "!17. Number of excitations of B per H2+/H+ ion" << endl
+			<< "!18. Number of excitations of C per H2+/H+ ion" << endl
+			<< "!19. Number of H2 dissociations per H2+/H+ ion (direct, two-step dissociation, triplet)" << endl;
 
 		output << "!";
-		for (j = 1; j <= 18; j++) {
-			output << setw(13) << j;
+		for (j = 1; j <= 19; j++) {
+			if (j == 8 || j == 12 || j == 16) {
+				output << setw(16) << j;
+			}
+			else {
+				output << setw(13) << j;
+			}
 		}
 		output << endl;
 	}
@@ -739,19 +799,21 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 		<< setw(13) << nb_ions / energy
 		<< setw(13) << heating_effic
 		<< setw(13) << diss_heat_singlet
-		<< setw(13) << diss_heat_triplet
-		<< setw(13) << energy_in_rovibr / energy
+		<< setw(13) << diss_heat_singlet + diss_heat_triplet
+		<< setw(16) << energy_in_rovibr / energy
+
 		<< setw(13) << fabs(enloss_h2_vibr_arr.back()) / energy
 		<< setw(13) << fabs(enloss_h2_vibr_arr_01.back()) / energy
 		<< setw(13) << h2_vibr_vstates_arr.back().arr[2] / h2_vibr_vstates_arr.back().arr[1]
-		<< setw(13) << hei_excit_arr.back() / nb_he_ions;
+		<< setw(16) << fabs(enloss_h2_rot.back()) / energy;
+		
+	output << left << setw(13) << hei_excit_arr.back() / nb_he_ions;
 	
 	// He+
 	x = conc_data.back().arr[6] - conc_data.front().arr[6];
 	if (x < 1.e-99) {
 		x = 1.e-99;
 	}
-
 	output << left << setw(13) << energy / x;
 
 	// H2+
@@ -759,7 +821,6 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 	if (x < 1.e-99) {
 		x = 1.e-99;
 	}
-
 	output << left << setw(13) << energy / x;
 
 	// H+
@@ -767,8 +828,7 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 	if (x < 1.e-99) {
 		x = 1.e-99;
 	}
-
-	output << left << setw(13) << energy / x;
+	output << left << setw(16) << energy / x;
 
 	// H2 parameters:
 	output << left 
@@ -792,13 +852,13 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 			<< "!Initial number of electrons [cm-3]: " << nb_density << endl
 			<< "!1. Initial electron energy E [eV]" << endl
 			<< "!2. total_exc  - Excitations to all H2 electronic states (WITH excitations to dissociation continuum) [cm-3];" << endl
-			<< "!3. total_diss - Dissociations (excitations to dissociation continuum, all triplet states, Solomon process) [cm-3];" << endl
-			<< "!Electronic states: B, C, Bp, D, EF, Bpp, Dp, b, a, c, d (sum of additional triplet states at last columns)" << endl
-			<< "!Parameters: 1. excitation (no direct dissociation); 2. direct dissociation; 3. two-step dissociation" << endl;
+			<< "!3. total_diss - Dissociations (excitations to dissociation continuum, triplet states, Solomon process) [cm-3];" << endl
+			<< "!Electronic states: B, C, Bp, D, EF, Bpp, Dp, b, a, c, d" << endl
+			<< "!Parameters: 1. excitation (no direct dissociation); 2. direct dissociation; 3. two-step dissociation; 4. energy loss fraction (excit. & direct diss.), > 0;" << endl;
 
 		output << left << setw(13) << "!1" << setw(13) << "2" << setw(13) << "3";
-		for (j = 0; j < 3 * (NB_EXC_ELECTRONIC_STATES - 1); j += 3) {
-			output << left << setw(13) << j + 4 << setw(13) << j + 5 << setw(15) << j + 6;
+		for (j = 0; j < 4 * (NB_EXC_ELECTRONIC_STATES - 1); j += 4) {
+			output << left << setw(13) << j + 4 << setw(13) << j + 5 << setw(13) << j + 6 << setw(15) << j + 7;
 		}
 		output << endl;
 
@@ -806,7 +866,8 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 		for (j = 0; j < NB_EXC_ELECTRONIC_STATES; j++) {
 			output << left << setw(13) << H2_ELECTRONIC_STATE_NAMES[j] + "_1"
 				<< setw(13) << H2_ELECTRONIC_STATE_NAMES[j] + "_2"
-				<< setw(15) << H2_ELECTRONIC_STATE_NAMES[j] + "_3";
+				<< setw(13) << H2_ELECTRONIC_STATE_NAMES[j] + "_3"
+				<< setw(15) << H2_ELECTRONIC_STATE_NAMES[j] + "_4";
 		}
 		output << endl;
 	}
@@ -815,7 +876,8 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 	for (j = 0; j < NB_EXC_ELECTRONIC_STATES; j++) {
 		output << left << setw(13) << (h2_state_data_arr.back())[j].excit
 			<< setw(13) << (h2_state_data_arr.back())[j].direct_diss
-			<< setw(15) << (h2_state_data_arr.back())[j].twostep_diss;
+			<< setw(13) << (h2_state_data_arr.back())[j].twostep_diss
+			<< setw(15) << -((h2_state_data_arr.back())[j].enloss_excit + (h2_state_data_arr.back())[j].enloss_direct_diss) / energy;
 	}
 	output << endl;
 	output.close();
@@ -833,7 +895,7 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 			<< "!Initial number of electrons [cm-3]: " << nb_density << endl
 			<< "!1. Initial electron energy E [eV]" << endl
 			<< "!There are two parameters for each vibration state v = 0,1,...14:" << endl
-			<< "!1. v1 vibrational excitation, vi -> vf, vi < vf (within the ground electronic state) [cm-3]," << endl
+			<< "!1. v1 vibrational excitation, vi = 0 -> vf, vi < vf (within the ground electronic state) [cm-3]," << endl
 			<< "!for v = 0, H2 rotational excitation, from v= 0, j = 0 or j = 1, to level with j > 1 [cm-3]," << endl
 			<< "!2. v2 Excitation of vibration state through electronic excitation [cm-3]," << endl;
 

@@ -295,8 +295,7 @@ int main()
 	}
 
 	// please, check the saving directory,
-	output_path = "C:/Users/Александр/Documents/Данные и графики/paper Numerical model of fast electron energy deposition/python/";
-	//output_path = "C:/Users/Александр/Documents/Данные и графики/paper GRB in molecular cloud/python_scripts_ism/";
+	output_path = "C:/Users/Александр/Documents/Данные и графики/paper Numerical model of fast electron energy deposition/python_scripts_ism/";
 	data_path   = "C:/Users/Александр/Documents/input_data/";
 
 	ioniz_fract = 1.e-7;
@@ -548,7 +547,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	initial_data[heieq_nb] = initial_data[nb_of_el_energies + HE_NB];
 
 	// Initial gas/dust temperature, in K
-	initial_data[physeq_nb] = initial_data[physeq_nb + 1] = 10.;
+	initial_data[physeq_nb] = initial_data[physeq_nb + 1] = THERMAL_NEUTRAL_TEMPERATURE;
 
 	// Dust charge
 	initial_data[physeq_nb + 2] = 0.;
@@ -559,7 +558,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	dg_ratio = 0.;
 
 	user_data->set_dust_parameters(dust_is_presented, grain_radius, grain_nb_density);
-	save_model_parameters(output_path_2, conc_h_tot, op_ratio_h2, ioniz_fract, dg_ratio, grain_radius, grain_nb_density);
+	save_model_parameters_mono(output_path_2, conc_h_tot, op_ratio_h2, ioniz_fract, he_abund, electron_conc, electron_energy);
 
 	//
 	// Simulations
@@ -989,6 +988,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 		enloss_mt_arr,
 		enloss_coulomb_el_arr,
 		neutral_coll_heating_arr,
+		enloss_h2_rot_arr,
 		enloss_h2_vibr_arr,
 		enloss_h2_vibr_arr_01,
 		h2_state_data_arr,

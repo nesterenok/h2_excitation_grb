@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <fstream>
 #include <sstream>
+#include <cmath>
 
 #include "constants.h"
 #include "spectroscopy.h"
@@ -21,10 +22,12 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	bool is_extrapolation_on;
 	int i, k, nb_of_energies, lf, vf, dj, electronic_state, isotope, nb_lev_h2, nb_lev_h2_b, nb_lev_h2_bp, nb_lev_h2_ef,
 		nb_lev_h2_cminus, nb_lev_h2_dminus, nb_lev_h2_a3, nb_lev_h2_c3, nb_lev_h2_d3, verbosity = 1;
+	
 	double t, enloss_mt_h2, enloss_ion_h2, enloss_ion_h2_rel, enloss_rot_h2, enloss_vibr_h2_v01, enloss_vibr_h2_v02,
 		enloss_singlet_h2, enloss_singlet_h2_tot, enloss_diss_singlet_h2, enloss_diss_triplet_h2_b, enloss_triplet_h2_add, enloss_triplet_h2,
-		enloss_mt_he, enloss_ion_he, enloss_ion_he_rel, enloss_coulomb,
-		cs_vibr_h2_v01, cs_vibr_h2_v02, cs_vibr_h2_v03, cs_singlet_h2, cs_singlet_h2_tot, cs_diss_singlet_h2, cs_diss_triplet_h2_b,
+		enloss_mt_he, enloss_ion_he, enloss_ion_he_rel, enloss_coulomb;
+
+	double cs_vibr_h2_v01, cs_vibr_h2_v02, cs_vibr_h2_v03, cs_singlet_h2, cs_singlet_h2_tot, cs_diss_singlet_h2, cs_diss_triplet_h2_b,
 		cs_triplet_h2_add, cs_triplet_h2;
 	double* electron_energies, * electron_velocities;
 
@@ -117,7 +120,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	ss << ".txt";
 
 	fname = ss.str();
-	cross_section_table_mccc* h2_rot_cs02
+	cross_section_table_mccc* h2_rot_cs
 		= new cross_section_table_mccc(data_path, fname, is_extrapolation_on = false, verbosity);
 
 	// H2 vibrational excitation, 
@@ -503,12 +506,21 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	// S1g(X) -> S3u+(b) (dissociative state),
 	ss.clear();
 	ss.str("");
-
-	ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
-	ss << vi;
-	ss << "/MCCC-el-H2-b3Su_DE.X1Sg_vi=";
-	ss << vi;
-	ss << ".txt";
+	
+	if (vi == 0) {
+		// several lines with data are commented in the file, in order to make energy threshold equal to 7.0 = 4.5 + 2.5 eV;
+		// 2.5 is minimal kinetic energy of H atoms released for excitation from v = 0; Trevisan & Tennyson, Plasma Phys. Control. Fusion 44, 1263 (2002);
+		ss << "coll_h2/MCCC-el-H2-b3Su_DE.X1Sg_vi=";
+		ss << vi;
+		ss << "_changed.txt";
+	}
+	else {
+		ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+		ss << vi;
+		ss << "/MCCC-el-H2-b3Su_DE.X1Sg_vi=";
+		ss << vi;
+		ss << ".txt";
+	}
 
 	fname = ss.str();
 	cross_section_table_mccc* h2_3bstate_diss_cs
@@ -517,7 +529,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	//
 	// Triplet states
 	// 1Sg(X) -> 3Sg+(a)
-	// Excitation to bound state, without excitation to dissiociation continuum that is 0.1 per cent,
+	// Excitation to bound state, without excitation to dissociation continuum that is 0.1 per cent,
 	cross_section_table_mccc** h2_3astate_cs
 		= new cross_section_table_mccc * [5 * MAX_H2_VSTATES_a3Sg];
 
@@ -555,7 +567,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	}
 
 	// 1Sg(X) -> 3Pu (c) 
-	// Excitation to bound state, without excitation to dissiociation continuum that is ... per cent,
+	// Excitation to bound state, without excitation to dissiociation continuum, that is less than 0.5 per cent,
 	cross_section_table_mccc** h2_3cstate_cs
 		= new cross_section_table_mccc * [11 * MAX_H2_VSTATES_c3Pu];
 
@@ -593,7 +605,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	}
 
 	// 1Sg(X) -> 3Pu (d) 
-	// Excitation to bound state, without excitation to dissiociation continuum that is ... per cent,
+	// Excitation to bound state, without excitation to dissociation continuum that is about 1 per cent,
 	cross_section_table_mccc** h2_3dstate_cs
 		= new cross_section_table_mccc * [11 * MAX_H2_VSTATES_d3Pu];
 
@@ -709,7 +721,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	fname += ".txt";
 	output.open(fname.c_str());
 
-	output << left << "!Energy losses in [cm2 eV] of electron in the H2 (normalized to one H2 molecule), initial level j = " << ji << endl
+	output << left << "!Energy losses in [cm2 eV] of electron in pure H2 gas (normalized to one H2 molecule), initial level j = " << ji << endl
 		<< "!for MCCC cross sections - at higher energies, the cross sections are extrapolated as a power law, cs = cs_0*(E/E_0)^(gamma);" << endl
 		<< "!Coulomb losses - Swartz et al., J. of Geophys. Res. 76, p. 8425 (1971); ionization fraction: " << ionization_fraction << endl
 		<< "!Vibrational excitation v = 0 -> 1: the sum of (v,j) = (0,j) -> (1,j) and (0,j) -> (1,j+2); the same for v = 0 -> 2; 0 -> 3 and etc.;" << endl
@@ -719,7 +731,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		<< setw(12) << "m.t."
 		<< setw(12) << "ioniz"
 		<< setw(12) << "ioniz_rel"
-		<< setw(15) << "J=0-2"
+		<< setw(15) << "ji-ji+2"
 		<< setw(12) << "v=0-1"
 		<< setw(15) << "v=0-2"
 		<< setw(12) << "1Su+(B) "
@@ -749,10 +761,10 @@ void save_cross_section_table(const string& output_path, const string& data_path
 		output << left << setw(12) << enloss_ion_h2 << setw(15) << enloss_ion_h2_rel;
 
 		lf = h2_di->get_nb(0, ji + 2);  // ji is small, 0 or 1
-		enloss_rot_h2 = (*h2_rot_cs02)(electron_energies[i]) * (h2_di->lev_array[lf].energy - h2_di->lev_array[ji].energy) * CM_INVERSE_TO_EV;
+		enloss_rot_h2 = (*h2_rot_cs)(electron_energies[i]) * (h2_di->lev_array[lf].energy - h2_di->lev_array[ji].energy) * CM_INVERSE_TO_EV;
 		output << left << setw(12) << enloss_rot_h2;
 
-		// (v, J) = (0,0) -> (1,0) and (0,0) -> (1,2)
+		// (v, J) = (0,j) -> (1,j) and (0,j) -> (1,j+2)
 		lf = h2_di->get_nb(1, ji);
 		enloss_vibr_h2_v01 = (*h2_vibr_rot_cs_v01_dj0)(electron_energies[i])
 			* (h2_di->lev_array[lf].energy - h2_di->lev_array[ji].energy) * CM_INVERSE_TO_EV;
@@ -788,7 +800,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 				}
 			}
 		}
-		enloss_singlet_h2 *= CM_INVERSE_TO_EV;
+		enloss_singlet_h2 *= CM_INVERSE_TO_EV;  // to eV cm2
 
 		enloss_singlet_h2_tot += enloss_singlet_h2;
 		output << left << setw(12) << enloss_singlet_h2;
@@ -942,6 +954,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	}
 	output.close();
 
+	//
 	// Saving cross sections,
 	fname = output_path + "cs_electron_h2_ji";
 	fname += to_string(ji);
@@ -979,9 +992,9 @@ void save_cross_section_table(const string& output_path, const string& data_path
 			<< setw(12) << h2_ioniz_cs->get_int_cs(electron_energies[i])
 			<< setw(15) << h2_ioniz_cs_rel->get_int_cs(electron_energies[i]);
 
-		output << left << setw(12) << (*h2_rot_cs02)(electron_energies[i]);
+		output << left << setw(12) << (*h2_rot_cs)(electron_energies[i]);
 
-		// (v, J) = (0,0) -> (1,0) and (0,0) -> (1,2)
+		// (v, J) = (0,j) -> (1,j) and (0,j) -> (1,j+2)
 		cs_vibr_h2_v01 = (*h2_vibr_rot_cs_v01_dj0)(electron_energies[i]);
 		cs_vibr_h2_v01 += (*h2_vibr_rot_cs_v01_dj2)(electron_energies[i]);
 		output << left << setw(12) << cs_vibr_h2_v01;

@@ -9,8 +9,11 @@
 
 
 // Saving parameters of the model
+void save_model_parameters_mono(const std::string& output_path, double conc_h_tot, double op_ratio_h2, double ioniz_fract, 
+    double he_abund, double electron_conc, double electron_energy);
+
 void save_model_parameters(const std::string& output_path,  double conc_h_tot, double op_ratio_h2, double ioniz_fract, double dust_gas_mass_ratio, 
-    double grain_radius, double grain_nb_density, double grb_cloud_distance = 0., double grb_distance = 0., double hcolumn_dens = 0., int layer_nb = -1);
+    double grain_radius, double grain_nb_density, double grb_cloud_distance, double grb_distance, double hcolumn_dens, int layer_nb);
 
 
 // Evolution of electron spectrum with time,  
@@ -74,6 +77,7 @@ void save_output_parameters(const std::string& output_path, double conc_h_tot, c
     const std::vector<double>& enloss_mt_arr,
     const std::vector<double>& enloss_coulomb_el_arr,
     const std::vector<double>& neutral_coll_heating_arr,
+    const std::vector<double>& enloss_h2_rot,
     const std::vector<double>& enloss_h2_vibr_arr,
     const std::vector<double>& enloss_h2_vibr_arr_01,
     std::vector< std::array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES>> & h2_state_data_arr,

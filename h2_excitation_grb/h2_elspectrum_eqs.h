@@ -15,10 +15,10 @@
 //
 // Electronic H2 states, taken into account: 
 //      ground state   - 1Sg+ (X), 
-//      singlet states - 1Su+ (B, Bp, Bpp), 1Pu (C+-, D+-, Dp+-), 1Sg+ (EF)
-//      triplet states - 3Sg+ (a), 3Pu (c,d)
+//      singlet states - 1Su+(B), 1Pu(C+-), 1Su+(Bp), 1Pu(D+-), 1Sg+(EF), 1Su+(Bpp), 1Pu(Dp+-), 
 //      triplet states (dissociative) - 3Su+(b)
-//      triplet states (optional) - 3Su+ (e)
+//      triplet states - 3Sg+ (a), 3Pu (c,d)
+//      
 
 // Contribution of triplet states to the dissociation (cross section at maximum):
 // S3u+(b) - 1.64*a0^2, total cs: S3u+(e) - 0.096*a0^2, S3u+(h) - 0.12*a0^2,
@@ -95,8 +95,7 @@ protected:
 
     double** h2_bstate_rates, ** h2_cstate_rates, ** h2_bpstate_rates, ** h2_dstate_rates, ** h2_efstate_rates,
         ** h2_3astate_rates, ** h2_3cstate_rates, ** h2_3dstate_rates;
-    double** h2_bstate_diss_rates, ** h2_cstate_diss_rates, ** h2_bpstate_diss_rates, ** h2_dstate_diss_rates, **h2_efstate_diss_rates, ** h2_3bstate_diss_rates, 
-        ** h2_3estate_tot_rates, ** h2_3hstate_tot_rates, ** h2_3gstate_tot_rates;
+    double** h2_bstate_diss_rates, ** h2_cstate_diss_rates, ** h2_bpstate_diss_rates, ** h2_dstate_diss_rates, **h2_efstate_diss_rates, ** h2_3bstate_diss_rates;
     double** h2_rot_rates, ** h2_rovibr_rates;
     double** hei_rates;
     double*  coll_partn_conc;
@@ -119,7 +118,6 @@ protected:
         ** h2_3astate_cs, **h2_3cstate_cs, ** h2_3dstate_cs;
     cross_section_table_mccc** h2_bstate_diss_cs, ** h2_cstate_diss_cs, ** h2_bpstate_diss_cs, ** h2_dstate_diss_cs, ** h2_efstate_diss_cs,
         ** h2_3bstate_diss_cs;
-    cross_section_table_mccc **h2_3estate_tot_cs, ** h2_3hstate_tot_cs, ** h2_3gstate_tot_cs;
     cross_section_table_mccc** h2_rot_cs, **h2_rovibr_cs;
 
     // auxiliary objects, 
