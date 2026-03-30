@@ -54,11 +54,44 @@ electronic_excitation_data_unit& electronic_excitation_data_unit::operator=(cons
 	return *this;
 }
 
+void electronic_excitation_data_unit::set_to_zero() {
+	excit = direct_diss = twostep_diss = diss_heat_input = enloss_excit = enloss_direct_diss = 0.;
+}
+
+
+energy_loss_data_unit::energy_loss_data_unit(const energy_loss_data_unit &obj)
+{
+	mt = obj.mt;
+	rot = obj.rot;
+	vibr = obj.vibr; 
+	vibr_01 = obj.vibr_01;
+	ioniz = obj.ioniz;
+	hei = obj.hei;
+	coulomb = obj.coulomb;
+	neutral_coll_heating = obj.neutral_coll_heating;
+}
+
+energy_loss_data_unit& energy_loss_data_unit::operator=(const energy_loss_data_unit& obj)
+{
+	mt = obj.mt;
+	rot = obj.rot;
+	vibr = obj.vibr;
+	vibr_01 = obj.vibr_01;
+	ioniz = obj.ioniz;
+	hei = obj.hei;
+	coulomb = obj.coulomb;
+	neutral_coll_heating = obj.neutral_coll_heating;
+	return *this;
+}
+
+void energy_loss_data_unit::set_to_zero() {
+	mt = rot = vibr = vibr_01 = ioniz = hei = coulomb = neutral_coll_heating = 0.;
+}
+
 
 elspectra_evolution_data::elspectra_evolution_data(const string& data_path, const string& output_path, double cht, double iof, const vector<double>& en_grid, int verb)
 	: verbosity(verb), conc_h_tot(cht), ioniz_fract(iof), dust_is_presented(false),
-	enloss_rate_mt(0.), enloss_rate_h2_rot(0.), enloss_rate_h2_rot_pos(0.), enloss_rate_h2_vibr(0.), enloss_rate_h2_vibr_01(0.), enloss_rate_h2_vibr_pos(0.),
-	enloss_rate_ioniz(0.), enloss_rate_hei(0.),  hei_exc_rate(0.), h2_excit_rot_rate(0.), neutral_coll_heating_rate(0.),
+	enloss_rate_h2_rot_pos(0.), enloss_rate_h2_vibr_pos(0.), hei_exc_rate(0.), h2_excit_rot_rate(0.),
 	grain_cs(0.), grain_nb_density(0.), conc_n(0.), conc_i(0.), energy_gain_n(0.), energy_gain_e(0.), nb_gain_n(0.), nb_gain_i(0.),
 	indices(0), coll_partn_conc(0), h2_coll(0)
 {
@@ -837,7 +870,8 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	init_tables_h2_electronic_diss(h2_3bstate_diss_cs, h2_3bstate_diss_rates, h2_b3su_diss_min_nb, verbosity);
 
 	// 1Sg(X) -> 3Sg+(a)
-	// Excitation to bound state, without excitation to dissociation continuum that is 0.1 per cent,
+	// Excitation to bound state, 
+	// without excitation to dissociation continuum that is 0.1 per cent,
 	h2_3astate_cs = new cross_section_table_mccc * [5 * USED_NB_OF_H2_VSTATES_X1SG * MAX_H2_VSTATES_a3Sg * MAX_NB_J_H2];
 
 	for (k = 0, vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
@@ -1010,6 +1044,94 @@ elspectra_evolution_data::elspectra_evolution_data(const string& data_path, cons
 	init_tables_h2_exc_sg_pu_state(h2_3dstate_cs, h2_3dstate_rates, MAX_H2_VSTATES_d3Pu, verbosity);
 	h2_d3pu_min_nb = calc_min_energy_of_transition(h2_di_d3, MAX_H2_VSTATES_d3Pu);
 
+	//
+	// States below are not dissociative, but are treated as dissociative in order to estimate their effect,
+	// 1Sg(X) -> 3Su+ (e),
+	h2_3estate_tot_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
+	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
+		ss.clear();
+		ss.str("");
+
+		ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+		ss << vi;
+		ss << "/MCCC-el-H2-e3Su_total.X1Sg_vi=";
+		ss << vi;
+		ss << ".txt";
+
+		fname = ss.str();
+		h2_3estate_tot_cs[vi] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+	}
+	init_tables_h2_electronic_diss(h2_3estate_tot_cs, h2_3estate_tot_rates, h2_e3su_min_nb, verbosity);
+
+	// 1Sg(X) -> 3Sg+(h),
+	h2_3hstate_tot_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
+	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
+		ss.clear();
+		ss.str("");
+
+		ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+		ss << vi;
+		ss << "/MCCC-el-H2-h3Sg_total.X1Sg_vi=";
+		ss << vi;
+		ss << ".txt";
+
+		fname = ss.str();
+		h2_3hstate_tot_cs[vi] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+	}
+	init_tables_h2_electronic_diss(h2_3hstate_tot_cs, h2_3hstate_tot_rates, h2_h3sg_min_nb, verbosity);
+
+	// 1Sg(X) -> 3Sg+(g),
+	h2_3gstate_tot_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
+	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
+		ss.clear();
+		ss.str("");
+
+		ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+		ss << vi;
+		ss << "/MCCC-el-H2-g3Sg_total.X1Sg_vi=";
+		ss << vi;
+		ss << ".txt";
+
+		fname = ss.str();
+		h2_3gstate_tot_cs[vi] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+	}
+	init_tables_h2_electronic_diss(h2_3gstate_tot_cs, h2_3gstate_tot_rates, h2_g3sg_min_nb, verbosity);
+
+	// 1Sg(X) -> 3Pg(i),
+	h2_3istate_tot_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
+	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
+		ss.clear();
+		ss.str("");
+
+		ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+		ss << vi;
+		ss << "/MCCC-el-H2-i3Pg_total.X1Sg_vi=";
+		ss << vi;
+		ss << ".txt";
+
+		fname = ss.str();
+		h2_3istate_tot_cs[vi] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+	}
+	init_tables_h2_electronic_diss(h2_3istate_tot_cs, h2_3istate_tot_rates, h2_i3sg_min_nb, verbosity);
+	
+	// 1Sg(X) -> 3Dg(j),
+	h2_3jstate_tot_cs = new cross_section_table_mccc * [USED_NB_OF_H2_VSTATES_X1SG];
+	for (vi = 0; vi < USED_NB_OF_H2_VSTATES_X1SG; vi++) {
+		ss.clear();
+		ss.str("");
+
+		ss << "coll_h2/MCCC-el-H2-X1Sg-excitation/vi=";
+		ss << vi;
+		ss << "/MCCC-el-H2-j3Dg_total.X1Sg_vi=";
+		ss << vi;
+		ss << ".txt";
+
+		fname = ss.str();
+		h2_3jstate_tot_cs[vi] = new cross_section_table_mccc(data_path, fname, is_extrapolation_on = true, verbosity);
+	}
+	init_tables_h2_electronic_diss(h2_3jstate_tot_cs, h2_3jstate_tot_rates, h2_j3sg_min_nb, verbosity);
+
+	//
 	// Initialization of HeI excitation cross sections,
 	// only excitation from the ground state 1s2 1S is implemented yet,
 	init_hei_cross_sections(data_path);
@@ -1139,6 +1261,18 @@ elspectra_evolution_data::~elspectra_evolution_data()
 	free_2d_array(h2_rot_rates);
 	free_2d_array(h2_rovibr_rates);
 	free_2d_array(hei_rates);
+
+	delete[] h2_3estate_tot_cs;
+	delete[] h2_3hstate_tot_cs;
+	delete[] h2_3gstate_tot_cs;
+	delete[] h2_3istate_tot_cs;
+	delete[] h2_3jstate_tot_cs;
+
+	free_2d_array(h2_3estate_tot_rates);
+	free_2d_array(h2_3hstate_tot_rates);
+	free_2d_array(h2_3gstate_tot_rates);
+	free_2d_array(h2_3istate_tot_rates);
+	free_2d_array(h2_3jstate_tot_rates);
 }
 
 void elspectra_evolution_data::init_tables_ionization(electron_impact_ionization * cs,
@@ -1653,22 +1787,22 @@ double elspectra_evolution_data::get_energy_h2_rovibr(N_Vector y)
 	return energy_in_rovibr_levels * CM_INVERSE_TO_EV;  // in [eV cm-3]
 }
 
-void elspectra_evolution_data::get_el_energy_losses(double& mt, double& h2_rot, double& h2_rot_p, double &h2_vibr, double& h2_vibr_01, 
-	double& h2_vibr_p, double& ion, double& hei, double & el_coul, double& neut_heat_coll) const
+void elspectra_evolution_data::get_el_energy_losses(energy_loss_data_unit & data, double& h2_rot_p, double& h2_vibr_p) const
 {
 	// [eV cm-3 s-1]
-	h2_rot = enloss_rate_h2_rot;
-	h2_rot_p = enloss_rate_h2_rot_pos;
-	h2_vibr = enloss_rate_h2_vibr;
-	h2_vibr_01 = enloss_rate_h2_vibr_01;
-	h2_vibr_p = enloss_rate_h2_vibr_pos;
-	ion = enloss_rate_ioniz;
-	hei = enloss_rate_hei;
-
+	data.rot = enloss_data.rot;
+	data.vibr = enloss_data.vibr;
+	data.vibr_01 = enloss_data.vibr_01;
+	data.ioniz = enloss_data.ioniz;
+	data.hei = enloss_data.hei;
+		
 	// contributes to gas heating:
-	mt = enloss_rate_mt;
-	el_coul = enloss_rate_coulomb_el;                        // Coulomb losses (collisions with thermal electrons), fast electrons lose energy
-	neut_heat_coll = neutral_coll_heating_rate;              // collisions of excited H2 with H2 and He,
+	data.mt = enloss_data.mt;
+	data.coulomb = enloss_data.coulomb;                              // Coulomb losses (collisions with thermal electrons), fast electrons lose energy
+	data.neutral_coll_heating = enloss_data.neutral_coll_heating;    // collisions of excited H2 with H2 and He,
+	
+	h2_rot_p = enloss_rate_h2_rot_pos;
+	h2_vibr_p = enloss_rate_h2_vibr_pos;
 }
 
 void elspectra_evolution_data::get_h2_state_data(array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> & data)
@@ -1701,7 +1835,7 @@ void elspectra_evolution_data::get_h2_excitation_rates(dynamic_array& electr_vst
 int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 {
 	int i, j;
-	double a, x1, x2, rate, log_coulomb, conc_ph2, down_rate, up_rate, scaling_factor, enloss_rate, 
+	double x1, rate, log_coulomb, conc_ph2, down_rate, up_rate, scaling_factor, enloss_rate, 
 		excit_rate, diss_rate, twostep_diss_rate, heating_rate;
 
 	realtype* y_data, * ydot_data;
@@ -1718,7 +1852,7 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	// The derivative of the electron spectrum, 
 	// the spectrum is the nb of electrons in the energy bin per cm3, [cm-3]
 	// momentum transfer in collisions with neutral species:
-	enloss_rate_mt = 0.;
+	enloss_data.mt = 0.;
 	for (i = 1; i < nb_of_el_energies; i++) {
 		// [cm2 eV cm/s eV-1] * [cm-3] * [cm-3] = [cm-3 s-1]
 		x1 = (el_enloss_h2_mt[i]* y_data[h2_nb] + el_enloss_he_mt[i] * y_data[he_nb]) * y_data[i];
@@ -1728,12 +1862,12 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 
 		// [cm-3 s-1 eV], fast electrons lose energy, < 0
 		// the energy that is lost when electron moves from interval i to i-1
-		enloss_rate_mt -= x1 * (electron_energies[i] - electron_energies[i - 1]);
+		enloss_data.mt -= x1 * (electron_energies[i] - electron_energies[i - 1]);
 	}
-	energy_gain_n -= EV_TO_ERGS * enloss_rate_mt;  // [erg cm-3 s-1], neutrals gain energy in this process, must be > 0.
+	energy_gain_n -= EV_TO_ERGS * enloss_data.mt;  // [erg cm-3 s-1], neutrals gain energy in this process, must be > 0.
 
 	// Coulomb losses
-	enloss_rate_coulomb_el = 0.;
+	enloss_data.coulomb = 0.;
 
 	// Fast electron scattering on thermal electrons,
 #if CALC_EL_LOSSES_THERMAL_EL
@@ -1744,20 +1878,20 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 		ydot_data[i - 1] += x1;
 
 		// [cm-3 s-1 eV],
-		enloss_rate_coulomb_el -= x1 * (electron_energies[i] - electron_energies[i - 1]);
+		enloss_data.coulomb -= x1 * (electron_energies[i] - electron_energies[i - 1]);
 	}
-	energy_gain_e = -enloss_rate_coulomb_el * EV_TO_ERGS;  // energy gain of thermal electrons, [erg cm-3 s-1]
+	energy_gain_e = -enloss_data.coulomb * EV_TO_ERGS;  // energy gain of thermal electrons, [erg cm-3 s-1]
 #endif
 
 	//
 	// Electron impact ionization of H2, He, H, H2+, He+
-	enloss_rate_ioniz = 0.;
+	enloss_data.ioniz = 0.;
 
 #if IONIZATION_LOSSES
 	derivatives_ionization(y_data, ydot_data, h2_ioniz_rates, h2_ioniz_rates_tot, h2_ioniz_indexes, h2_ioniz_cs->get_binding_energy(),
 		h2_ioniz_min_nb, h2_nb, rate, enloss_rate);
 
-	enloss_rate_ioniz = enloss_rate;
+	enloss_data.ioniz = enloss_rate;
 
 	ydot_data[h2_nb] -= rate;
 	ydot_data[el_nb] += rate;
@@ -1777,7 +1911,7 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	derivatives_ionization(y_data, ydot_data, he_ioniz_rates, he_ioniz_rates_tot, he_ioniz_indexes, he_ioniz_cs->get_binding_energy(),
 		he_ioniz_min_nb, he_nb, rate, enloss_rate);
 
-	enloss_rate_ioniz += enloss_rate;
+	enloss_data.ioniz += enloss_rate;
 
 	ydot_data[he_nb] -= rate;
 	ydot_data[hep_nb] += rate;
@@ -1791,7 +1925,7 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	derivatives_ionization(y_data, ydot_data, h_ioniz_rates, h_ioniz_rates_tot, h_ioniz_indexes, h_ioniz_cs->get_binding_energy(),
 		h_ioniz_min_nb, h_nb, rate, enloss_rate);
 
-	enloss_rate_ioniz += enloss_rate;
+	enloss_data.ioniz += enloss_rate;
 
 	ydot_data[h_nb] -= rate;
 	ydot_data[hp_nb] += rate;
@@ -1800,7 +1934,7 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	derivatives_ionization(y_data, ydot_data, h2p_ioniz_rates, h2p_ioniz_rates_tot, h2p_ioniz_indexes, h2p_ioniz_cs->get_binding_energy(),
 		h2p_ioniz_min_nb, h2p_nb, rate, enloss_rate);
 
-	enloss_rate_ioniz += enloss_rate;
+	enloss_data.ioniz += enloss_rate;
 
 	ydot_data[h2p_nb] -= rate;
 	ydot_data[hp_nb] += 2.*rate;
@@ -1809,7 +1943,7 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	derivatives_ionization(y_data, ydot_data, hep_ioniz_rates, hep_ioniz_rates_tot, hep_ioniz_indexes, hep_ioniz_cs->get_binding_energy(),
 		hep_ioniz_min_nb, hep_nb, rate, enloss_rate);
 
-	enloss_rate_ioniz += enloss_rate;
+	enloss_data.ioniz += enloss_rate;
 
 	ydot_data[hep_nb] -= rate;
 	ydot_data[hepp_nb] += rate;
@@ -1973,6 +2107,49 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 3].excit = excit_rate;
 	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 3].diss_heat_input = 3. * excit_rate;
 
+	//
+	// additional triplet states that are treated as dissociative,
+	// S1g(X) -> S3u(e)
+	derivatives_h2_electronic_diss(y_data, ydot_data, h2_3estate_tot_cs, h2_3estate_tot_rates, h2_e3su_min_nb,
+		enloss_rate, diss_rate);
+
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].enloss_direct_diss = enloss_rate;
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].direct_diss = diss_rate;  // !!!
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].diss_heat_input = 3. * diss_rate;  // [eV cm-3 s-1]
+
+	// S1g(X) -> S3g(h)
+	derivatives_h2_electronic_diss(y_data, ydot_data, h2_3hstate_tot_cs, h2_3hstate_tot_rates, h2_h3sg_min_nb,
+		enloss_rate, diss_rate);
+
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].enloss_direct_diss += enloss_rate;
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].direct_diss += diss_rate;
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].diss_heat_input += 3. * diss_rate;  // [eV cm-3 s-1]
+
+	// S1g(X) -> S3g(g)
+	derivatives_h2_electronic_diss(y_data, ydot_data, h2_3gstate_tot_cs, h2_3gstate_tot_rates, h2_g3sg_min_nb,
+		enloss_rate, diss_rate);
+
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].enloss_direct_diss += enloss_rate;
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].direct_diss += diss_rate;
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].diss_heat_input += 3. * diss_rate;  // [eV cm-3 s-1]
+
+	// S1g(X) -> P3g(i)
+	derivatives_h2_electronic_diss(y_data, ydot_data, h2_3istate_tot_cs, h2_3istate_tot_rates, h2_i3sg_min_nb,
+		enloss_rate, diss_rate);
+
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].enloss_direct_diss += enloss_rate;
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].direct_diss += diss_rate;
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].diss_heat_input += 3. * diss_rate;  // [eV cm-3 s-1]
+
+	// S1g(X) -> D3g(j)
+	derivatives_h2_electronic_diss(y_data, ydot_data, h2_3jstate_tot_cs, h2_3jstate_tot_rates, h2_j3sg_min_nb,
+		enloss_rate, diss_rate);
+
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].enloss_direct_diss += enloss_rate;
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].direct_diss += diss_rate;
+	h2_state_data[NB_EXC_ELECTRONIC_SINGLET_STATES + 4].diss_heat_input += 3. * diss_rate;  // [eV cm-3 s-1]
+
+	//
 	// the decrease of population densities of H2 is taken into account in the functions above,
 	// all excitations to triplet states lead eventually to dissociation,
 	x1 = 0.;
@@ -1992,7 +2169,8 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 
 	// if electrons loose energy, the gain is negative, < 0
 	// pos means positive, e.g. only collisions in which electrons gain energy are taken into account,
-	enloss_rate_h2_rot = enloss_rate_h2_rot_pos = enloss_rate_h2_vibr = enloss_rate_h2_vibr_01 = enloss_rate_h2_vibr_pos = 0.;  // [eV cm-3 s-1]
+	enloss_rate_h2_rot_pos = enloss_rate_h2_vibr_pos = 0;           // [eV cm-3 s-1]
+	enloss_data.rot = enloss_data.vibr = enloss_data.vibr_01 = 0.;  // [eV cm-3 s-1]
 	h2_excit_rot_rate = 0.;  // [cm-3 s-1],
 
 	// Vibrational excitation of vibrational states of the ground electronic state, [cm-3 s-1],
@@ -2002,13 +2180,13 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 
 #if (ROVIBRATIONAL_EXC_LOSSES)
 	// pure H2 rotational excitation,
-	derivatives_h2_rotational_exc(y_data, ydot_data, h2_rot_rates, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, h2_excit_rot_rate);
+	derivatives_h2_rotational_exc(y_data, ydot_data, h2_rot_rates, enloss_data.rot, enloss_rate_h2_rot_pos, h2_excit_rot_rate);
 
 	// H2 ro-vibrational excitation, 
-	derivatives_h2_rovibr_exc(y_data, ydot_data, h2_rovibr_rates, enloss_rate_h2_vibr, enloss_rate_h2_vibr_01, enloss_rate_h2_vibr_pos, h2_vibrational_exc_vstates);
+	derivatives_h2_rovibr_exc(y_data, ydot_data, h2_rovibr_rates, enloss_data.vibr, enloss_data.vibr_01, enloss_rate_h2_vibr_pos, h2_vibrational_exc_vstates);
 	
 	// energy losses related to vibrational excitation include energy loss due to pure rotational excitation,
-	enloss_rate_h2_vibr += enloss_rate_h2_rot;
+	enloss_data.vibr += enloss_data.rot;
 	enloss_rate_h2_vibr_pos += enloss_rate_h2_rot_pos;
 #endif
 
@@ -2025,7 +2203,7 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 	}
 
 	// Collisional excitation and de-excitation of H2 molecules:
-	neutral_coll_heating_rate = 0.;
+	enloss_data.neutral_coll_heating = 0.;
 
 #if (H2_COLLISIONS_WITH_H2_HE)
 	// evaluation of the concentrations of para-H2,
@@ -2071,17 +2249,20 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 		}
 		delete[] arr;
 	}
-	neutral_coll_heating_rate = x1 * CM_INVERSE_TO_EV;         // heating/cooling units are [eV cm-3 s-1];
 #endif
-
+	enloss_data.neutral_coll_heating = x1 * CM_INVERSE_TO_EV;          // heating/cooling units are [eV cm-3 s-1];
+	energy_gain_n += enloss_data.neutral_coll_heating * EV_TO_ERGS;    // must be in [erg cm-3 s-1], gas heating is > 0.
+	
 	// Excitation of HeI by electron impact
-	enloss_rate_hei = hei_exc_rate = 0.;
+	enloss_data.hei = 0.;
+	hei_exc_rate = 0.;
+
 #if(HELIUM_EXC_LOSSES)
-	derivatives_hei_exc(y_data, ydot_data, enloss_rate_hei, hei_exc_rate);
+	derivatives_hei_exc(y_data, ydot_data, enloss_data.hei, hei_exc_rate);
 #endif
 
 	// Radiative transitions in HeI (only radiative decay),
-	// the effect of He radiation is discussed in the book by B.T. Draine, Physics of the Interstellar and Intergalactic Medium (2011)
+	// the effect of He radiation is discussed in the book by B.T. Draine, Physics of the Interstellar and Intergalactic Medium (2011), p.146;
     // Transitions leading to 1s2s 1S will be followed by two-photon decay with A=51.0 s-1 (Drake 1986), 
 	// and a total photon energy 20.62 eV; 56 % of these two photon decays produce a photon with hv > 13.6 eV.
 	// the ionization of species by photons emitted by excited states of helium IS NOT taken into account yet;
@@ -2096,6 +2277,12 @@ int elspectra_evolution_data::f(realtype t, N_Vector y, N_Vector ydot)
 			}
 		}
 	}
+
+	// Neutral gas temperature calculations, the change in number density of particles is not taken into account,
+	conc_n = y_data[h2_nb] + y_data[he_nb] + y_data[h_nb];  // [cm-3]
+	ydot_data[physeq_nb] = 2. * energy_gain_n / (3. * BOLTZMANN_CONSTANT * conc_n);
+
+	// effects of dust presence are not taken into account yet
 	return 0;
 }
 

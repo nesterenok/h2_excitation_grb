@@ -4,8 +4,8 @@
 #include "spectroscopy.h"
 
 // Number of excited electronic states taken into account,
-// order - B, C, Bp, D, EF, Bpp, Dp, b, a, c, d
-#define NB_EXC_ELECTRONIC_STATES 11
+// order - B, C, Bp, D, EF, Bpp, Dp, b, a, c, d, additional triplet states (h,e,g,i,j)
+#define NB_EXC_ELECTRONIC_STATES 12
 #define NB_EXC_ELECTRONIC_SINGLET_STATES 7
 
 // only excited states

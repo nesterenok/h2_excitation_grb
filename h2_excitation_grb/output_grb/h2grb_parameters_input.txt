@@ -1,0 +1,40 @@
+!H2-electron propagation parameters, date Tue Mar 17 12:18:00 2026
+!Molecular cloud parameters:
+!Cloud layer number:
+100
+!Distance from the GRB source to the cloud boundary [pc]:
+1.00000e+02
+!Distance from the GRB source to the centre of the cloud layer [pc]:
+1.00326e+02
+!H column density passed by the GRB, from the cloud boundary to the cloud layer centre [cm-2]:
+2.01000e+22
+!Gas parameters:
+!H nuclei concentration [cm-3]:
+2.00000e+04
+!Initial H2 concentration [cm-3]:
+1.00000e+04
+!Initial H2 OPR:
+1.00000e-01
+!Coulomb losses (0/1):
+1
+!Ionization fraction of thermal electrons:
+1.00000e-07
+!Thermal electron temperature (initial) [K]:
+1.00000e+02
+!Collisions of H2 with H2, He included (0/1):
+1
+!Temperature of the neutral gas in the cloud (initial) [K]:
+1.50000e+01
+!Nb of H2 vibrational states taking into account in electron-impact excitation:
+15
+!Dust parameters:
+!Dust-gas mass ratio:
+3.55000e-03
+!Initial grain radius [cm]:
+9.97141e-06
+!Grain number density [cm-3]:
+1.08800e-08
+!Nb of bins per order in the electron energy grid (default 100):
+100
+!Nb of processors in OpenMP:
+6

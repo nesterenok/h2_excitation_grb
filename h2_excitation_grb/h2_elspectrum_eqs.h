@@ -17,7 +17,7 @@
 //      ground state   - 1Sg+ (X), 
 //      singlet states - 1Su+(B), 1Pu(C+-), 1Su+(Bp), 1Pu(D+-), 1Sg+(EF), 1Su+(Bpp), 1Pu(Dp+-), 
 //      triplet states (dissociative) - 3Su+(b)
-//      triplet states - 3Sg+ (a), 3Pu (c,d)
+//      triplet states - 3Sg+ (a), 3Pu (c,d), additional triplet states (h, e, g, i, j)
 //      
 
 // Contribution of triplet states to the dissociation (cross section at maximum):
@@ -53,10 +53,30 @@ struct electronic_excitation_data_unit {
     double enloss_excit;
     double enloss_direct_diss;
     
+    void set_to_zero();
+
     electronic_excitation_data_unit() : excit(0.), direct_diss(0.), twostep_diss(0.), diss_heat_input(0.), enloss_excit(0.), enloss_direct_diss(0.) { ; }
     electronic_excitation_data_unit(const  electronic_excitation_data_unit &);
     electronic_excitation_data_unit& operator = (const electronic_excitation_data_unit& obj);
 };
+
+
+struct energy_loss_data_unit {
+    double mt;
+    double rot;
+    double vibr, vibr_01;
+    double ioniz;
+    double hei;
+    double coulomb;
+    double neutral_coll_heating;
+
+    void set_to_zero();
+
+    energy_loss_data_unit() : mt(0.), rot(0.), vibr(0.), vibr_01(0.), ioniz(0.), hei(0.), coulomb(0.), neutral_coll_heating(0.) { ; }
+    energy_loss_data_unit(const energy_loss_data_unit&);
+    energy_loss_data_unit& operator = (const energy_loss_data_unit& obj);
+};
+
 
 
 class elspectra_evolution_data
@@ -72,19 +92,18 @@ protected:
     int h2_ioniz_min_nb, he_ioniz_min_nb, h_ioniz_min_nb, h2p_ioniz_min_nb, hep_ioniz_min_nb, hei_min_nb, h2_b1su_min_nb, h2_c1pu_min_nb,
         h2_bp1su_min_nb, h2_d1pu_min_nb, h2_ef1sg_min_nb, h2_b1su_diss_min_nb, h2_c1pu_diss_min_nb, h2_bp1su_diss_min_nb, h2_d1pu_diss_min_nb,
         h2_ef1sg_diss_min_nb, h2_b3su_diss_min_nb, h2_a3sg_min_nb, h2_c3pu_min_nb, h2_d3pu_min_nb;
-    int h2_e3su_min_nb, h2_h3sg_min_nb, h2_g3sg_min_nb;
+    int h2_e3su_min_nb, h2_h3sg_min_nb, h2_g3sg_min_nb, h2_i3sg_min_nb, h2_j3sg_min_nb;
     
     int* indices;
 
-    double conc_h_tot, ioniz_fract, hei_exc_rate, h2_excit_rot_rate, neutral_coll_heating_rate,
-        enloss_rate_mt, enloss_rate_h2_rot, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr, enloss_rate_h2_vibr_01, enloss_rate_h2_vibr_pos, 
-        enloss_rate_ioniz, enloss_rate_hei, enloss_rate_coulomb_el;
-  
+    double conc_h_tot, ioniz_fract, hei_exc_rate, h2_excit_rot_rate, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr_pos;
     double grain_cs, grain_nb_density, conc_n, conc_i, nb_gain_n, nb_gain_i, energy_gain_n, energy_gain_e;
 
     electronic_excitation_data_unit h2_state_data[NB_EXC_ELECTRONIC_STATES];
     double h2_electronic_exc_vstates[MAX_NB_H2_VSTATES_X1SG];
     double h2_vibrational_exc_vstates[MAX_NB_H2_VSTATES_X1SG];
+
+    energy_loss_data_unit enloss_data;
 
     // in eV, in electron_energies - the centre of energy interval is provided,
     double* electron_energies_grid, * electron_energy_bin_size, *electron_energies, *electron_velocities;      
@@ -96,6 +115,7 @@ protected:
     double** h2_bstate_rates, ** h2_cstate_rates, ** h2_bpstate_rates, ** h2_dstate_rates, ** h2_efstate_rates,
         ** h2_3astate_rates, ** h2_3cstate_rates, ** h2_3dstate_rates;
     double** h2_bstate_diss_rates, ** h2_cstate_diss_rates, ** h2_bpstate_diss_rates, ** h2_dstate_diss_rates, **h2_efstate_diss_rates, ** h2_3bstate_diss_rates;
+    double** h2_3estate_tot_rates, **h2_3hstate_tot_rates, **h2_3gstate_tot_rates, **h2_3istate_tot_rates, **h2_3jstate_tot_rates;
     double** h2_rot_rates, ** h2_rovibr_rates;
     double** hei_rates;
     double*  coll_partn_conc;
@@ -119,6 +139,9 @@ protected:
     cross_section_table_mccc** h2_bstate_diss_cs, ** h2_cstate_diss_cs, ** h2_bpstate_diss_cs, ** h2_dstate_diss_cs, ** h2_efstate_diss_cs,
         ** h2_3bstate_diss_cs;
     cross_section_table_mccc** h2_rot_cs, **h2_rovibr_cs;
+
+    // additional triplet states that are treated as dissociative b state:
+    cross_section_table_mccc** h2_3estate_tot_cs, **h2_3hstate_tot_cs, **h2_3gstate_tot_cs, **h2_3istate_tot_cs, **h2_3jstate_tot_cs;
 
     // auxiliary objects, 
     h2_ioniz_cs_table_straub1996 * h2_ioniz_cs_straub;
@@ -230,8 +253,7 @@ public:
     
     // energy losses are < 0 if electrons loses energy, [eV cm-3 s-1]
     // neutral heating rate due to collisions H2-H2, H2-He, [eV cm-3 s-1]
-    void get_el_energy_losses(double & mt, double & h2_rot, double& h2_rot_p, double &h2_vibr, double& h2_vibr_01, double& h2_vibr_p, 
-        double & ion, double & hei, double& el_coul, double & neut_heat_coll) const;
+    void get_el_energy_losses(energy_loss_data_unit &, double& h2_rot_p, double& h2_vibr_p) const;
     
     void get_h2_state_data(std::array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> &);
     void get_h2_excitation_rates(dynamic_array & electr_vstate_exc, dynamic_array & vibr_vstate_exc,

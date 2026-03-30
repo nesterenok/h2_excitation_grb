@@ -34,28 +34,14 @@ void save_hei_populations_evolution(const std::string& output_path, const std::v
     const std::vector<dynamic_array>& hei_popdens_data, double conc_h_tot, int nb_lev_hei);
 
 void save_electron_energy_loss_rates(const std::string& output_path, double conc_h_tot, const std::vector<double>& time_moments,
-    const std::vector<double>& enloss_rates_mt, 
-    const std::vector<double>& enloss_rates_h2_rot,
+    const std::vector<energy_loss_data_unit>& enloss_rate_arr,
     const std::vector<double>& enloss_rates_h2_rot_pos,
-    const std::vector<double>& enloss_rates_h2_vibr,
-    const std::vector<double>& enloss_rates_h2_vibr_01,
     const std::vector<double>& enloss_rates_h2_vibr_pos,
-    const std::vector<double>& enloss_rates_ioniz,
-    const std::vector<double>& enloss_rates_hei,
-    const std::vector<double>& enloss_rates_coulomb_el,
-    const std::vector<double>& neut_heat_coll_rates, 
     std::vector< std::array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES>>& h2_state_data_rate_arr);
 
 
 void save_electron_energy_losses(const std::string& output_path, double conc_h_tot, const std::vector<double>& time_moments,
-    const std::vector<double>& enloss_mt,
-    const std::vector<double>& enloss_h2_rot,
-    const std::vector<double>& enloss_h2_vibr,
-    const std::vector<double>& enloss_h2_vibr_01,
-    const std::vector<double>& enloss_ioniz,
-    const std::vector<double>& enloss_hei,
-    const std::vector<double>& enloss_coulomb_el,
-    const std::vector<double>& neut_heat_coll, 
+    const std::vector<energy_loss_data_unit>& enloss_int_arr,
     std::vector< std::array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES>> & h2_state_data_arr);
 
 
@@ -74,12 +60,7 @@ void save_vibrational_states_excit_rates(const std::string& output_path, double 
 void save_output_parameters(const std::string& output_path, double conc_h_tot, const std::vector<double>& electron_energies_grid, const std::vector<double>& electron_energy_bin_size,
     const std::vector<dynamic_array>& spectrum_data,
     const std::vector<dynamic_array>& conc_data,
-    const std::vector<double>& enloss_mt_arr,
-    const std::vector<double>& enloss_coulomb_el_arr,
-    const std::vector<double>& neutral_coll_heating_arr,
-    const std::vector<double>& enloss_h2_rot,
-    const std::vector<double>& enloss_h2_vibr_arr,
-    const std::vector<double>& enloss_h2_vibr_arr_01,
+    const std::vector<energy_loss_data_unit>& enloss_int_arr,
     std::vector< std::array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES>> & h2_state_data_arr,
     const std::vector<dynamic_array> & h2_electr_vstates_arr,
     const std::vector<dynamic_array> & h2_vibr_vstates_arr, 

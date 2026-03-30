@@ -8,7 +8,7 @@
 // 1. H2 + e- -> H2+ + e- + e-
 // 2. H2 + e- -> H + H+ + e- + e- 
 // Straub et al., Physical Review A 54, 2146 (1996);
-// = average of the ratio for energies, where cross section >= 0.5 * maximal cross section
+// at the total cross section maximum,
 #define H2_IONIZ_CHANNEL_RATIO 0.074
 
 // Calculation of lifetimes of HeI states,

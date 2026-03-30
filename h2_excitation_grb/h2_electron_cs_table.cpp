@@ -12,7 +12,8 @@
 
 using namespace std;
 
-void save_cross_section_table(const string& output_path, const string& data_path, double ionization_fraction, double thermal_electron_temp, int ji)
+void save_cross_section_table(const string& output_path, const string& data_path, double ionization_fraction, double thermal_electron_temp, int ji,
+	const string& str)
 {
 	const int vi = 0;
 	const double energy_min = 0.01;  // eV
@@ -718,6 +719,8 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	// Saving energy losses:
 	fname = output_path + "energy_loss_electron_h2_ji";
 	fname += to_string(ji);
+	fname += "_x";
+	fname += str;
 	fname += ".txt";
 	output.open(fname.c_str());
 

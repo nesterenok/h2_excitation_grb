@@ -3,7 +3,7 @@
 # path to the directory with data tables (spectroscopic data, collision rates and etc.),
 C:/Users/Александр/Documents/input_data/
 # path to the directory for the output,
-C:/Users/Александр/Documents/Visual Studio 2019/h2_excitation_grb/h2_excitation_grb/output/
+C:/Users/Александр/Documents/Visual Studio 2019/h2_excitation_grb/h2_excitation_grb/output_mono/
 # H nuclei total concentration, [cm-3]
 2.e+4
 # Helium abundance (only H2 and He are taken into account), He abundance must be > 0.

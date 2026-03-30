@@ -98,10 +98,10 @@ void save_model_parameters(const std::string& output_path,  double conc_h_tot, d
 	
 	output << left << "!Coulomb losses (0/1):" << endl << CALC_EL_LOSSES_THERMAL_EL << endl
 		<< "!Ionization fraction of thermal electrons:" << endl << ioniz_fract << endl
-		<< "!Thermal electron temperature [K]:" << endl << THERMAL_EL_TEMPERATURE << endl;
+		<< "!Thermal electron temperature (initial) [K]:" << endl << THERMAL_EL_TEMPERATURE << endl;
 	
 	output << left << "!Collisions of H2 with H2, He included (0/1):" << endl << H2_COLLISIONS_WITH_H2_HE << endl
-		<< "!Temperature of the neutral gas in the cloud [K]:" << endl << THERMAL_NEUTRAL_TEMPERATURE << endl;
+		<< "!Temperature of the neutral gas in the cloud (initial) [K]:" << endl << THERMAL_NEUTRAL_TEMPERATURE << endl;
 
 	output << left << "!Nb of H2 vibrational states taking into account in electron-impact excitation:" << endl << USED_NB_OF_H2_VSTATES_X1SG << endl;
 	
@@ -115,7 +115,7 @@ void save_model_parameters(const std::string& output_path,  double conc_h_tot, d
 
 #ifdef _OPENMP
 	output << left << "!Nb of processors in OpenMP:" << endl 
-		<< omp_get_num_threads() << endl;
+		<< omp_get_max_threads() << endl;
 #else
 	output << left << "!No OpenMP" << endl << "1" << endl;
 #endif
@@ -224,7 +224,12 @@ void save_specimen_conc_evolution(const string& output_path, const vector<double
 	
 	output << left << setw(13) << "!time(s)";
 	for (i = 0; i < NB_OF_CHEM_SPECIES; i++) {
-		output << left << setw(12) << chemical_species[i];
+		if (i == 3) { // for H2 higher accuracy 
+			output << left << setw(15) << chemical_species[i];
+		}
+		else {
+			output << left << setw(12) << chemical_species[i];
+		}
 	}
 	output << endl;
 
@@ -232,14 +237,19 @@ void save_specimen_conc_evolution(const string& output_path, const vector<double
 		output.precision(4);
 		output << left << setw(13) << time_moments[l];
 
-		output.precision(3);  // maybe, higher accuracy?
 		for (i = 0; i < NB_OF_CHEM_SPECIES; i++) 
 		{
 			w = conc_data[l].arr[i];
 			if (w < MINIMAL_ABUNDANCE) {
 				w = MINIMAL_ABUNDANCE;
 			}
-			output << left << setw(12) << w;
+			
+			if (i == 3) { // for H2 higher accuracy 
+				output << left << setprecision(6) << setw(15) << w;
+			}
+			else {
+				output << left << setprecision(3) << setw(12) << w;
+			}
 		}
 		output << endl;
 	}
@@ -380,16 +390,9 @@ void save_hei_populations_evolution(const string& output_path, const vector<doub
 
 
 void save_electron_energy_loss_rates(const string& output_path, double conc_h_tot, const vector<double>& time_moments,
-	const vector<double>& enloss_rates_mt,
-	const vector<double>& enloss_rates_h2_rot, 
+	const vector<energy_loss_data_unit>& enloss_rate_arr,
 	const vector<double>& enloss_rates_h2_rot_pos,
-	const vector<double>& enloss_rates_h2_vibr,
-	const vector<double>& enloss_rates_h2_vibr_01,
 	const vector<double>& enloss_rates_h2_vibr_pos,
-	const vector<double>& enloss_rates_ioniz, 
-	const vector<double>& enloss_rates_hei,
-	const vector<double>& enloss_rates_coulomb_el,
-	const vector<double>& neut_heat_coll_rates, 
 	vector< array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES>>& h2_state_data_rate_arr)
 {
 	int i, j;
@@ -421,7 +424,7 @@ void save_electron_energy_loss_rates(const string& output_path, double conc_h_to
 		<< "!ndiss - neutral heating rate due to H2 dissociation (two-step dissociation, triplet excitation), > 0" << endl;
 
 	output << left << "!H nuclei concentration [cm-3], nb of times," << endl
-		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)enloss_rates_mt.size() << endl;
+		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)enloss_rate_arr.size() << endl;
 	
 	output << left << setw(12) << "!time(s)"
 		<< setw(12) << "tot" << setw(12) << "rot" << setw(12) << "rot_pos" << setw(12) << "vibr" << setw(12) << "vibr01" << setw(12) << "vibr_pos"
@@ -429,7 +432,7 @@ void save_electron_energy_loss_rates(const string& output_path, double conc_h_to
 		<< setw(12) << "ncoll" << setw(12) << "ndiss" << endl;
 
 	// losses on vibrational excitation of H2 include pure rotational excitation, 
-	for (i = 0; i < (int)enloss_rates_mt.size(); i++) 
+	for (i = 0; i < (int)enloss_rate_arr.size(); i++) 
 	{
 		enloss_sin = enloss_tri = diss_heat_input = 0.;
 		for (j = 0; j < NB_EXC_ELECTRONIC_SINGLET_STATES; j++) {
@@ -444,24 +447,24 @@ void save_electron_energy_loss_rates(const string& output_path, double conc_h_to
 			diss_heat_input += (h2_state_data_rate_arr[i])[j].diss_heat_input;
 		}
 
-		tot = enloss_rates_mt[i] + enloss_rates_h2_vibr[i] + enloss_rates_ioniz[i] + enloss_rates_coulomb_el[i] + enloss_rates_hei[i]
+		tot = enloss_rate_arr[i].mt + enloss_rate_arr[i].vibr + enloss_rate_arr[i].ioniz + enloss_rate_arr[i].coulomb + enloss_rate_arr[i].hei
 			+ enloss_sin + enloss_tri;
 
 		output << left << setw(12) << time_moments[i];
 
 		output << left << setw(12) << tot 
-			<< setw(12) << enloss_rates_h2_rot[i]
+			<< setw(12) << enloss_rate_arr[i].rot
 			<< setw(12) << enloss_rates_h2_rot_pos[i]
-			<< setw(12) << enloss_rates_h2_vibr[i]
-			<< setw(12) << enloss_rates_h2_vibr_01[i]
+			<< setw(12) << enloss_rate_arr[i].vibr
+			<< setw(12) << enloss_rate_arr[i].vibr_01
 			<< setw(12) << enloss_rates_h2_vibr_pos[i]
 			<< setw(12) << enloss_sin
 			<< setw(12) << enloss_tri
-			<< setw(12) << enloss_rates_ioniz[i]
-			<< setw(12) << enloss_rates_hei[i] 
-			<< setw(12) << enloss_rates_mt[i]
-			<< setw(12) << enloss_rates_coulomb_el[i]
-			<< setw(12) << neut_heat_coll_rates[i]
+			<< setw(12) << enloss_rate_arr[i].ioniz
+			<< setw(12) << enloss_rate_arr[i].hei
+			<< setw(12) << enloss_rate_arr[i].mt
+			<< setw(12) << enloss_rate_arr[i].coulomb
+			<< setw(12) << enloss_rate_arr[i].neutral_coll_heating
 			<< setw(12) << diss_heat_input << endl;
 	}
 	output.close();
@@ -469,14 +472,7 @@ void save_electron_energy_loss_rates(const string& output_path, double conc_h_to
 
 
 void save_electron_energy_losses(const string& output_path, double conc_h_tot, const vector<double>& time_moments,
-	const vector<double>& enloss_mt,
-	const vector<double>& enloss_h2_rot,
-	const vector<double>& enloss_h2_vibr,
-	const vector<double>& enloss_h2_vibr_01,
-	const vector<double>& enloss_ioniz,
-	const vector<double>& enloss_hei,
-	const vector<double>& enloss_coulomb_el,
-	const vector<double>& neut_heat_coll, 
+	const vector<energy_loss_data_unit>& enloss_int_arr,
 	vector< array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> >& h2_state_data_arr)
 {
 	int i, j;
@@ -506,7 +502,7 @@ void save_electron_energy_losses(const string& output_path, double conc_h_tot, c
 		<< "!ndiss_int - neutral heating rate due to H2 dissociation (two-step dissociation, triplet excitation), > 0" << endl;
 
 	output << left << "! H nuclei concentration [cm-3], nb of times," << endl
-		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)enloss_mt.size() << endl;
+		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)enloss_int_arr.size() << endl;
 
 	output << left << setw(12) << "!time(s)" 
 		<< setw(12) << "tot_int"
@@ -524,7 +520,7 @@ void save_electron_energy_losses(const string& output_path, double conc_h_tot, c
 		<< setw(12) << "ndiss_int"<< endl;
 
 	// losses on vibrational excitation of H2 include pure rotational excitation, 
-	for (i = 0; i < (int)enloss_mt.size(); i++) 
+	for (i = 0; i < (int)enloss_int_arr.size(); i++) 
 	{
 		enloss_sin = enloss_tri = diss_heat_input = 0.;
 		for (j = 0; j < NB_EXC_ELECTRONIC_SINGLET_STATES; j++) {
@@ -539,22 +535,22 @@ void save_electron_energy_losses(const string& output_path, double conc_h_tot, c
 			diss_heat_input += (h2_state_data_arr[i])[j].diss_heat_input;
 		}
 
-		tot_int = enloss_mt[i] + enloss_h2_vibr[i] + enloss_ioniz[i] + enloss_coulomb_el[i] + enloss_hei[i] 
+		tot_int = enloss_int_arr[i].mt + enloss_int_arr[i].vibr + enloss_int_arr[i].ioniz + enloss_int_arr[i].coulomb + enloss_int_arr[i].hei 
 			+ enloss_sin + enloss_tri;
 
 		output << left << setw(12) << time_moments[i];
 
 		output << left << setw(12) << tot_int
-			<< setw(12) << enloss_h2_rot[i]
-			<< setw(12) << enloss_h2_vibr[i]
-			<< setw(12) << enloss_h2_vibr_01[i]
+			<< setw(12) << enloss_int_arr[i].rot
+			<< setw(12) << enloss_int_arr[i].vibr
+			<< setw(12) << enloss_int_arr[i].vibr_01
 			<< setw(12) << enloss_sin
 			<< setw(12) << enloss_tri
-			<< setw(12) << enloss_ioniz[i]
-			<< setw(12) << enloss_hei[i] 
-			<< setw(12) << enloss_mt[i]
-			<< setw(12) << enloss_coulomb_el[i]
-			<< setw(12) << neut_heat_coll[i] 
+			<< setw(12) << enloss_int_arr[i].ioniz
+			<< setw(12) << enloss_int_arr[i].hei 
+			<< setw(12) << enloss_int_arr[i].mt
+			<< setw(12) << enloss_int_arr[i].coulomb
+			<< setw(12) << enloss_int_arr[i].neutral_coll_heating
 			<< setw(12) << diss_heat_input << endl;
 	}
 	output.close();
@@ -657,12 +653,7 @@ void save_vibrational_states_excit_rates(const string& output_path, double conc_
 void save_output_parameters(const string& output_path, double conc_h_tot, const vector<double>& electron_energies_grid, const vector<double>& electron_energy_bin_size,
 	const vector<dynamic_array>& spectrum_data,
 	const vector<dynamic_array>& conc_data,
-	const vector<double>& enloss_mt_arr,
-	const vector<double>& enloss_coulomb_el_arr,
-	const vector<double>& neutral_coll_heating_arr,
-	const vector<double>& enloss_h2_rot,
-	const vector<double>& enloss_h2_vibr_arr,
-	const vector<double>& enloss_h2_vibr_arr_01,
+	const vector<energy_loss_data_unit>& enloss_int_arr,
 	vector< array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES>>& h2_state_data_arr,
 	const vector<dynamic_array> & h2_electr_vstates_arr,
 	const vector<dynamic_array> & h2_vibr_vstates_arr, 
@@ -709,7 +700,7 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 	// energy in H2 rotational levels, that had no time to decay,
 	energy_in_rovibr = energy_in_rovibr_levels_arr.back() - energy_in_rovibr_levels_arr.front();  // [eV cm-3]
 
-	heating_effic = (fabs(enloss_mt_arr.back()) + fabs(enloss_coulomb_el_arr.back()) + neutral_coll_heating_arr.back()
+	heating_effic = (fabs(enloss_int_arr.back().mt) + fabs(enloss_int_arr.back().coulomb) + enloss_int_arr.back().neutral_coll_heating
 		+ energy_in_rovibr) / energy;  // dimensionless, including energy in H2 rotational levels, that had no time to decay,
 	
 	diss_heat_singlet = diss_heat_triplet = 0.;
@@ -802,10 +793,10 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 		<< setw(13) << diss_heat_singlet + diss_heat_triplet
 		<< setw(16) << energy_in_rovibr / energy
 
-		<< setw(13) << fabs(enloss_h2_vibr_arr.back()) / energy
-		<< setw(13) << fabs(enloss_h2_vibr_arr_01.back()) / energy
+		<< setw(13) << fabs(enloss_int_arr.back().vibr) / energy
+		<< setw(13) << fabs(enloss_int_arr.back().vibr_01) / energy
 		<< setw(13) << h2_vibr_vstates_arr.back().arr[2] / h2_vibr_vstates_arr.back().arr[1]
-		<< setw(16) << fabs(enloss_h2_rot.back()) / energy;
+		<< setw(16) << fabs(enloss_int_arr.back().rot) / energy;
 		
 	output << left << setw(13) << hei_excit_arr.back() / nb_he_ions;
 	
@@ -853,11 +844,11 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 			<< "!1. Initial electron energy E [eV]" << endl
 			<< "!2. total_exc  - Excitations to all H2 electronic states (WITH excitations to dissociation continuum) [cm-3];" << endl
 			<< "!3. total_diss - Dissociations (excitations to dissociation continuum, triplet states, Solomon process) [cm-3];" << endl
-			<< "!Electronic states: B, C, Bp, D, EF, Bpp, Dp, b, a, c, d" << endl
+			<< "!Electronic states: B, C, Bp, D, EF, Bpp, Dp, b, a, c, d, additional triplet states treated as dissociative" << endl
 			<< "!Parameters: 1. excitation (no direct dissociation); 2. direct dissociation; 3. two-step dissociation; 4. energy loss fraction (excit. & direct diss.), > 0;" << endl;
 
 		output << left << setw(13) << "!1" << setw(13) << "2" << setw(13) << "3";
-		for (j = 0; j < 4 * (NB_EXC_ELECTRONIC_STATES - 1); j += 4) {
+		for (j = 0; j < 4 * NB_EXC_ELECTRONIC_STATES; j += 4) {
 			output << left << setw(13) << j + 4 << setw(13) << j + 5 << setw(13) << j + 6 << setw(15) << j + 7;
 		}
 		output << endl;
