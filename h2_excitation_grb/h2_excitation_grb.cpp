@@ -51,7 +51,8 @@ const int VERBOSITY = 1;
 void init_cloud_parameters(const string& sim_path, double & grb_cloud_distance, double& conc_h_tot, double & op_ratio_h2);
 void init_specimen_conc(const string& sim_path, vector<double>& layer_centre_distances, vector<dynamic_array>& d);
 void init_dust_abund(const string& sim_path, vector<double>& d, double& grain_radius_init, double& grain_nb_density, double& grain_material_density);
-void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& init_data, const vector<double>& electron_energies_grid);
+void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& init_data, 
+	const vector<double>& electron_energies_grid, bool save_data_for_test);
 void init_electron_spectra_mono(dynamic_array & init_data, const vector<double>& en_grid, 
 	double electron_conc, double electron_energy);
 void init_h2_population_density(const string& sim_path, vector<dynamic_array>& d, vector<int>& qnb_v_arr, vector<int>& qnb_j_arr);
@@ -62,14 +63,21 @@ void init_time_intervals();
 void init_electron_energy_grid(double max_electron_energy);
 
 void simulations_monoenergetic(const string& data_path, const string& output_path, double conc_h_tot, double he_abund, double ioniz_fract,
-	double op_ratio_h2, double electron_conc, double electron_energy);
+	double pop_j0, double pop_j1, double electron_conc, double electron_energy);
 
 void simulations_grb(const string& data_path, const string& sim_path, const string& output_path,
 	double hcolumn_density, int is_h2_pop_dens_init);
 
+void simulations_grb_uv(const string& data_path, const string& sim_path, const string& output_path);
+
 
 static int f_elsp(realtype t, N_Vector y, N_Vector ydot, void* user_data) {
 	static_cast<elspectra_evolution_data*>(user_data)->f(t, y, ydot);
+	return (0);
+}
+
+static int f_h2ev(realtype t, N_Vector y, N_Vector ydot, void* user_data) {
+	static_cast<h2_population_evolution_data*>(user_data)->f(t, y, ydot);
 	return (0);
 }
 
@@ -98,11 +106,12 @@ array< electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> h2_state_data,
 
 // Excitation and dissociation rates [cm-3 s-1], energy loss rate [eV cm-3 s-1], as a function of time
 vector< array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> > h2_state_data_rate_arr;
-vector< dynamic_array> h2_electr_vstates_rate_arr, h2_vibr_vstates_rate_arr;
+vector< dynamic_array> h2_electr_excit_vstates_rate_arr, h2_vibr_excit_vstates_rate_arr;
 
 // Number of excitations and dissociations [cm-3], energy loss [eV cm-3] during the time interval [0, t] as a function of time t,
 vector< array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> > h2_state_data_arr;
-vector< dynamic_array> h2_electr_vstates_arr, h2_vibr_vstates_arr;
+vector< dynamic_array> h2_electr_excit_vstates_arr, h2_vibr_excit_vstates_arr;
+vector< dynamic_array> h2_electr_excit_xlevels_arr, h2_vibr_excit_xlevels_arr;
 
 // Energy loss rates in [eV cm-3 s-1], as a function of time
 vector< energy_loss_data_unit > enloss_rate_arr;
@@ -147,7 +156,7 @@ int main()
 	char text_line[MAX_TEXT_LINE_WIDTH];
 
 	int i, ji, nb_processors(6), nb(1), is_h2_pop_dens_init(0);
-	double op_ratio_h2, conc_h_tot, ioniz_fract;
+	double pop_j0, pop_j1, conc_h_tot, ioniz_fract;
 	double x, electron_conc, he_abund;
 	
 	vector<double> electron_energy_arr, hcolumn_density_arr;
@@ -232,15 +241,14 @@ int main()
 		ss.str(text_line);
 		ss >> ioniz_fract;
 
-		// ortho-to-para-H2 ratio,
-		// test the dependence on this parameter,
+		// normalized populations of energy levels v = 0, j = 0 and j = 1, the sum is equal to 1.
 		do
 			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
 		while (text_line[0] == '#');
 
 		ss.clear();
 		ss.str(text_line);
-		ss >> op_ratio_h2;
+		ss >> pop_j0 >> pop_j1;
 
 		// electron concentration, in [cm-3]
 		do
@@ -292,15 +300,14 @@ int main()
 #endif
 
 	for (i = 0; i < nb; i++) {
-	//	simulations_monoenergetic(data_path, output_path, conc_h_tot, he_abund, ioniz_fract, op_ratio_h2, electron_conc, 
-	//		electron_energy_arr[i]);
+	//	simulations_monoenergetic(data_path, output_path, conc_h_tot, he_abund, ioniz_fract, pop_j0, pop_j1, electron_conc, electron_energy_arr[i]);
 	}
 
 	//
 	//
 	// Simulations with electron spectrum produced by GRB
 	//
-	fname = "input_parameters_grb.txt";
+	fname = "input_parameters_grb_xrays.txt";
 	input.open(fname.c_str());
 
 	if (!input) {
@@ -393,8 +400,74 @@ int main()
 #endif
 
 	for (i = 0; i < nb; i++) {
-		simulations_grb(data_path, sim_path, output_path, hcolumn_density_arr[i], is_h2_pop_dens_init);
+		//simulations_grb(data_path, sim_path, output_path, hcolumn_density_arr[i], is_h2_pop_dens_init);
 	}
+
+	//
+	//
+	// Simulations of H2 de-excitation, without electrons
+	//
+	fname = "input_parameters_grb_uv.txt";
+	input.open(fname.c_str());
+
+	if (!input) {
+		cout << "Error in " << SOURCE_NAME << ": can't open file with data " << fname << endl;
+		exit(1);
+	}
+
+	while (!input.eof())
+	{
+		do // comment lines are read:
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> nb_processors;
+
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		ss.clear();
+		ss.str(text_line);
+		ss >> data_path;
+
+		// path to the directory with the simulation data (GRB propagation)
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		// path may contain spaces
+		sim_path = text_line;
+
+		// path to the directory for the output
+		do
+			input.getline(text_line, MAX_TEXT_LINE_WIDTH);
+		while (text_line[0] == '#');
+
+		// path may have spaces,
+		output_path = text_line;
+		input.close();
+	}
+
+#ifdef _OPENMP
+	omp_set_num_threads(nb_processors);
+
+#pragma omp parallel 
+	{
+#pragma omp master 
+		{
+			cout << "OpenMP is supported" << endl;
+			cout << "Nb of threads: " << omp_get_num_threads() << endl;
+		}
+	}
+#else
+	cout << "No OpenMP" << endl;
+#endif
+	
+	simulations_grb_uv(data_path, sim_path, output_path);
+
 
 	//
 	//
@@ -441,12 +514,15 @@ void memory_freeing_up()
 	}
 
 	h2_state_data_rate_arr.clear();
-	h2_electr_vstates_rate_arr.clear();
-	h2_vibr_vstates_rate_arr.clear();
+	h2_electr_excit_vstates_rate_arr.clear();
+	h2_vibr_excit_vstates_rate_arr.clear();
 
 	h2_state_data_arr.clear();
-	h2_electr_vstates_arr.clear();
-	h2_vibr_vstates_arr.clear();
+	h2_electr_excit_vstates_arr.clear();
+	h2_vibr_excit_vstates_arr.clear();
+
+	h2_electr_excit_xlevels_arr.clear(); 
+	h2_vibr_excit_xlevels_arr.clear();
 
 	enloss_rate_arr.clear();
 	enloss_rate_h2_rot_arr_pos.clear();
@@ -513,6 +589,7 @@ void init_electron_energy_grid(double max_electron_energy)
 }
 
 
+// Note, the time grid is important in integration n(t) dt
 void init_time_intervals()
 {
 	int i;
@@ -532,8 +609,10 @@ void init_time_intervals()
 }
 
 
+// A. Nesterenok, L.H. Scarlett, M.C. Zammit, I. Bray, D.V. Fursa, 
+// "Numerical model of fast electron energy deposition in interstellar molecular gas", Astrophysics & Space Science (2026)
 void simulations_monoenergetic(const string& data_path, const string& output_path, double conc_h_tot, double he_abund, double ioniz_fract, 
-	double op_ratio_h2, double electron_conc, double electron_energy)
+	double pop_j0, double pop_j1, double electron_conc, double electron_energy)
 {
 	bool must_be_saved;
 	int i, k, time_nb, step_nb, flag;
@@ -621,15 +700,16 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 		initial_data[i] = el_spectrum.arr[i] * user_data->get_electron_energy_bin(i);
 	}
 
+	// Gas constituents are H2 and He,
 	// initial ionization fraction is taken into account in specimen abundances
 	initial_data[nb_of_el_energies + EL_NB] = conc_h_tot * ioniz_fract;
 	initial_data[nb_of_el_energies + H2_NB] = 0.5 * conc_h_tot * (1. - ioniz_fract);
 	initial_data[nb_of_el_energies + H2_P_NB] = 0.5 * conc_h_tot * ioniz_fract;
 	initial_data[nb_of_el_energies + HE_NB] = he_abund * conc_h_tot;
 
-	// the initial distribution of energy level populations is postulated, [cm-3]
-	initial_data[h2eq_nb] = initial_data[nb_of_el_energies + H2_NB] / (op_ratio_h2 + 1.);
-	initial_data[h2eq_nb + 1] = initial_data[nb_of_el_energies + H2_NB] * op_ratio_h2 / (op_ratio_h2 + 1.);
+	// the initial distribution of energy level populations is postulated, [cm-3]	
+	initial_data[h2eq_nb] = initial_data[nb_of_el_energies + H2_NB] * pop_j0;
+	initial_data[h2eq_nb + 1] = initial_data[nb_of_el_energies + H2_NB] * pop_j1;
 
 	// the initial distribution of HeI levels,
 	initial_data[heieq_nb] = initial_data[nb_of_el_energies + HE_NB];
@@ -646,7 +726,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	dg_ratio = 0.;
 
 	user_data->set_dust_parameters(dust_is_presented, grain_radius, grain_nb_density);
-	save_model_parameters_mono(output_path_2, conc_h_tot, op_ratio_h2, ioniz_fract, he_abund, electron_conc, electron_energy);
+	save_model_parameters_mono(output_path_2, conc_h_tot, pop_j0, pop_j1, ioniz_fract, he_abund, electron_conc, electron_energy);
 
 	//
 	// Simulations
@@ -658,11 +738,17 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	// the arrays are initialized by zeros in the class constructor,
 	dynamic_array specimen_conc(NB_OF_CHEM_SPECIES), h2_popul_dens(nb_lev_h2), hei_popul_dens(nb_lev_hei), h2_pop_v(MAX_NB_H2_VSTATES_X1SG);
 
-	dynamic_array h2_electr_vstates(MAX_NB_H2_VSTATES_X1SG), h2_electr_vstates_rates(MAX_NB_H2_VSTATES_X1SG),
-		h2_electr_vstates_aux(MAX_NB_H2_VSTATES_X1SG);
+	dynamic_array h2_electr_excit_vstates(MAX_NB_H2_VSTATES_X1SG), h2_electr_excit_vstates_rates(MAX_NB_H2_VSTATES_X1SG),
+		h2_electr_excit_vstates_aux(MAX_NB_H2_VSTATES_X1SG);
 
-	dynamic_array h2_vibr_vstates(MAX_NB_H2_VSTATES_X1SG), h2_vibr_vstates_rates(MAX_NB_H2_VSTATES_X1SG),
-		h2_vibr_vstates_aux(MAX_NB_H2_VSTATES_X1SG);
+	dynamic_array h2_vibr_excit_vstates(MAX_NB_H2_VSTATES_X1SG), h2_vibr_excit_vstates_rates(MAX_NB_H2_VSTATES_X1SG),
+		h2_vibr_excit_vstates_aux(MAX_NB_H2_VSTATES_X1SG);
+
+	dynamic_array h2_electr_excit_xlevels(MAX_NB_H2_ROVIBR_X1SG), h2_electr_excit_xlevels_rates(MAX_NB_H2_ROVIBR_X1SG),
+		h2_electr_excit_xlevels_aux(MAX_NB_H2_ROVIBR_X1SG);
+
+	dynamic_array h2_vibr_excit_xlevels(MAX_NB_H2_ROVIBR_X1SG), h2_vibr_excit_xlevels_rates(MAX_NB_H2_ROVIBR_X1SG),
+		h2_vibr_excit_xlevels_aux(MAX_NB_H2_ROVIBR_X1SG);
 
 	// vectors used by solver SUNDIALS CVODE
 	N_Vector y, ydot, abs_tol;
@@ -755,11 +841,11 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	f_elsp(model_time, y, ydot, (void*)user_data);
 
 	user_data->get_el_energy_losses(enloss_rate, enloss_rate_h2_rot_pos, enloss_rate_h2_vibr_pos);
-
 	user_data->get_h2_state_data(h2_state_data_rates);
 
-	user_data->get_h2_excitation_rates(h2_electr_vstates_rates, h2_vibr_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
-	
+	user_data->get_h2_excitation_rates(h2_electr_excit_vstates_rates, h2_vibr_excit_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
+	user_data->get_h2_excitation_rates(h2_electr_excit_xlevels_rates, h2_vibr_excit_xlevels_rates);
+
 	energy_in_rovibr_levels = user_data->get_energy_h2_rovibr(y);
 
 	// Energy loss rates
@@ -777,12 +863,16 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 
 	// H2 data
 	h2_state_data_rate_arr.push_back(h2_state_data_rates);
-	h2_electr_vstates_rate_arr.push_back(h2_electr_vstates_rates);
-	h2_vibr_vstates_rate_arr.push_back(h2_vibr_vstates_rates);
+	h2_electr_excit_vstates_rate_arr.push_back(h2_electr_excit_vstates_rates);
+	h2_vibr_excit_vstates_rate_arr.push_back(h2_vibr_excit_vstates_rates);
 
 	h2_state_data_arr.push_back(h2_state_data);
-	h2_electr_vstates_arr.push_back(h2_electr_vstates);
-	h2_vibr_vstates_arr.push_back(h2_vibr_vstates);
+	h2_electr_excit_vstates_arr.push_back(h2_electr_excit_vstates);
+	h2_vibr_excit_vstates_arr.push_back(h2_vibr_excit_vstates);
+
+	// only time-integrated data in this case is stored:
+	h2_electr_excit_xlevels_arr.push_back(h2_electr_excit_xlevels);
+	h2_vibr_excit_xlevels_arr.push_back(h2_vibr_excit_xlevels);
 
 	energy_in_rovibr_levels_arr.push_back(energy_in_rovibr_levels);
 	
@@ -797,8 +887,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	timer = time(NULL);
 
 	if (VERBOSITY) {
-		cout << left << setw(12) << "model_time " << setw(9) << "steps_nb "
-			<< setw(12) << "gas_temp(K)" << setw(12) << "ion_temp(K)" << setw(12) << "dust_charge" << endl;
+		cout << left << setw(12) << "Model time is shown..." << endl;
 	}
 
 	time_nb = 1;
@@ -881,28 +970,41 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 
 			// Excitation rates,
 			for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
-				h2_electr_vstates_aux.arr[i] = h2_electr_vstates_rates.arr[i];
-				h2_vibr_vstates_aux.arr[i] = h2_vibr_vstates_rates.arr[i];
+				h2_electr_excit_vstates_aux.arr[i] = h2_electr_excit_vstates_rates.arr[i];
+				h2_vibr_excit_vstates_aux.arr[i] = h2_vibr_excit_vstates_rates.arr[i];
 
 			}
 			x1 = h2_excit_rot_rate;
 			x2 = hei_excit_rate;
 
-			user_data->get_h2_excitation_rates(h2_electr_vstates_rates, h2_vibr_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
+			user_data->get_h2_excitation_rates(h2_electr_excit_vstates_rates, h2_vibr_excit_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
 			
 			for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
-				h2_electr_vstates.arr[i] += (h2_electr_vstates_aux.arr[i] + h2_electr_vstates_rates.arr[i]) *dt;
-				h2_vibr_vstates.arr[i] += (h2_vibr_vstates_aux.arr[i] + h2_vibr_vstates_rates.arr[i]) *dt;
+				h2_electr_excit_vstates.arr[i] += (h2_electr_excit_vstates_aux.arr[i] + h2_electr_excit_vstates_rates.arr[i]) *dt;
+				h2_vibr_excit_vstates.arr[i] += (h2_vibr_excit_vstates_aux.arr[i] + h2_vibr_excit_vstates_rates.arr[i]) *dt;
 			}
 			h2_excit_rot += (x1 + h2_excit_rot_rate) * dt;
 			hei_excit += (x2 + hei_excit_rate) * dt;
+
+			//
+			for (i = 0; i < MAX_NB_H2_ROVIBR_X1SG; i++) {
+				h2_electr_excit_xlevels_aux.arr[i] = h2_electr_excit_xlevels_rates.arr[i];
+				h2_vibr_excit_xlevels_aux.arr[i] = h2_vibr_excit_xlevels_rates.arr[i];
+
+			}
+
+			user_data->get_h2_excitation_rates(h2_electr_excit_xlevels_rates, h2_vibr_excit_xlevels_rates);
+
+			for (i = 0; i < MAX_NB_H2_ROVIBR_X1SG; i++) {
+				h2_electr_excit_xlevels.arr[i] += (h2_electr_excit_xlevels_aux.arr[i] + h2_electr_excit_xlevels_rates.arr[i]) * dt;
+				h2_vibr_excit_xlevels.arr[i] += (h2_vibr_excit_xlevels_aux.arr[i] + h2_vibr_excit_xlevels_rates.arr[i]) * dt;
+			}
 
 			flag = CVodeGetNumSteps(cvode_mem, &nb_steps_tot);
 
 			if (VERBOSITY) {
 				cout.precision(2);
-				cout << left << setw(12) << model_time_aux << setw(9) << nb_steps_tot <<
-					setw(12) << NV_Ith_S(y, physeq_nb) << setw(12) << NV_Ith_S(y, physeq_nb + 1) << setw(12) << NV_Ith_S(y, physeq_nb + 2) << endl;
+				cout << left << setw(12) << model_time_aux << endl;
 			}
 
 			// saving data,
@@ -946,12 +1048,16 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 
 				// H2 data
 				h2_state_data_rate_arr.push_back(h2_state_data_rates);
-				h2_electr_vstates_rate_arr.push_back(h2_electr_vstates_rates);
-				h2_vibr_vstates_rate_arr.push_back(h2_vibr_vstates_rates);
+				h2_electr_excit_vstates_rate_arr.push_back(h2_electr_excit_vstates_rates);
+				h2_vibr_excit_vstates_rate_arr.push_back(h2_vibr_excit_vstates_rates);
 
 				h2_state_data_arr.push_back(h2_state_data);
-				h2_electr_vstates_arr.push_back(h2_electr_vstates);
-				h2_vibr_vstates_arr.push_back(h2_vibr_vstates);
+				h2_electr_excit_vstates_arr.push_back(h2_electr_excit_vstates);
+				h2_vibr_excit_vstates_arr.push_back(h2_vibr_excit_vstates);
+
+				// only time-integrated data in this case is stored:
+				h2_electr_excit_xlevels_arr.push_back(h2_electr_excit_xlevels);
+				h2_vibr_excit_xlevels_arr.push_back(h2_vibr_excit_xlevels);
 
 				energy_in_rovibr_levels = user_data->get_energy_h2_rovibr(y);
 				energy_in_rovibr_levels_arr.push_back(energy_in_rovibr_levels);
@@ -969,8 +1075,9 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 
 				save_specimen_conc_evolution(output_path_2, time_cloud_arr, specimen_conc_evol, conc_h_tot);
 
-				save_h2_populations_evolution(output_path_2, time_cloud_arr, h2_popdens_evol, h2_popdens_v_evol, conc_h_tot, nb_lev_h2);
-
+				// ?
+				save_h2_populations_evolution(output_path_2, time_cloud_arr, h2_popdens_evol, conc_h_tot, nb_lev_h2);
+				save_h2_vibr_populations_evolution(output_path_2, time_cloud_arr, h2_popdens_v_evol, conc_h_tot, nb_lev_h2);
 				save_hei_populations_evolution(output_path_2, time_cloud_arr, hei_popul_dens_evol, conc_h_tot, nb_lev_hei);
 
 				save_electron_energy_loss_rates(output_path_2, conc_h_tot, time_cloud_arr,
@@ -987,7 +1094,7 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 				save_electronic_states_excit_rates(output_path_2, conc_h_tot, time_cloud_arr, h2_state_data_rate_arr);
 
 				// Saving H2 vibrational excitation data
-				save_vibrational_states_excit_rates(output_path_2, conc_h_tot, time_cloud_arr, h2_electr_vstates_rate_arr, h2_vibr_vstates_rate_arr,
+				save_vibrational_states_excit_rates(output_path_2, conc_h_tot, time_cloud_arr, h2_electr_excit_vstates_rate_arr, h2_vibr_excit_vstates_rate_arr,
 					h2_excit_rot_rate_arr);
 			}
 		}
@@ -1011,23 +1118,26 @@ void simulations_monoenergetic(const string& data_path, const string& output_pat
 	// Free the matrix memory
 	SUNMatDestroy(A);
 
-	save_output_parameters(output_path, conc_h_tot, electron_energies_grid, electron_energy_bin_size,
-		el_spectrum_evol,
+	save_output_parameters_mono(output_path, conc_h_tot, pop_j0, pop_j1, electron_conc, electron_energy,
 		specimen_conc_evol,
 		enloss_int_arr,
 		h2_state_data_arr,
-		h2_electr_vstates_arr,
-		h2_vibr_vstates_arr,
+		h2_electr_excit_vstates_arr,
+		h2_vibr_excit_vstates_arr,
 		h2_excit_rot_arr,
 		hei_excit_arr, 
 		energy_in_rovibr_levels_arr);
+
+	save_output_excitation_yields(output_path, conc_h_tot, pop_j0, pop_j1, electron_conc, electron_energy,
+		h2_electr_excit_xlevels_arr, h2_vibr_excit_xlevels_arr);
 }
 
 
+// 
 void simulations_grb(const string& data_path, const string& sim_path, const string& output_path, 
 	double hcolumn_density, int is_h2_pop_dens_init)
 {
-	bool must_be_saved;
+	bool must_be_saved, save_data_for_test;
 	int i, k, lay_nb, time_nb, step_nb, flag;
 	long int nb_steps_tot;
 	
@@ -1052,13 +1162,9 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 	elspectra_evolution_data* user_data;
 
 	// directory name for saving the data on the specific H column density,
-	i = (int)log10(hcolumn_density);
+	// H column density must be = integer value * 1.e+21
+	i = 21;
 	k = rounding(hcolumn_density / pow(10., i));
-
-	if (fabs(hcolumn_density - k * pow(10., i)) / hcolumn_density > numeric_limits<double>::epsilon()) {
-		i--;
-		k = rounding(hcolumn_density / pow(10., i));
-	}
 
 	ss.clear();
 	ss.str("");
@@ -1096,6 +1202,7 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 		<< "Initialization of the data..." << endl;
 
 	memory_freeing_up();
+	// one has to integrate over time in the luminosity calculations, time grid must be sufficiently fine,
 	init_time_intervals();
 	init_electron_energy_grid(MAX_ELECTRON_ENERGY);
 
@@ -1106,7 +1213,8 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 	init_specimen_conc(sim_path, layer_centre_distances, specimen_conc_init_data);
 
 	// electron spectrum in the file has the dimension [cm-3 eV-1],	
-	init_electron_spectra(sim_path, output_path, el_spectrum_init_data, electron_energies_grid);
+	save_data_for_test = false;
+	init_electron_spectra(sim_path, output_path_2, el_spectrum_init_data, electron_energies_grid, save_data_for_test);
 
 	// population density in the file has dimension [cm-3],
 	init_h2_population_density(sim_path, h2_pop_dens_init_data, qnb_v_arr, qnb_j_arr);
@@ -1194,7 +1302,7 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 	}
 	user_data->set_dust_parameters(dust_is_presented, grain_radius, grain_nb_density);
 
-	save_model_parameters(output_path_2, conc_h_tot, op_ratio_h2, IONIZATION_FRACTION_THERMAL_EL, dg_ratio, grain_radius, grain_nb_density,
+	save_model_parameters_grb_xrays(output_path_2, conc_h_tot, op_ratio_h2, IONIZATION_FRACTION_THERMAL_EL, dg_ratio, grain_radius, grain_nb_density,
 		grb_cloud_distance, grb_distance, hcolumn_density, lay_nb);
 
 	//
@@ -1207,11 +1315,11 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 	dynamic_array el_spectrum(nb_of_el_energies), specimen_conc(NB_OF_CHEM_SPECIES), h2_popul_dens(nb_lev_h2), hei_popul_dens(nb_lev_hei),
 		h2_pop_v(MAX_NB_H2_VSTATES_X1SG);
 
-	dynamic_array h2_electr_vstates(MAX_NB_H2_VSTATES_X1SG), h2_electr_vstates_rates(MAX_NB_H2_VSTATES_X1SG),
-		h2_electr_vstates_aux(MAX_NB_H2_VSTATES_X1SG);
+	dynamic_array h2_electr_excit_vstates(MAX_NB_H2_VSTATES_X1SG), h2_electr_excit_vstates_rates(MAX_NB_H2_VSTATES_X1SG),
+		h2_electr_excit_vstates_aux(MAX_NB_H2_VSTATES_X1SG);
 
-	dynamic_array h2_vibr_vstates(MAX_NB_H2_VSTATES_X1SG), h2_vibr_vstates_rates(MAX_NB_H2_VSTATES_X1SG),
-		h2_vibr_vstates_aux(MAX_NB_H2_VSTATES_X1SG);
+	dynamic_array h2_vibr_excit_vstates(MAX_NB_H2_VSTATES_X1SG), h2_vibr_excit_vstates_rates(MAX_NB_H2_VSTATES_X1SG),
+		h2_vibr_excit_vstates_aux(MAX_NB_H2_VSTATES_X1SG);
 
 	// vectors used by solver SUNDIALS CVODE
 	N_Vector y, ydot, abs_tol;
@@ -1308,7 +1416,7 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 
 	user_data->get_h2_state_data(h2_state_data_rates);
 
-	user_data->get_h2_excitation_rates(h2_electr_vstates_rates, h2_vibr_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
+	user_data->get_h2_excitation_rates(h2_electr_excit_vstates_rates, h2_vibr_excit_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
 
 	energy_in_rovibr_levels = user_data->get_energy_h2_rovibr(y);
 
@@ -1327,12 +1435,12 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 
 	// H2 data
 	h2_state_data_rate_arr.push_back(h2_state_data_rates);
-	h2_electr_vstates_rate_arr.push_back(h2_electr_vstates_rates);
-	h2_vibr_vstates_rate_arr.push_back(h2_vibr_vstates_rates);
+	h2_electr_excit_vstates_rate_arr.push_back(h2_electr_excit_vstates_rates);
+	h2_vibr_excit_vstates_rate_arr.push_back(h2_vibr_excit_vstates_rates);
 
 	h2_state_data_arr.push_back(h2_state_data);
-	h2_electr_vstates_arr.push_back(h2_electr_vstates);
-	h2_vibr_vstates_arr.push_back(h2_vibr_vstates);
+	h2_electr_excit_vstates_arr.push_back(h2_electr_excit_vstates);
+	h2_vibr_excit_vstates_arr.push_back(h2_vibr_excit_vstates);
 
 	energy_in_rovibr_levels_arr.push_back(energy_in_rovibr_levels);
 
@@ -1430,18 +1538,18 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 
 			// Excitation rates,
 			for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
-				h2_electr_vstates_aux.arr[i] = h2_electr_vstates_rates.arr[i];
-				h2_vibr_vstates_aux.arr[i] = h2_vibr_vstates_rates.arr[i];
+				h2_electr_excit_vstates_aux.arr[i] = h2_electr_excit_vstates_rates.arr[i];
+				h2_vibr_excit_vstates_aux.arr[i] = h2_vibr_excit_vstates_rates.arr[i];
 
 			}
 			x1 = h2_excit_rot_rate;
 			x2 = hei_excit_rate;
 
-			user_data->get_h2_excitation_rates(h2_electr_vstates_rates, h2_vibr_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
+			user_data->get_h2_excitation_rates(h2_electr_excit_vstates_rates, h2_vibr_excit_vstates_rates, h2_excit_rot_rate, hei_excit_rate);
 
 			for (i = 0; i < MAX_NB_H2_VSTATES_X1SG; i++) {
-				h2_electr_vstates.arr[i] += (h2_electr_vstates_aux.arr[i] + h2_electr_vstates_rates.arr[i]) * dt;
-				h2_vibr_vstates.arr[i] += (h2_vibr_vstates_aux.arr[i] + h2_vibr_vstates_rates.arr[i]) * dt;
+				h2_electr_excit_vstates.arr[i] += (h2_electr_excit_vstates_aux.arr[i] + h2_electr_excit_vstates_rates.arr[i]) * dt;
+				h2_vibr_excit_vstates.arr[i] += (h2_vibr_excit_vstates_aux.arr[i] + h2_vibr_excit_vstates_rates.arr[i]) * dt;
 			}
 			h2_excit_rot += (x1 + h2_excit_rot_rate) * dt;
 			hei_excit += (x2 + hei_excit_rate) * dt;
@@ -1494,12 +1602,12 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 
 				// H2 data
 				h2_state_data_rate_arr.push_back(h2_state_data_rates);
-				h2_electr_vstates_rate_arr.push_back(h2_electr_vstates_rates);
-				h2_vibr_vstates_rate_arr.push_back(h2_vibr_vstates_rates);
+				h2_electr_excit_vstates_rate_arr.push_back(h2_electr_excit_vstates_rates);
+				h2_vibr_excit_vstates_rate_arr.push_back(h2_vibr_excit_vstates_rates);
 
 				h2_state_data_arr.push_back(h2_state_data);
-				h2_electr_vstates_arr.push_back(h2_electr_vstates);
-				h2_vibr_vstates_arr.push_back(h2_vibr_vstates);
+				h2_electr_excit_vstates_arr.push_back(h2_electr_excit_vstates);
+				h2_vibr_excit_vstates_arr.push_back(h2_vibr_excit_vstates);
 
 				energy_in_rovibr_levels = user_data->get_energy_h2_rovibr(y);
 				energy_in_rovibr_levels_arr.push_back(energy_in_rovibr_levels);
@@ -1517,7 +1625,8 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 
 				save_specimen_conc_evolution(output_path_2, time_cloud_arr, specimen_conc_evol, conc_h_tot);
 
-				save_h2_populations_evolution(output_path_2, time_cloud_arr, h2_popdens_evol, h2_popdens_v_evol, conc_h_tot, nb_lev_h2);
+				save_h2_populations_evolution(output_path_2, time_cloud_arr, h2_popdens_evol, conc_h_tot, nb_lev_h2);
+				save_h2_vibr_populations_evolution(output_path_2, time_cloud_arr, h2_popdens_v_evol, conc_h_tot, nb_lev_h2);
 
 				save_hei_populations_evolution(output_path_2, time_cloud_arr, hei_popul_dens_evol, conc_h_tot, nb_lev_hei);
 
@@ -1535,7 +1644,7 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 				save_electronic_states_excit_rates(output_path_2, conc_h_tot, time_cloud_arr, h2_state_data_rate_arr);
 
 				// Saving H2 vibrational excitation data
-				save_vibrational_states_excit_rates(output_path_2, conc_h_tot, time_cloud_arr, h2_electr_vstates_rate_arr, h2_vibr_vstates_rate_arr,
+				save_vibrational_states_excit_rates(output_path_2, conc_h_tot, time_cloud_arr, h2_electr_excit_vstates_rate_arr, h2_vibr_excit_vstates_rate_arr,
 					h2_excit_rot_rate_arr);
 
 				save_phys_param_evolution(output_path_2, conc_h_tot, time_cloud_arr, neutral_temp_arr, ion_temp_arr, dust_charge_arr, specimen_conc_evol);
@@ -1548,6 +1657,309 @@ void simulations_grb(const string& data_path, const string& sim_path, const stri
 	}
 	cout << left << "Total calculation time (s): " << setw(12) << (int)(time(NULL) - timer) << endl;
 
+	N_VDestroy(y);
+	N_VDestroy(ydot);
+	N_VDestroy(abs_tol);
+
+	// Free integrator memory
+	CVodeFree(&cvode_mem);
+
+	// Free the linear solver memory
+	SUNLinSolFree(LS);
+
+	// Free the matrix memory
+	SUNMatDestroy(A);
+
+	save_output_parameters_grb(output_path, conc_h_tot, grb_cloud_distance, grb_distance, hcolumn_density, lay_nb);
+}
+
+
+void simulations_grb_uv(const string& data_path, const string& sim_path, const string& output_path)
+{
+	bool must_be_saved;
+	int i, k, l, lay_nb, nb_lay_av, nb_lev_h2, nb_of_equat, flag, time_nb, step_nb, nb_bins_per_order_1, nb_bins_per_order_2, nb_of_time_moments;
+	
+	double x1, x2, grb_cloud_distance, grb_distance, max_hcolumn_density, hcolumn_density, conc_h_tot, op_ratio_h2, rel_tol,
+		min_model_time, max_model_time, model_time_1, model_time_2, model_time_aux, model_time_aux_prev, model_time, model_time_step, model_time_out;
+	
+	time_t timer;
+	char* ctime_str;
+	stringstream ss;
+
+	vector<int>    qnb_v_arr, qnb_j_arr;
+	vector<double> layer_centre_distances, time_cloud_arr;  // in cm
+
+	nb_lay_av = 2;
+	max_hcolumn_density = 5.e+21;
+
+	timer = time(NULL);
+	ctime_str = ctime(&timer);
+	if (VERBOSITY) {
+		cout << ctime_str << endl << "Start of the simulations of the GRB" << endl;
+	}
+
+	// Initialization of time grid,
+	min_model_time = 100.;  // in s
+	max_model_time = 1.e+8; 
+
+	model_time_1 = 1.e+5;
+	model_time_2 = 1.e+7;
+	nb_bins_per_order_1 = 30;
+	nb_bins_per_order_2 = 100;
+
+	time_cloud_arr.clear();
+	time_cloud_arr.push_back(0.);
+	time_cloud_arr.push_back(min_model_time);
+
+	x1 = pow(10., 1. / nb_bins_per_order_1);
+	x2 = pow(10., 1. / nb_bins_per_order_2);
+
+	for (i = 0; time_cloud_arr.back() < model_time_1 * (1. - 1.e-9); i++) {
+		time_cloud_arr.push_back(time_cloud_arr.back() * x1);
+	}
+	for (i = 0; time_cloud_arr.back() < model_time_2 * (1. - 1.e-9); i++) {
+		time_cloud_arr.push_back(time_cloud_arr.back() * x2);
+	}
+	for (i = 0; time_cloud_arr.back() < max_model_time; i++) {
+		time_cloud_arr.push_back(time_cloud_arr.back() * x1);
+	}
+	nb_of_time_moments = (int)time_cloud_arr.size();
+
+	// user data
+	h2_population_evolution_data* user_data
+		= new h2_population_evolution_data(data_path, output_path, VERBOSITY);
+
+	nb_lev_h2 = user_data->get_nb_of_h2_lev();
+	nb_of_equat = nb_lev_h2;
+
+	vector<dynamic_array> h2_popdens_evol, h2_popdens_v_evol, h2_popdens_evol_average, specimen_conc_init_data, h2_pop_dens_init_data;
+	dynamic_array h2_popul_dens(nb_lev_h2), h2_pop_v(MAX_NB_H2_VSTATES_X1SG);  // the arrays are initialized by zeros in the class constructor,
+
+	init_cloud_parameters(sim_path, grb_cloud_distance, conc_h_tot, op_ratio_h2);
+	
+	// layer coordinates are initialized here,
+	init_specimen_conc(sim_path, layer_centre_distances, specimen_conc_init_data);
+
+	// population density in the file has dimension [cm-3],
+	init_h2_population_density(sim_path, h2_pop_dens_init_data, qnb_v_arr, qnb_j_arr);
+
+	// vectors used by solver SUNDIALS CVODE
+	N_Vector y, ydot, abs_tol;
+
+	cout << scientific;
+	cout.precision(3);
+
+	SUNMatrix A;
+	SUNLinearSolver LS;
+	void* cvode_mem;
+
+	y = N_VNew_Serial(nb_of_equat);
+	ydot = N_VNew_Serial(nb_of_equat);
+	abs_tol = N_VNew_Serial(nb_of_equat);
+
+	// Initialization for tolerances:
+	rel_tol = REL_ERROR_SOLVER;
+	user_data->set_tolerances(abs_tol);
+
+	// Call CVodeCreate to create the solver memory and specify the Backward Differentiation Formula and the use of a Newton iteration 
+	cvode_mem = CVodeCreate(CV_BDF);
+
+	// Call CVodeInit to initialize the integrator memory and specify the user's right hand side function in y'=f(t,y), 
+	// the initial time t0, and the initial dependent variable vector y;
+	// y is not defined yet,
+	flag = CVodeInit(cvode_mem, f_h2ev, model_time = 0., y);
+
+	// Call CVodeSVtolerances to specify the scalar tolerances:
+	flag = CVodeSVtolerances(cvode_mem, rel_tol, abs_tol);
+
+	// The maximal number of steps between simulation stops;
+	flag = CVodeSetMaxNumSteps(cvode_mem, 10000);
+
+	// specifies the maximum number of error test failures permitted in attempting one step:
+	flag = CVodeSetMaxErrTestFails(cvode_mem, MAX_ERR_TEST_FAILS_SOLVER); // default value is 7; 
+	flag = CVodeSetMaxConvFails(cvode_mem, MAX_CONV_FAILS_SOLVER); // default value is 10;
+
+	// Create dense SUNMatrix for use in linear solves 
+	A = SUNDenseMatrix(nb_of_equat, nb_of_equat);
+
+	// Create dense SUNLinearSolver object for use by CVode 
+	//LS = SUNDenseLinearSolver(y, A);
+	LS = SUNLinSol_Dense(y, A);
+
+	// Call CVDlsSetLinearSolver to attach the matrix and linear solver to CVode 
+	//flag = CVDlsSetLinearSolver(cvode_mem, LS, A);
+	flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+
+	// The function attaches the user data block to the solver;
+	flag = CVodeSetUserData(cvode_mem, user_data);
+
+	// the cycle over layer numbers,
+	for (hcolumn_density = 0, lay_nb = 0; (lay_nb < (int)layer_centre_distances.size()) && hcolumn_density < max_hcolumn_density; lay_nb += nb_lay_av)
+	{
+		h2_popdens_evol_average.clear();
+
+		//averaging over a set of layers,
+		for (l = 0; (l < nb_lay_av) && (lay_nb + l < (int)layer_centre_distances.size()); l++) 
+		{
+			h2_popdens_evol.clear();
+			h2_popdens_v_evol.clear();
+
+			// population densities must be in [cm-3],
+			for (i = 0; i < h2_pop_dens_init_data[lay_nb + l].dim; i++)
+			{
+				k = user_data->get_level_nb_h2(qnb_v_arr[i], qnb_j_arr[i]);
+				if (k >= 0) {
+					h2_popul_dens.arr[k] = h2_pop_dens_init_data[lay_nb + l].arr[i];
+				}
+			}
+
+			// Initialization of initial values of variables,
+			for (i = 0; i < nb_of_equat; i++) {
+				NV_Ith_S(y, i) = h2_popul_dens.arr[i];
+			}
+
+			h2_popdens_evol.push_back(h2_popul_dens);
+
+			memset(h2_pop_v.arr, 0, MAX_NB_H2_VSTATES_X1SG * sizeof(double));
+			for (i = 0; i < nb_lev_h2; i++) {
+				k = user_data->get_vibr_nb_h2(i);
+				if (k >= 0) {
+					h2_pop_v.arr[k] += NV_Ith_S(y, h2eq_nb + i);
+				}
+			}
+			h2_popdens_v_evol.push_back(h2_pop_v);
+
+			//
+			// Simulations
+			//
+			model_time_aux = model_time = 0.;
+
+			// restart of the solver with new values of initial conditions,
+			flag = CVodeReInit(cvode_mem, model_time, y);
+
+			// update the members of user_data class,
+			f_h2ev(model_time, y, ydot, (void*)user_data);
+
+			if (VERBOSITY) {
+				cout << endl;
+				cout << left << "lay_nb: " << lay_nb + l << endl;
+			}
+			timer = time(NULL);
+
+			time_nb = 1;
+			// there is integration of the parameters over the time, this time step must be sufficiently small, 
+			model_time_step = 1.;
+
+			while (model_time < time_cloud_arr.back())
+			{
+				flag = CV_SUCCESS;
+				must_be_saved = false;
+				model_time_aux_prev = model_time_aux;
+
+				if (model_time < time_cloud_arr[time_nb])
+				{
+					step_nb = 0;
+					model_time_out = model_time + model_time_step;  // ?
+
+					while (step_nb < MAX_NB_STEPS && flag == CV_SUCCESS && model_time < model_time_out)
+					{
+						// actual model time is stored in cvode_mem, 
+						flag = CVode(cvode_mem, model_time_out, y, &model_time, CV_ONE_STEP);  // CV_NORMAL or CV_ONE_STEP	
+						step_nb++;
+					}
+				}
+
+				if (flag == CV_SUCCESS) {
+					if (model_time > time_cloud_arr[time_nb]) {
+						// step back to the time grid value, updating model time,
+						flag = CVodeGetDky(cvode_mem, time_cloud_arr[time_nb], 0, y);
+						model_time_aux = time_cloud_arr[time_nb];
+
+						must_be_saved = true;
+						time_nb++;
+
+						if (flag != CV_SUCCESS) {
+							cout << "Error in CVodeGetDky() " << flag << endl;
+						}
+					}
+					else {
+						model_time_aux = model_time;
+					}
+
+					// update the members of user_data class,
+					f_h2ev(model_time_aux, y, ydot, user_data);
+
+					// saving data,
+					if (must_be_saved) {
+						for (i = 0; i < nb_lev_h2; i++) {
+							h2_popul_dens.arr[i] = NV_Ith_S(y, i);
+						}
+						h2_popdens_evol.push_back(h2_popul_dens);
+
+						memset(h2_pop_v.arr, 0, MAX_NB_H2_VSTATES_X1SG * sizeof(double));
+						for (i = 0; i < nb_lev_h2; i++) {
+							k = user_data->get_vibr_nb_h2(i);
+							if (k >= 0)
+								h2_pop_v.arr[k] += NV_Ith_S(y, i);
+						}
+						h2_popdens_v_evol.push_back(h2_pop_v);
+					}
+				}
+				else {
+					cout << "Some unexpected error has been occurred: " << flag << endl;
+					break;
+				}
+			}
+			
+			// summing of populations
+			if (l == 0) {
+				for (i = 0; i < (int)h2_popdens_evol.size(); i++) {
+					h2_popdens_evol_average.push_back(h2_popdens_evol[i]);
+				}
+			}
+			else{
+				for (i = 0; i < (int)h2_popdens_evol_average.size(); i++) {
+					for (k = 0; k < (int)h2_popdens_evol_average[i].dim; k++) {
+						h2_popdens_evol_average[i].arr[k] += h2_popdens_evol[i].arr[k];
+					}
+				}
+			}
+			
+			if (VERBOSITY) {
+				i = (int)(time(NULL) - timer);
+				cout << left << "Calc time for " << lay_nb + l << " layer (s): " << i << endl;
+			}
+		}
+
+		// from the cloud boundary to the cloud layer centre,
+		// l = nb_lay_av in general case (or lower, if quit condition is satisfied),
+		hcolumn_density = conc_h_tot * (0.5 * (layer_centre_distances[lay_nb + l - 1] + layer_centre_distances[lay_nb]) - grb_cloud_distance);
+
+		// distance from the GRB source to the centre of the particular cloud layer,
+		grb_distance = 0.5 * (layer_centre_distances[lay_nb + l - 1] + layer_centre_distances[lay_nb]);
+
+		for (i = 0; i < (int)h2_popdens_evol_average.size(); i++) {
+			for (k = 0; k < (int)h2_popdens_evol_average[i].dim; k++) {
+				h2_popdens_evol_average[i].arr[k] /= l;
+			}
+		}
+
+		// directory name for saving the data on the specific H column density,
+		// Here, H column density must be = integer value * 1.e+19
+		i = 19;
+		k = rounding(hcolumn_density / pow(10., i));
+
+		ss.clear();
+		ss.str("");
+		ss << "_nh" << k << "e" << i;
+
+		save_h2_populations_evolution(output_path, time_cloud_arr, h2_popdens_evol_average, conc_h_tot, nb_lev_h2, ss.str());
+		save_output_parameters_grb(output_path, conc_h_tot, grb_cloud_distance, grb_distance, hcolumn_density, lay_nb / nb_lay_av);
+	}
+	
+	if (VERBOSITY) {
+		cout << "The memory is freeing up" << endl;
+	}
 	N_VDestroy(y);
 	N_VDestroy(ydot);
 	N_VDestroy(abs_tol);
@@ -1614,8 +2026,6 @@ void init_cloud_parameters(const string& sim_path, double& grb_cloud_distance, d
 		input.close();
 	}
 }
-
-
 
 //
 // please, check the value of MAX_TEXT_LINE_WIDTH
@@ -1714,7 +2124,8 @@ void init_electron_spectra_mono(dynamic_array& init_spectrum, const vector<doubl
 }
 
 
-void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& init_data, const vector<double>& en_grid)
+void init_electron_spectra(const string& sim_path, const string& output_path, vector<dynamic_array>& init_data, const vector<double>& en_grid, 
+	bool save_data_for_test)
 {
 	// layer nb for which the electron spectra is saved (initial and after rescaling of energy grid),
 	const int lay_nb_test = 0;
@@ -1798,73 +2209,75 @@ void init_electron_spectra(const string& sim_path, const string& output_path, ve
 	}
 
 	// Saving electron spectra for test,
-	fname = output_path + "electron_spectra_file.txt";
-	output.open(fname.c_str());
-	output << scientific;
+	if (save_data_for_test) {
+		fname = output_path + "electron_spectra_file.txt";
+		output.open(fname.c_str());
+		output << scientific;
 
-	output << left << "!Electron spectra from file with simulation data," << endl
-		<< "!Histogram, energy (eV), spectra [cm-3 eV-1] (as in the file with simulation data), layer nb: " << lay_nb_test << endl;
+		output << left << "!Electron spectra from file with simulation data," << endl
+			<< "!Histogram, energy (eV), spectra [cm-3 eV-1] (as in the file with simulation data), layer nb: " << lay_nb_test << endl;
 
-	for (i = 0; i < en_nb_f; i++) {
-		output.precision(5);
-		output << left << setw(14) << en_grid_file[i] * 1.0001;
-
-		output.precision(3);
-		output << left << setw(12) << file_data[lay_nb_test].arr[i] << endl;
-
-		output.precision(5);
-		output << left << setw(14) << en_grid_file[i + 1];
-
-		output.precision(3);
-		output << left << setw(12) << file_data[lay_nb_test].arr[i] << endl;
-	}
-	output.close();
-
-	fname = output_path + "electron_spectra_init.txt";
-	output.open(fname.c_str());
-	output << scientific;
-
-	output << left << "!Initial electron spectra in simulations," << endl
-		<< "!Histogram, energy (eV), spectra [cm-3 eV-1], layer nb: " << lay_nb_test << endl;
-
-	for (i = 0; i < en_nb; i++) {
-		output.precision(5);
-		output << left << setw(14) << en_grid[i] * 1.0001;
-
-		output.precision(3);
-		output << left << setw(12) << init_data[lay_nb_test].arr[i] << endl;
-
-		output.precision(5);
-		output << left << setw(14) << en_grid[i + 1];
-
-		output.precision(3);
-		output << left << setw(12) << init_data[lay_nb_test].arr[i] << endl;
-	}
-	output.close();
-
-	fname = output_path + "electron_nb_density_test.txt";
-	output.open(fname.c_str());
-	output << scientific;
-	output.precision(3);
-
-	output << left << "!The initial number density of electrons, from initial and rebinned spectra," << endl
-		<< "!Layer nb, number density (file), number density (re-binned) [cm-3]:" << endl;
-
-	for (l = 0; l < nb_l; l++)
-	{
-		x = 0.;
 		for (i = 0; i < en_nb_f; i++) {
-			x += file_data[l].arr[i] * (en_grid_file[i + 1] - en_grid_file[i]);
-		}
-		output << left << setw(5) << l << setw(12) << x;
+			output.precision(5);
+			output << left << setw(14) << en_grid_file[i] * 1.0001;
 
-		x = 0.;
-		for (i = 0; i < en_nb; i++) {
-			x += init_data[l].arr[i] * (en_grid[i + 1] - en_grid[i]);
+			output.precision(3);
+			output << left << setw(12) << file_data[lay_nb_test].arr[i] << endl;
+
+			output.precision(5);
+			output << left << setw(14) << en_grid_file[i + 1];
+
+			output.precision(3);
+			output << left << setw(12) << file_data[lay_nb_test].arr[i] << endl;
 		}
-		output << left << setw(12) << x << endl;
+		output.close();
+
+		fname = output_path + "electron_spectra_init.txt";
+		output.open(fname.c_str());
+		output << scientific;
+
+		output << left << "!Initial electron spectra in simulations," << endl
+			<< "!Histogram, energy (eV), spectra [cm-3 eV-1], layer nb: " << lay_nb_test << endl;
+
+		for (i = 0; i < en_nb; i++) {
+			output.precision(5);
+			output << left << setw(14) << en_grid[i] * 1.0001;
+
+			output.precision(3);
+			output << left << setw(12) << init_data[lay_nb_test].arr[i] << endl;
+
+			output.precision(5);
+			output << left << setw(14) << en_grid[i + 1];
+
+			output.precision(3);
+			output << left << setw(12) << init_data[lay_nb_test].arr[i] << endl;
+		}
+		output.close();
+
+		fname = output_path + "electron_nb_density_test.txt";
+		output.open(fname.c_str());
+		output << scientific;
+		output.precision(3);
+
+		output << left << "!The initial number density of electrons, from initial and rebinned spectra," << endl
+			<< "!Layer nb, number density (file), number density (re-binned) [cm-3]:" << endl;
+
+		for (l = 0; l < nb_l; l++)
+		{
+			x = 0.;
+			for (i = 0; i < en_nb_f; i++) {
+				x += file_data[l].arr[i] * (en_grid_file[i + 1] - en_grid_file[i]);
+			}
+			output << left << setw(5) << l << setw(12) << x;
+
+			x = 0.;
+			for (i = 0; i < en_nb; i++) {
+				x += init_data[l].arr[i] * (en_grid[i + 1] - en_grid[i]);
+			}
+			output << left << setw(12) << x << endl;
+		}
+		output.close();
 	}
-	output.close();
 }
 
 //
@@ -1998,4 +2411,5 @@ void init_h2_population_density(const string& path, vector<dynamic_array>& d, ve
 	}
 	input.close();
 }
+
 

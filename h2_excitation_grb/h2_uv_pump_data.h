@@ -14,6 +14,9 @@ const std::string H2_ELECTRONIC_STATE_NAMES[] = { "B1Su", "C1Pu", "Bp1Su", "D1Pu
 // Maximal number of rotational levels of the ground electronic state X1Sg (for vibrational state v = 0),
 #define MAX_NB_J_H2 32  // 0,1,..,31
 
+// Maximal number of ro-vibrational levels of the ground electronic state X1Sg
+#define MAX_NB_H2_ROVIBR_X1SG 302  // Roueff et al. A&A 630, A58, 2019
+
 // Nb of vibrational states of electronic state taken into account,
 // this nb is reconciled with CLOUDY data (reference in CLOUDY files, Abgrall et al., A&AS, 141, 297-300, 2000);
 #define MAX_NB_H2_VSTATES_X1SG 15   // 0,1,..,14 (including) in CLOUDY, the same as in Dabrowski, Can. J. Phys. 62, p. 1639, 1984

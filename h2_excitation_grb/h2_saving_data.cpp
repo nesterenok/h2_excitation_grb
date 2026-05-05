@@ -16,7 +16,7 @@
 using namespace std;
 
 
-void save_model_parameters_mono(const std::string& output_path, double conc_h_tot, double op_ratio_h2, double ioniz_fract, 
+void save_model_parameters_mono(const std::string& output_path, double conc_h_tot, double pop_j0, double pop_j1, double ioniz_fract,
 	double he_abund, double electron_conc, double electron_energy)
 {
 	time_t timer;
@@ -38,7 +38,7 @@ void save_model_parameters_mono(const std::string& output_path, double conc_h_to
 	output << left << "!Gas parameters:" << endl
 		<< "!H nuclei concentration [cm-3]:" << endl << conc_h_tot << endl
 		<< "!Initial H2 concentration [cm-3]:" << endl << 0.5 * conc_h_tot << endl
-		<< "!Initial H2 OPR:" << endl << op_ratio_h2 << endl;
+		<< "!Initial H2 populations (v = 0, j = 0 and j = 1):" << endl << setw(14) << pop_j0 << setw(14) << pop_j1 << endl;
 	
 	output << "!He abundance:" << endl << he_abund << endl
 		<< "!Electron concentration [cm-3]:" << endl << electron_conc << endl
@@ -65,8 +65,8 @@ void save_model_parameters_mono(const std::string& output_path, double conc_h_to
 	output.close();
 }
 
-void save_model_parameters(const std::string& output_path,  double conc_h_tot, double op_ratio_h2, double ioniz_fract, double dust_gas_mass_ratio, 
-	double grain_radius, double grain_nb_density, double grb_cloud_distance, double grb_distance, double hcolumn_dens, int layer_nb)
+void save_model_parameters_grb_xrays(const std::string& output_path,  double conc_h_tot, double op_ratio_h2, double ioniz_fract, double dust_gas_mass_ratio, 
+	double grain_radius, double grain_nb_density, double grb_cloud_distance, double grb_distance, double hcolumn_density, int layer_nb)
 {
 	time_t timer;
 	char* ctime_str;
@@ -88,8 +88,9 @@ void save_model_parameters(const std::string& output_path,  double conc_h_tot, d
 		output << left << "!Molecular cloud parameters:" << endl
 			<< "!Cloud layer number:" << endl << layer_nb << endl
 			<< "!Distance from the GRB source to the cloud boundary [pc]:" << endl << grb_cloud_distance / PARSEC << endl
-			<< "!Distance from the GRB source to the centre of the cloud layer [pc]:" << endl << grb_distance / PARSEC << endl
-			<< "!H column density passed by the GRB, from the cloud boundary to the cloud layer centre [cm-2]:" << endl << hcolumn_dens << endl;
+			<< "!Distance from the GRB source to the centre of the cloud layer [pc]:" << endl 
+			<< setprecision(7) << grb_distance / PARSEC << setprecision(5) << endl
+			<< "!H column density passed by the GRB, from the cloud boundary to the cloud layer centre [cm-2]:" << endl << hcolumn_density << endl;
 	}
 	output << left << "!Gas parameters:" << endl
 		<< "!H nuclei concentration [cm-3]:" << endl << conc_h_tot << endl
@@ -258,14 +259,16 @@ void save_specimen_conc_evolution(const string& output_path, const vector<double
 
 
 void save_h2_populations_evolution(const string& output_path, const vector<double>& time_moments,
-	const vector<dynamic_array>& h2_popdens_data, const vector<dynamic_array>& h2_popdens_v_data, double conc_h_tot, int nb_lev_h2)
+	const vector<dynamic_array>& h2_popdens_data, double conc_h_tot, int nb_lev_h2, string id)
 {
-	int i, l, v;
+	int i, l;
 	double w;
 	string fname;
 	ofstream output;
 
-	fname = output_path + "h2grb_popdens.txt";
+	fname = output_path + "h2grb_popdens";
+	fname += id;
+	fname += ".txt";
 	output.open(fname.c_str());
 
 	output << scientific;
@@ -276,10 +279,10 @@ void save_h2_populations_evolution(const string& output_path, const vector<doubl
 		<< "!second row: level nb," << endl;
 
 	output << left << "! " << setw(15) << conc_h_tot << setw(7) << (int)h2_popdens_data.size() << setw(7) << nb_lev_h2 << endl;
-	
+
 	output << left << setw(13) << "!time(s)";
 	for (i = 1; i <= nb_lev_h2; i++) {
-		output << left << setw(12) << i;
+		output << left << setw(10) << i;
 	}
 	output << endl;
 
@@ -287,20 +290,34 @@ void save_h2_populations_evolution(const string& output_path, const vector<doubl
 		output.precision(4);
 		output << left << setw(13) << time_moments[l];
 
-		output.precision(3);
-		for (i = 0; i < nb_lev_h2; i++) 
-		{
+		for (i = 0; i < nb_lev_h2; i++) {
+			output.precision(3);
 			w = h2_popdens_data[l].arr[i];
+			
 			if (w < MINIMAL_ABUNDANCE) {
 				w = MINIMAL_ABUNDANCE;
 			}
-			output << left << setw(12) << w;
+			if (w < ABS_POPULATION_ERROR_SOLVER) {
+				output.precision(1);
+			}
+			output << left << w << " ";
 		}
 		output << endl;
 	}
 	output.close();
+}
 
-	fname = output_path + "h2grb_popdens_v.txt";
+void save_h2_vibr_populations_evolution(const string& output_path, const vector<double>& time_moments,
+	const vector<dynamic_array>& h2_popdens_v_data, double conc_h_tot, int nb_lev_h2, string id)
+{
+	int l, v;
+	double w;
+	string fname;
+	ofstream output;
+
+	fname = output_path + "h2grb_popdens_v";
+	fname += id;
+	fname += ".txt";
 	output.open(fname.c_str());
 
 	output << scientific;
@@ -609,8 +626,8 @@ void save_electronic_states_excit_rates(const string& output_path, double conc_h
 
 
 void save_vibrational_states_excit_rates(const string& output_path, double conc_h_tot, const vector<double>& time_moments,
-	const vector<dynamic_array>& h2_electr_vstates_rate_arr,
-	const vector<dynamic_array>& h2_vibr_vstates_rate_arr, 
+	const vector<dynamic_array>& h2_electr_excit_vstates_rate_arr,
+	const vector<dynamic_array>& h2_vibr_excit_vstates_rate_arr, 
 	const vector<double>& h2_excit_rot_rate_arr)
 {
 	int i, j;
@@ -623,14 +640,14 @@ void save_vibrational_states_excit_rates(const string& output_path, double conc_
 	output << scientific;
 	output.precision(3);
 
-	output << left << "!Excitation of vibrational states of the ground electronic state," << endl
+	output << left << "!Excitation of vibrational states of the ground electronic state as a function of time," << endl
 		<< "!First parameter - pure rotational excitation [cm-3 s-1], from v= 0, j = 0 or j = 1, to level with j > 1" << endl
 		<< "!For each vibration state (0,1,...14) two parameters:" << endl
 		<< "!1. Vibrational excitation rate, vi = 0 -> vf, vi < vf (within the ground electronic state) [cm-3 s-1]," << endl
 		<< "!2. Excitation rate of vibration state through electronic excitation [cm-3 s-1]," << endl;
 
 	output << left << "!H nuclei concentration [cm-3], nb of times," << endl
-		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)h2_vibr_vstates_rate_arr.size() << endl;
+		<< "! " << setw(15) << conc_h_tot << setw(7) << (int)h2_vibr_excit_vstates_rate_arr.size() << endl;
 
 	output << left << setw(12) << "!time(s)" << setw(14) << "rot";
 	for (j = 0; j < MAX_NB_H2_VSTATES_X1SG; j++) {
@@ -638,11 +655,11 @@ void save_vibrational_states_excit_rates(const string& output_path, double conc_
 	}
 	output << endl;
 
-	for (i = 0; i < (int)h2_vibr_vstates_rate_arr.size(); i++) {
+	for (i = 0; i < (int)h2_vibr_excit_vstates_rate_arr.size(); i++) {
 		output << left << setw(12) << time_moments[i] << setw(14) << h2_excit_rot_rate_arr[i];
 
 		for (j = 0; j < MAX_NB_H2_VSTATES_X1SG; j++) {
-			output << left << setw(12) << h2_vibr_vstates_rate_arr[i].arr[j] << setw(14) << h2_electr_vstates_rate_arr[i].arr[j];
+			output << left << setw(12) << h2_vibr_excit_vstates_rate_arr[i].arr[j] << setw(14) << h2_electr_excit_vstates_rate_arr[i].arr[j];
 		}
 		output  << endl;
 	}
@@ -650,33 +667,23 @@ void save_vibrational_states_excit_rates(const string& output_path, double conc_
 }
 
 
-void save_output_parameters(const string& output_path, double conc_h_tot, const vector<double>& electron_energies_grid, const vector<double>& electron_energy_bin_size,
-	const vector<dynamic_array>& spectrum_data,
+void save_output_parameters_mono(const string& output_path, double conc_h_tot, double pop_j0, double pop_j1, double electron_conc, double electron_energy,
 	const vector<dynamic_array>& conc_data,
 	const vector<energy_loss_data_unit>& enloss_int_arr,
 	vector< array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES>>& h2_state_data_arr,
-	const vector<dynamic_array> & h2_electr_vstates_arr,
-	const vector<dynamic_array> & h2_vibr_vstates_arr, 
+	const vector<dynamic_array> & h2_electr_excit_vstates_arr,
+	const vector<dynamic_array> & h2_vibr_excit_vstates_arr, 
 	const std::vector<double>& h2_excit_rot_arr, 
 	const std::vector<double>& hei_excit_arr, 
 	const std::vector<double>& energy_in_rovibr_levels_arr)
 {
 	bool do_files_exist = false;
-	int j, nb_of_el_energies;
-	double x, energy, nb_density, nb_ions, nb_h_ions, nb_he_ions, energy_in_rovibr, heating_effic, diss_heat_singlet, diss_heat_triplet, 
+	int j;
+	double x, nb_ions, nb_h_ions, nb_he_ions, energy_in_rovibr, heating_effic, diss_heat_singlet, diss_heat_triplet, 
 		total_electr_excit, total_diss;
 
 	string fname;
 	ofstream output;
-
-	nb_of_el_energies = (int)electron_energy_bin_size.size();
-
-	// Energy in electrons, number density of electrons at the start of simulations,
-	energy = nb_density = 0.;
-	for (j = 0; j < nb_of_el_energies; j++) {
-		energy += spectrum_data.front().arr[j] * 0.5 * (electron_energies_grid[j] + electron_energies_grid[j + 1]);  // [eV cm-3]
-		nb_density += spectrum_data.front().arr[j];  // [cm-3]
-	}
 
 	// simple species are: "e-", "H", "H+", "H2", "H2+", "He", "He+", "He++"
 	// number density of ions at the start of the simulations,
@@ -701,7 +708,7 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 	energy_in_rovibr = energy_in_rovibr_levels_arr.back() - energy_in_rovibr_levels_arr.front();  // [eV cm-3]
 
 	heating_effic = (fabs(enloss_int_arr.back().mt) + fabs(enloss_int_arr.back().coulomb) + enloss_int_arr.back().neutral_coll_heating
-		+ energy_in_rovibr) / energy;  // dimensionless, including energy in H2 rotational levels, that had no time to decay,
+		+ energy_in_rovibr) / (electron_conc * electron_energy);  // dimensionless, including energy in H2 rotational levels, that had no time to decay,
 	
 	diss_heat_singlet = diss_heat_triplet = 0.;
 	for (j = 0; j < NB_EXC_ELECTRONIC_SINGLET_STATES; j++) {
@@ -711,8 +718,8 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 		diss_heat_triplet += (h2_state_data_arr.back())[j].diss_heat_input;  // [eV cm-3]
 	}
 
-	diss_heat_singlet /= energy;  // dimensionless
-	diss_heat_triplet /= energy;  // dimensionless
+	diss_heat_singlet /= electron_conc * electron_energy;  // dimensionless
+	diss_heat_triplet /= electron_conc * electron_energy;  // dimensionless
 	
 	// rate of excitation to all H2 electronic states (WITH excitations to dissociation continuum) [cm-3]
 	total_electr_excit = total_diss = 0.;
@@ -749,7 +756,8 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 	if (!do_files_exist) {
 		output << left << "!Parameters of the electron energy degradation," << endl
 			<< "!H nuclei concentration [cm-3]: " << conc_h_tot << endl
-			<< "!Initial number of electrons [cm-3]: " << nb_density << endl
+			<< "!Initial populations of energy levels v = 0, j = 0 and j = 1: " << setw(14) << pop_j0 << setw(14) << pop_j1 << endl
+			<< "!Initial number of electrons [cm-3]: " << electron_conc << endl
 			<< "!1. Initial electron energy E [eV]" << endl
 			<< "!2. Number density of ions (secondary electrons) [cm-3] (H+, H2+, He+, 2*He++)" << endl
 			<< "!3. Mean energy per ion pair (per secondary electron) W [eV]" << endl
@@ -784,19 +792,19 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 		}
 		output << endl;
 	}
-	output << left << setw(13) << energy / nb_density
+	output << left << setw(13) << electron_energy
 		<< setw(13) << nb_ions
-		<< setw(13) << energy / nb_ions
-		<< setw(13) << nb_ions / energy
+		<< setw(13) << electron_conc * electron_energy / nb_ions
+		<< setw(13) << nb_ions / (electron_conc * electron_energy)
 		<< setw(13) << heating_effic
 		<< setw(13) << diss_heat_singlet
 		<< setw(13) << diss_heat_singlet + diss_heat_triplet
-		<< setw(16) << energy_in_rovibr / energy
+		<< setw(16) << energy_in_rovibr / (electron_conc * electron_energy)
 
-		<< setw(13) << fabs(enloss_int_arr.back().vibr) / energy
-		<< setw(13) << fabs(enloss_int_arr.back().vibr_01) / energy
-		<< setw(13) << h2_vibr_vstates_arr.back().arr[2] / h2_vibr_vstates_arr.back().arr[1]
-		<< setw(16) << fabs(enloss_int_arr.back().rot) / energy;
+		<< setw(13) << fabs(enloss_int_arr.back().vibr) / (electron_conc * electron_energy)
+		<< setw(13) << fabs(enloss_int_arr.back().vibr_01) / (electron_conc * electron_energy)
+		<< setw(13) << h2_vibr_excit_vstates_arr.back().arr[2] / h2_vibr_excit_vstates_arr.back().arr[1]
+		<< setw(16) << fabs(enloss_int_arr.back().rot) / (electron_conc * electron_energy);
 		
 	output << left << setw(13) << hei_excit_arr.back() / nb_he_ions;
 	
@@ -805,21 +813,21 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 	if (x < 1.e-99) {
 		x = 1.e-99;
 	}
-	output << left << setw(13) << energy / x;
+	output << left << setw(13) << electron_conc * electron_energy / x;
 
 	// H2+
 	x = conc_data.back().arr[4] - conc_data.front().arr[4];
 	if (x < 1.e-99) {
 		x = 1.e-99;
 	}
-	output << left << setw(13) << energy / x;
+	output << left << setw(13) << electron_conc * electron_energy / x;
 
 	// H+
 	x = conc_data.back().arr[2] - conc_data.front().arr[2];
 	if (x < 1.e-99) {
 		x = 1.e-99;
 	}
-	output << left << setw(16) << energy / x;
+	output << left << setw(16) << electron_conc * electron_energy / x;
 
 	// H2 parameters:
 	output << left 
@@ -829,9 +837,9 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 
 	output.close();
 
-
+	//
 	// Excitation of H2 electronic states
-	fname = output_path + "h2grb_output_electr_excit.txt";
+	fname = output_path + "h2grb_output_excit_electr_states.txt";
 	output.open(fname.c_str(), ios_base::app);
 
 	output << scientific;
@@ -839,8 +847,9 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 
 	if (!do_files_exist) {
 		output << left << "!Dissociations/excitations for each of the electronic states [cm-3]," << endl
-			<< "!H nuclei concentration [cm-3]: " << conc_h_tot << endl 
-			<< "!Initial number of electrons [cm-3]: " << nb_density << endl
+			<< "!H nuclei concentration [cm-3]: " << conc_h_tot << endl
+			<< "!Initial populations of energy levels v = 0, j = 0 and j = 1: " << setw(14) << pop_j0 << setw(14) << pop_j1 << endl
+			<< "!Initial number of electrons [cm-3]: " << electron_conc << endl
 			<< "!1. Initial electron energy E [eV]" << endl
 			<< "!2. total_exc  - Excitations to all H2 electronic states (WITH excitations to dissociation continuum) [cm-3];" << endl
 			<< "!3. total_diss - Dissociations (excitations to dissociation continuum, triplet states, Solomon process) [cm-3];" << endl
@@ -863,18 +872,18 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 		output << endl;
 	}
 
-	output << left << setw(13) << energy / nb_density << setw(13) << total_electr_excit << setw(13) << total_diss;
+	output << left << setw(13) << electron_energy << setw(13) << total_electr_excit << setw(13) << total_diss;
 	for (j = 0; j < NB_EXC_ELECTRONIC_STATES; j++) {
 		output << left << setw(13) << (h2_state_data_arr.back())[j].excit
 			<< setw(13) << (h2_state_data_arr.back())[j].direct_diss
 			<< setw(13) << (h2_state_data_arr.back())[j].twostep_diss
-			<< setw(15) << -((h2_state_data_arr.back())[j].enloss_excit + (h2_state_data_arr.back())[j].enloss_direct_diss) / energy;
+			<< setw(15) << -((h2_state_data_arr.back())[j].enloss_excit + (h2_state_data_arr.back())[j].enloss_direct_diss) / (electron_conc * electron_energy);
 	}
 	output << endl;
 	output.close();
 
 	// Excitation of vibration states,
-	fname = output_path + "h2grb_output_vibr_excit.txt";
+	fname = output_path + "h2grb_output_excit_vibr_states.txt";
 	output.open(fname.c_str(), ios_base::app);
 
 	output << scientific;
@@ -883,7 +892,8 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 	if (!do_files_exist) {
 		output << left << "!Excitation of vibrational states of the ground electronic state," << endl
 			<< "!H nuclei concentration [cm-3]: " << conc_h_tot << endl
-			<< "!Initial number of electrons [cm-3]: " << nb_density << endl
+			<< "!Initial populations of energy levels v = 0, j = 0 and j = 1: " << setw(14) << pop_j0 << setw(14) << pop_j1 << endl
+			<< "!Initial number of electrons [cm-3]: " << electron_conc << endl
 			<< "!1. Initial electron energy E [eV]" << endl
 			<< "!There are two parameters for each vibration state v = 0,1,...14:" << endl
 			<< "!1. v1 vibrational excitation, vi = 0 -> vf, vi < vf (within the ground electronic state) [cm-3]," << endl
@@ -899,19 +909,139 @@ void save_output_parameters(const string& output_path, double conc_h_tot, const 
 		output << endl;
 	}
 	
-	output << left << setw(13) << energy / nb_density 
-		<< setw(13) << h2_excit_rot_arr.back() << setw(15) << h2_electr_vstates_arr.back().arr[0];
+	output << left << setw(13) << electron_energy 
+		<< setw(13) << h2_excit_rot_arr.back() << setw(15) << h2_electr_excit_vstates_arr.back().arr[0];
 	
 	for (j = 1; j < MAX_NB_H2_VSTATES_X1SG; j++) {
-		output << left << setw(13) << h2_vibr_vstates_arr.back().arr[j] 
-			<< setw(15) << h2_electr_vstates_arr.back().arr[j];
+		output << left << setw(13) << h2_vibr_excit_vstates_arr.back().arr[j] 
+			<< setw(15) << h2_electr_excit_vstates_arr.back().arr[j];
 	}
 	output << endl;
 	output.close();
 }
 
 
-// Not used
+void save_output_excitation_yields(const string& output_path, double conc_h_tot, double pop_j0, double pop_j1, double electron_conc, double electron_energy,
+	const vector<dynamic_array>& h2_electr_excit_xlevels_arr, const vector<dynamic_array>& h2_vibr_excit_xlevels_arr)
+{
+	bool do_files_exist;
+	int j;
+
+	string fname;
+	ofstream output;
+
+	fname = output_path + "h2grb_output_xlevels_vibr_excit.txt";
+
+	// Checking if files exist
+	ifstream fcheck(fname.c_str());
+	if (fcheck.good()) {
+		do_files_exist = true;
+	}
+	else {
+		do_files_exist = false;
+	}
+
+	output.open(fname.c_str(), ios_base::app);
+	output << scientific;
+	output.precision(4);
+
+	if (!do_files_exist) {
+		output << left << "!Direct vibrational excitation of energy levels of the ground electronic state," << endl
+			<< "!H nuclei concentration [cm-3]: " << conc_h_tot << endl
+			<< "!Initial populations of energy levels v = 0, j = 0 and j = 1: " << setw(14) << pop_j0 << setw(14) << pop_j1 << endl
+			<< "!Initial number of electrons [cm-3]: " << electron_conc << endl
+			<< "!First row - level number," << endl
+			<< "!1. Initial electron energy E [eV] 2. Direct vibrational excitation, (vi = 0, ji) -> (vf, jf) (within the ground electronic state) [cm-3]" << endl
+			<< "!Number of levels:" << endl << MAX_NB_H2_ROVIBR_X1SG << endl;
+
+		output << left << setw(13) << "!Energy";
+		for (j = 1; j <= MAX_NB_H2_ROVIBR_X1SG; j++) {
+			output << left << setw(12) << j;  // level nb starting from 1
+		}
+		output << endl;
+	}
+
+	output << left << setw(13) << electron_energy;
+	output.precision(3);
+	
+	for (j = 0; j < MAX_NB_H2_ROVIBR_X1SG; j++) {
+		output << left << setw(12) << h2_vibr_excit_xlevels_arr.back().arr[j];
+	}
+	output << endl;
+	output.close();
+
+
+	fname = output_path + "h2grb_output_xlevels_electr_excit.txt";
+	output.open(fname.c_str(), ios_base::app);
+
+	output << scientific;
+	output.precision(4);
+
+	if (!do_files_exist) {
+		output << left << "!Electronic excitation of energy levels of the ground electronic state," << endl
+			<< "!H nuclei concentration [cm-3]: " << conc_h_tot << endl
+			<< "!Initial populations of energy levels v = 0, j = 0 and j = 1: " << setw(14) << pop_j0 << setw(14) << pop_j1 << endl
+			<< "!Initial number of electrons [cm-3]: " << electron_conc << endl
+			<< "!First row - level number," << endl
+			<< "!1. Initial electron energy E [eV] 2. Excitation of energy levels through electronic excitation [cm-3]" << endl
+			<< "!Number of levels:" << endl << MAX_NB_H2_ROVIBR_X1SG << endl;
+
+		output << left << setw(13) << "!Energy";
+		for (j = 1; j <= MAX_NB_H2_ROVIBR_X1SG; j++) {
+			output << left << setw(12) << j;
+		}
+		output << endl;
+	}
+
+	output << left << setw(13) << electron_energy;
+	output.precision(3);
+
+	for (j = 0; j < MAX_NB_H2_ROVIBR_X1SG; j++) {
+		output << left << setw(12) << h2_electr_excit_xlevels_arr.back().arr[j];
+	}
+	output << endl;
+	output.close();
+}
+
+
+void save_output_parameters_grb(const std::string& output_path, double conc_h_tot, 
+	double grb_cloud_distance, double grb_distance, double hcolumn_density, int lay_nb)
+{
+	bool do_files_exist = false;
+	string fname;
+	ofstream output;
+
+	// Saving the general parameters of the electron energy degradation,
+	fname = output_path + "h2grb_output_parameters.txt";
+
+	// Checking if files exist
+	ifstream fcheck(fname.c_str());
+	if (fcheck.good()) {
+		do_files_exist = true;
+	}
+	else {
+		do_files_exist = false;
+	}
+
+	output.open(fname.c_str(), ios_base::app);
+	output << scientific;
+	output.precision(5);
+
+	if (!do_files_exist) {
+		output << left << "!Parameters of the electron energy degradation after GRB in molecular cloud," << endl
+			<< "!H nuclei concentration [cm-3]: " << conc_h_tot << endl
+			<< "!Distance from the GRB source to the cloud boundary [pc]: " << grb_cloud_distance / PARSEC << endl
+			<< "!1. Distance in [cm] from the cloud boundary to the centre of the cloud layer (for which the simulations were performed);" << endl
+			<< "!2. H column density in [cm-2] from the cloud boundary to the centre of the cloud layer;" << endl
+			<< "!3. Cloud layer number;" << endl;
+	}
+	output << left << setw(14) << grb_distance - grb_cloud_distance << setw(14) << hcolumn_density 
+		<< setw(7) << lay_nb << endl;
+	output.close();
+}
+
+
+// is used in GRB electrons simulations
 void save_phys_param_evolution(const string& output_path, double conc_h_tot, const vector<double>& time_moments,
 	const vector<double>& neut_temp_arr, const vector<double>& ion_temp_arr, const vector<double>& dust_charge_arr,
 	const vector<dynamic_array>& conc_data)

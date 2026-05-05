@@ -18,7 +18,7 @@ void save_cross_section_table(const string& output_path, const string& data_path
 	const int vi = 0;
 	const double energy_min = 0.01;  // eV
 	const double energy_max = 1.e+7;
-	const int nb_of_bins_per_order = 100;
+	const int nb_of_bins_per_order = 200;
 
 	bool is_extrapolation_on;
 	int i, k, nb_of_energies, lf, vf, dj, electronic_state, isotope, nb_lev_h2, nb_lev_h2_b, nb_lev_h2_bp, nb_lev_h2_ef,

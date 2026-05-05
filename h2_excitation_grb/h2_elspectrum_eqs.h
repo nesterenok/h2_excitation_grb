@@ -100,8 +100,11 @@ protected:
     double grain_cs, grain_nb_density, conc_n, conc_i, nb_gain_n, nb_gain_i, energy_gain_n, energy_gain_e;
 
     electronic_excitation_data_unit h2_state_data[NB_EXC_ELECTRONIC_STATES];
-    double h2_electronic_exc_vstates[MAX_NB_H2_VSTATES_X1SG];
-    double h2_vibrational_exc_vstates[MAX_NB_H2_VSTATES_X1SG];
+    double h2_electr_excit_vstates[MAX_NB_H2_VSTATES_X1SG];
+    double h2_vibr_excit_vstates[MAX_NB_H2_VSTATES_X1SG];
+
+    double h2_electr_excit_xlevels[MAX_NB_H2_ROVIBR_X1SG];
+    double h2_vibr_excit_xlevels[MAX_NB_H2_ROVIBR_X1SG];
 
     energy_loss_data_unit enloss_data;
 
@@ -178,7 +181,8 @@ protected:
     // dj = +-1, +-3, +-5 for X->B
     void derivatives_h2_electronic_sg_su(const realtype* y_data, realtype* ydot_data, const energy_diagram* h2_di_exc,
         const std::vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb,
-        double& enloss_rate, double& excit_rate, double& diss_rate, double& th_energy_deriv, double (&vstate_exc)[MAX_NB_H2_VSTATES_X1SG], double scaling_factor);
+        double& enloss_rate, double& excit_rate, double& diss_rate, double& th_energy_deriv, 
+        double (&excit_vstates)[MAX_NB_H2_VSTATES_X1SG], double(&excit_xlevels)[MAX_NB_H2_ROVIBR_X1SG], double scaling_factor);
 
     // 1Sg(X) -> 1Pu(C), 1Pu(D), dL = 1, sigma gerade - pi ungerade transitions
     // dj = 0, +-2, +-4 for X->C-; dj = +-1, +-3, +-5 for X->C+
@@ -186,13 +190,14 @@ protected:
         const energy_diagram* h2_di_plus, const energy_diagram* h2_di_minus,
         const std::vector<h2_energy_level_param> h2_state_plus_data, const std::vector<h2_energy_level_param> h2_state_minus_data, double** rates, 
         int vibr_qnb_final_max, int el_min_nb, double& enloss_rate, double& excit_rate, double& diss_rate, double& th_energy_deriv, 
-        double(&vstate_exc)[MAX_NB_H2_VSTATES_X1SG], double scaling_factor);
+        double(&excit_vstates)[MAX_NB_H2_VSTATES_X1SG], double(&excit_xlevels)[MAX_NB_H2_ROVIBR_X1SG], double scaling_factor);
 
     // 1Sg(X) -> 1Sg(EF), sigma gerade - sigma gerade,
     // dj = 0, +-2, +-4 for X->EF
     void derivatives_h2_electronic_sg_sg(const realtype* y_data, realtype* ydot_data, const energy_diagram* h2_di_exc,
         const std::vector<h2_energy_level_param> h2_exc_state_data, double** rates, int vibr_qnb_final_max, int el_min_nb,
-        double& enloss_rate, double& excit_rate, double& diss_rate, double& th_energy_deriv, double(&vstate_exc)[MAX_NB_H2_VSTATES_X1SG], double scaling_factor);
+        double& enloss_rate, double& excit_rate, double& diss_rate, double& th_energy_deriv, 
+        double(&excit_vstates)[MAX_NB_H2_VSTATES_X1SG], double(&excit_xlevels)[MAX_NB_H2_ROVIBR_X1SG], double scaling_factor);
 
     // for triplet state 3Sg+(a),
     // parameters with & are NOT summed
@@ -217,14 +222,14 @@ protected:
 
     // parameters with & are NOT summed
     void derivatives_h2_rotational_exc(const realtype* y_data, realtype* ydot_data, double**& rates, double& enloss_rate, double& enloss_rate_pos, 
-        double & excit_rate);
+        double(&excit_xlevels)[MAX_NB_H2_ROVIBR_X1SG], double & excit_rate);
 
     // H2 ro-vibrational excitation, vibration nb initial != final,
     void init_tables_h2_rovibr_exc(cross_section_table_mccc**, double**& rates, int verbosity = 1);
 
     // parameters with & are NOT summed (with exception of vstate_exc)
     void derivatives_h2_rovibr_exc(const realtype* y_data, realtype* ydot_data, double**& rates, double& enloss_rate, double& enloss_rate_01, double& enloss_rate_pos,
-        double(&vstate_exc)[MAX_NB_H2_VSTATES_X1SG]);
+        double(&excit_vstates)[MAX_NB_H2_VSTATES_X1SG], double(&excit_xlevels)[MAX_NB_H2_ROVIBR_X1SG]);
 
     // All data relevant to HeI excitation are initialized in this subroutine, no input parameters, class members are used,
     // data by Ralchenko et al. Atomic Data and Nuclear Data Tables 94, 603 (2008),
@@ -256,8 +261,9 @@ public:
     void get_el_energy_losses(energy_loss_data_unit &, double& h2_rot_p, double& h2_vibr_p) const;
     
     void get_h2_state_data(std::array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES> &);
-    void get_h2_excitation_rates(dynamic_array & electr_vstate_exc, dynamic_array & vibr_vstate_exc,
+    void get_h2_excitation_rates(dynamic_array & electr_excit_vstate, dynamic_array & vibr_excit_vstate,
         double & excit_rot_rate, double & hei_excit);
+    void get_h2_excitation_rates(dynamic_array& electr_excit_xlevels, dynamic_array& vibr_excit_xlevels);
 
     // returns energy in [eV cm-3] locked in ro-vibrational data:
     double get_energy_h2_rovibr(N_Vector y);
@@ -272,10 +278,6 @@ public:
     const energy_diagram* get_pointer_h2_levels() const { return h2_di; }
     const energy_level & get_level_reference(int level_nb) const;
 
-    // saving h2 level quantum numbers and energies of the ground electronic state, for which data are saved,
-    // put outside this class?
-    void save_h2_levels_used(const std::string& output_path);
-
     void set_tolerances(N_Vector abs_tol);
 
     // total H nuclei concentration in cm-3, ionization fraction xe = ne / conc_h_tot;
@@ -283,4 +285,31 @@ public:
         const std::vector<double> &electron_energies_grid, int verb);
 
     ~elspectra_evolution_data();
+};
+
+// saving H2 level quantum numbers and energies of the ground electronic state, for which data are saved,
+void save_h2_levels_used(const std::string& output_path, const energy_diagram &);
+
+
+class h2_population_evolution_data {
+protected:
+    int verbosity, nb_lev_h2;
+   
+    const energy_diagram * h2_di;
+    const einstein_coeff* h2_einst;
+
+public:
+    // function defining the ODE system for the evolution of the parameters
+    int f(realtype t, N_Vector y, N_Vector ydot);
+    void set_tolerances(N_Vector abs_tol);
+
+    int get_nb_of_h2_lev() const { return nb_lev_h2; }
+    int get_level_nb_h2(int v, int j) const;  // returns the nb of the H2 level belonging to the ground electronic state, 
+    int get_vibr_nb_h2(int level_nb) const;   // returns the vibration quantum nb of the ground electronic state of H2,
+
+     // returns energy in [eV cm-3] locked in ro-vibrational data:
+    double get_energy_h2_rovibr(N_Vector y);
+
+    h2_population_evolution_data(const std::string& data_path, const std::string& output_path, int verb);
+    ~h2_population_evolution_data();
 };

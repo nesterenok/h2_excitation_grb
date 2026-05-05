@@ -45,6 +45,7 @@ const std::string chemical_species[] = { "e-", "H", "H+", "H2", "H2+", "He", "He
 
 // time nb per order is used to initiate the time grid,
 // this number can not be very large (otherwise the data arrays with electron spectra will be large);
+// one has to integrate over time in the luminosity calculations, time grid must be sufficiently fine,
 #define NB_OF_BINS_PER_ORDER_TIME 30
 #define NB_OF_TIME_STEPS 1  // for saving electron spectra, the spectra are saved with this step in time point numbers, 
 

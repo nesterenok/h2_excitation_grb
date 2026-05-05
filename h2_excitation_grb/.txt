@@ -1,0 +1,4 @@
+!Evolution of population densities [cm-3] of H2 energy levels,
+!first row: H nuclei concentration [cm-3], nb of times, number of levels,
+!second row: level nb,
+! 2.000000e+03   323    302    

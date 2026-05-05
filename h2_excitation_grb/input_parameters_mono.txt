@@ -12,8 +12,9 @@ C:/Users/Александр/Documents/Visual Studio 2019/h2_excitation_grb/h2_excitation_
 # this parameter defines the energy losses on thermal electrons, 
 # the number of thermal electrons does not change during the simulations,
 0.
-# ortho-to-para-H2 ratio,
-3.
+# normalized populations of energy levels (v,j) = (0,0) and (0,1), 
+# for example, the values in the case ortho-/para = 3 are: 0.25  0.75  
+1.  0.
 # Electron concentration, in [cm-3],
 0.01
 # Nb of electron energies to calculate

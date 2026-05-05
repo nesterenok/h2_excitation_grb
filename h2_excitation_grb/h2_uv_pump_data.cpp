@@ -34,9 +34,9 @@ void h2_band_transitions(const std::string& path, std::vector<transition>& einst
 	stringstream ss;
 	transition* trans;
 
-	if (verbosity)
+	if (verbosity) {
 		cout << "H2 molecule radiative coefficients are being initializing..." << endl;
-
+	}
 	if (h2_excited_di->electronic_state == 1) {
 		name = "B";
 		fname = path + "h2_cloudy_data/transprob_B.dat";
@@ -149,10 +149,12 @@ void print_statistics(string output_path, string name, const std::vector<transit
 
 	for (i = 0; i < (int)einstein_coeff_vector.size(); i++) {
 		j = (int) (log(einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV / en_min) / log(x));
-		if (j < 0)
+		if (j < 0) {
 			j = 0;
-		if (j > nb - 1)
+		}
+		if (j > nb - 1) {
 			j = nb - 1;
+		}
 		arr[j]++;
 
 		if (einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV < trans_en_low) {
@@ -166,11 +168,13 @@ void print_statistics(string output_path, string name, const std::vector<transit
 		if (einstein_coeff_vector[i].low_lev.el == 0 && einstein_coeff_vector[i].low_lev.v == 0 
 			&& (einstein_coeff_vector[i].low_lev.j == 0 || einstein_coeff_vector[i].low_lev.j == 1)) 
 		{
-			if (einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV < ground_trans_en_low)
+			if (einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV < ground_trans_en_low) {
 				ground_trans_en_low = einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV;
+			}
 
-			if (einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV > ground_trans_en_high)
+			if (einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV > ground_trans_en_high) {
 				ground_trans_en_high = einstein_coeff_vector[i].energy * CM_INVERSE_TO_EV;
+			}
 		}
 	}
 	

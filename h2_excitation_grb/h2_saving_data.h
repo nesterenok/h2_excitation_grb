@@ -9,11 +9,14 @@
 
 
 // Saving parameters of the model
-void save_model_parameters_mono(const std::string& output_path, double conc_h_tot, double op_ratio_h2, double ioniz_fract, 
+void save_model_parameters_mono(const std::string& output_path, double conc_h_tot, double pop_j0, double pop_j1, double ioniz_fract,
     double he_abund, double electron_conc, double electron_energy);
 
-void save_model_parameters(const std::string& output_path,  double conc_h_tot, double op_ratio_h2, double ioniz_fract, double dust_gas_mass_ratio, 
-    double grain_radius, double grain_nb_density, double grb_cloud_distance, double grb_distance, double hcolumn_dens, int layer_nb);
+// grb_cloud_distance - distance from the GRB source to the cloud boundary [cm],
+// grb_distance       - distance from the GRB source to the centre of the cloud layer [cm],
+// hcolumn_dens       - from the cloud boundary to the cloud layer centre [cm-2],
+void save_model_parameters_grb_xrays(const std::string& output_path,  double conc_h_tot, double op_ratio_h2, double ioniz_fract, double dust_gas_mass_ratio, 
+    double grain_radius, double grain_nb_density, double grb_cloud_distance, double grb_distance, double hcolumn_density, int layer_nb);
 
 
 // Evolution of electron spectrum with time,  
@@ -27,7 +30,10 @@ void save_specimen_conc_evolution(const std::string& output_path, const std::vec
 
 // H2 population densities [cm-3] as a function of time,
 void save_h2_populations_evolution(const std::string& output_path, const std::vector<double>& time_moments,
-    const std::vector<dynamic_array>& h2_popdens_data, const std::vector<dynamic_array>& h2_popdens_v_data, double conc_h_tot, int nb_lev_h2);
+    const std::vector<dynamic_array>& h2_popdens_data, double conc_h_tot, int nb_lev_h2, std::string id = "");
+
+void save_h2_vibr_populations_evolution(const std::string& output_path, const std::vector<double>& time_moments,
+    const std::vector<dynamic_array>& h2_popdens_v_data, double conc_h_tot, int nb_lev_h2, std::string id = "");
 
 // He level population densities [cm-3] as a function of time,
 void save_hei_populations_evolution(const std::string& output_path, const std::vector<double>& time_moments,
@@ -52,24 +58,33 @@ void save_electronic_states_excit_rates(const std::string& output_path, double c
 
 // Rate of excitations, [cm-3 s-1], as a function of time,
 void save_vibrational_states_excit_rates(const std::string& output_path, double conc_h_tot, const std::vector<double>& time_moments,
-    const std::vector<dynamic_array> & h2_electr_vstates_rate_arr, 
-    const std::vector<dynamic_array> & h2_vibr_vstates_rate_arr, 
+    const std::vector<dynamic_array> & h2_electr_excit_vstates_rate_arr, 
+    const std::vector<dynamic_array> & h2_vibr_excit_vstates_rate_arr, 
     const std::vector<double>& h2_excit_rot_rate_arr);
 
 
-void save_output_parameters(const std::string& output_path, double conc_h_tot, const std::vector<double>& electron_energies_grid, const std::vector<double>& electron_energy_bin_size,
-    const std::vector<dynamic_array>& spectrum_data,
+// electron energy in eV, electron concentration in [cm-3]
+void save_output_parameters_mono(const std::string& output_path, double conc_h_tot, double pop_j0, double pop_j1, double electron_conc, double electron_energy,
     const std::vector<dynamic_array>& conc_data,
     const std::vector<energy_loss_data_unit>& enloss_int_arr,
     std::vector< std::array<electronic_excitation_data_unit, NB_EXC_ELECTRONIC_STATES>> & h2_state_data_arr,
-    const std::vector<dynamic_array> & h2_electr_vstates_arr,
-    const std::vector<dynamic_array> & h2_vibr_vstates_arr, 
+    const std::vector<dynamic_array> & h2_electr_excit_vstates_arr,
+    const std::vector<dynamic_array> & h2_vibr_excit_vstates_arr, 
     const std::vector<double>& h2_excit_rot_arr, 
     const std::vector<double>& hei_excit_arr, 
     const std::vector<double>& energy_in_rovibr_levels_arr);
 
+void save_output_excitation_yields(const std::string& output_path, double conc_h_tot, double pop_j0, double pop_j1, double electron_conc, double electron_energy,
+    const std::vector<dynamic_array>& h2_electr_excit_xlevels_arr,
+    const std::vector<dynamic_array>& h2_vibr_excit_xlevels_arr);
 
-// Not used
+
+void save_output_parameters_grb(const std::string& output_path, double conc_h_tot, 
+    double grb_cloud_distance, double grb_distance, double hcolumn_density, int lay_nb);
+
+
+
+// is used in GRB electrons simulations
 void save_phys_param_evolution(const std::string& output_path, double conc_h_tot, const std::vector<double>& time_moments,
     const std::vector<double>& neut_temp_arr, const std::vector<double>& ion_temp_arr, const std::vector<double>& dust_charge_arr,
     const std::vector<dynamic_array>& conc_data);
